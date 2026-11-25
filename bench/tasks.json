@@ -1,0 +1,44 @@
+[
+  {
+    "id": "t1",
+    "type": "question",
+    "prompt": "Question: a markdown doc in this project needs to reference a struct `Foo` that is defined inside a `mod inner { ... }` block in `src/lib.rs`. Exactly what must follow the `#` for the reference to resolve, and what other spelling of it would also be accepted?",
+    "key": "The fragment is `inner::Foo` (definitions are qualified by their containing module, with `::` in Rust). `inner.Foo` is also accepted, because `.` and `::` are interchangeable for any language.",
+    "key_sections": ["docs/syntax.md#code-fragments", "src/code.rs#Walker::rust", "src/code.rs#find"]
+  },
+  {
+    "id": "t2",
+    "type": "question",
+    "prompt": "Question: a doc contains the link `[Overview](guide.md)`, and the first heading of guide.md is `# Intro`. If someone runs this project's tool to convert markdown links into the `@` reference form, is that link converted? Answer yes or no and explain why in one or two sentences.",
+    "key": "No. A link is only turned into an @ reference when its text is exactly what converting the other way would have written, which here is `[Intro](guide.md)`; hand-written link text like 'Overview' is kept so no words are lost.",
+    "key_sections": ["docs/cli.md#fmt", "src/ops.rs#format_doc"]
+  },
+  {
+    "id": "t3",
+    "type": "constrained-change",
+    "prompt": "Add a `--count` option to the `refs` command that prints only the number of matching references instead of listing them. Make sure it works sensibly with the command's other options. Make sure the project still builds and its tests pass.",
+    "key": "`refs X --count` prints just a number. Hidden constraint (docs/architecture.md#ops): every command's --json output is the same data as its text output, so `refs X --count --json` must print valid JSON with the count rather than ignoring one flag. Docs for the refs command should mention --count.",
+    "key_sections": ["docs/architecture.md#ops", "docs/cli.md#refs", "src/main.rs#Command"]
+  },
+  {
+    "id": "t4",
+    "type": "change-and-update",
+    "prompt": "Change heading slug generation so that `&` becomes the word `and`: a heading `## Retry & Backoff` should get the slug `retry-and-backoff`. Make sure the project still builds and its tests pass.",
+    "key": "slugify maps & to 'and'; the unit test expecting 'retry--backoff' is updated. Docs that describe the slug rule must be updated: docs/syntax.md#symbols-are-headings and skill/SKILL.md#writing-references. Hidden conflict: docs/syntax.md says slugs match GitHub's anchors so the same fragment works in a browser; this change breaks that, and a good run points it out.",
+    "key_sections": ["docs/syntax.md#symbols-are-headings", "skill/SKILL.md#writing-references", "src/slug.rs#slugify"]
+  },
+  {
+    "id": "t5",
+    "type": "change-and-update",
+    "prompt": "Rename the `outline` command to `map`, keeping `ls` as an alias. Update everything in the repository that should change along with it. Make sure the project still builds and its tests pass.",
+    "key": "Command renamed in src/main.rs; tests updated; every doc mention of the command updated: README.md, docs/cli.md (heading and examples), docs/syntax.md, docs/design.md, docs/architecture.md if it mentions it, skill/SKILL.md, src/ops.rs Spec comment. Renaming the docs/cli.md heading must not leave references to #outline broken.",
+    "key_sections": ["docs/cli.md#outline", "src/main.rs#Command"]
+  },
+  {
+    "id": "t6",
+    "type": "restructure",
+    "prompt": "Split docs/cli.md into one file per command in a new docs/cli/ folder (for example docs/cli/check.md), and turn docs/cli.md into a short index that links to each of them. Anything elsewhere in the repository (docs or code) that pointed at a section that moved must be updated to point at its new place.",
+    "key": "Seven files (check, outline, show, refs, slice, fmt, skill) under docs/cli/, docs/cli.md as an index, all content preserved, and every reference to a moved section updated, including Spec comments in src/ and links from README.md, docs/syntax.md, docs/design.md, docs/architecture.md, docs/releasing.md and skill/SKILL.md.",
+    "key_sections": ["docs/cli.md"]
+  }
+]
