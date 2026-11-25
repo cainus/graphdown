@@ -371,3 +371,17 @@ fn skill_prints_and_installs() {
     // The installed copy is hidden, so it is not checked as a project doc.
     assert!(p.run(&["check"]).1.contains("across 1 docs"));
 }
+
+#[test]
+fn check_can_print_github_annotations() {
+    let p = Project::new(&[("docs/a.md", "# A\n\nSee @docs/a#nope, then stop.\n")]);
+    let (code, out) = p.run(&["check", "--format", "github"]);
+    assert_eq!(code, 1, "{out}");
+    assert!(
+        out.starts_with(
+            "::error file=docs/a.md,line=3,col=5,title=broken reference @docs/a#nope::no heading `#nope` in docs/a.md\n"
+        ),
+        "{out}"
+    );
+    assert!(out.contains("1 broken"), "{out}");
+}

@@ -1,0 +1,54 @@
+name: graphdown check
+description: Fail the build when a markdown reference or link points at a heading, file or code symbol that doesn't exist, with inline annotations on the PR.
+author: cainus
+branding:
+  icon: link
+  color: blue
+
+inputs:
+  version:
+    description: >-
+      graphdown version to install, like 0.1.0. Defaults to the version in the
+      action's own ref when that is a release tag (cainus/graphdown@v0.1.0),
+      otherwise the latest release.
+    required: false
+    default: ""
+  working-directory:
+    description: Folder to run the check in. The project root is found from there.
+    required: false
+    default: "."
+  args:
+    description: Extra arguments for `graphdown check`.
+    required: false
+    default: ""
+
+runs:
+  using: composite
+  steps:
+    - name: Install graphdown
+      shell: bash
+      env:
+        VERSION: ${{ inputs.version }}
+        ACTION_REF: ${{ github.action_ref }}
+      run: |
+        if [ -z "$VERSION" ] && [[ "$ACTION_REF" =~ ^v[0-9]+\.[0-9]+\.[0-9]+ ]]; then
+          VERSION="${ACTION_REF#v}"
+        fi
+        if [ -z "$VERSION" ] || [ "$VERSION" = latest ]; then
+          base="https://github.com/cainus/graphdown/releases/latest/download"
+        else
+          base="https://github.com/cainus/graphdown/releases/download/v${VERSION#v}"
+        fi
+        if [ "$RUNNER_OS" = Windows ]; then
+          powershell -ExecutionPolicy Bypass -Command "irm $base/graphdown-installer.ps1 | iex"
+        else
+          curl --proto '=https' --tlsv1.2 -LsSf "$base/graphdown-installer.sh" | sh
+        fi
+        echo "${CARGO_HOME:-$HOME/.cargo}/bin" >> "$GITHUB_PATH"
+
+    - name: Check references
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      env:
+        ARGS: ${{ inputs.args }}
+      run: graphdown check --format github $ARGS

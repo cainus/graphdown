@@ -7,11 +7,12 @@ One binary, `graphdown`, run anywhere inside a project. Targets on the command l
 ## check
 
 ```sh
-graphdown check          # exit 1 if any reference is broken
-graphdown check --json
+graphdown check                  # exit 1 if any reference is broken
+graphdown check --json           # same as --format json
+graphdown check --format github  # GitHub Actions annotations
 ```
 
-Resolves every reference in every doc and in every code comment (@docs/syntax#references-from-code). A broken one is reported as `file:line:col: reference: reason`, with a "did you mean" when a heading or symbol is close. Put it in CI and in a pre-commit hook; it is the type checker that keeps the rest of the commands honest. Implemented by @src/ops.rs#check.
+Resolves every reference in every doc and in every code comment (@docs/syntax#references-from-code). A broken one is reported as `file:line:col: reference: reason`, with a "did you mean" when a heading or symbol is close. Put it in CI and in a pre-commit hook; it is the type checker that keeps the rest of the commands honest. With `--format github`, each problem is also printed as a workflow command, so GitHub shows it as an error on that line of the pull request; the repo's own Action uses this (@docs/releasing#the-action). Implemented by @src/ops.rs#check.
 
 ## outline
 

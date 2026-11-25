@@ -25,8 +25,12 @@ struct Cli {
 enum Command {
     /// Check that every reference in every doc points at something real.
     Check {
+        /// Shorthand for `--format json`.
         #[arg(long)]
         json: bool,
+        /// `github` prints workflow annotations, shown inline on pull requests.
+        #[arg(long, value_enum, default_value_t = CheckFormat::Text)]
+        format: CheckFormat,
     },
     /// List the headings of docs (or the symbols of code files) with line ranges.
     #[command(alias = "ls")]
@@ -75,6 +79,13 @@ enum Command {
     },
 }
 
+#[derive(Clone, Copy, PartialEq, Eq, ValueEnum)]
+enum CheckFormat {
+    Text,
+    Json,
+    Github,
+}
+
 #[derive(Clone, Copy, ValueEnum)]
 enum Format {
     Markdown,
@@ -108,11 +119,17 @@ fn run(cli: Cli) -> Result<ExitCode> {
     let mut out = std::io::stdout().lock();
 
     match cli.command {
-        Command::Check { json } => {
+        Command::Check { json, format } => {
             let report = ops::check(&project);
-            if json {
+            let format = if json { CheckFormat::Json } else { format };
+            if format == CheckFormat::Json {
                 writeln!(out, "{}", serde_json::to_string_pretty(&report.problems)?)?;
             } else {
+                if format == CheckFormat::Github {
+                    for p in &report.problems {
+                        writeln!(out, "{}", ops::github_annotation(p))?;
+                    }
+                }
                 for p in &report.problems {
                     writeln!(
                         out,

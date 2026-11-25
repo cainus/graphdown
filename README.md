@@ -19,9 +19,25 @@ token for a new pair. Network failures retry with @docs/sync#backoff-policy.
 
 ## Install
 
+Releases are published to npm, PyPI and crates.io, with prebuilt binaries for macOS, Linux and Windows.
+
 ```sh
-cargo install --git https://github.com/cainus/graphdown
+npx @cainus/graphdown check     # or: npm install -g @cainus/graphdown
+uvx graphdown check             # or: pip install graphdown
+cargo install graphdown
+curl --proto '=https' --tlsv1.2 -LsSf https://github.com/cainus/graphdown/releases/latest/download/graphdown-installer.sh | sh
 ```
+
+Until the first release is tagged, install from source: `cargo install --git https://github.com/cainus/graphdown`.
+
+### In CI
+
+```yaml
+- uses: actions/checkout@v4
+- uses: cainus/graphdown@v0.1.0
+```
+
+Broken references fail the job and show up as annotations on the lines that contain them.
 
 ## Commands
 
@@ -43,6 +59,7 @@ These docs are written in graphdown and checked in CI.
 - @docs/cli: every command and flag
 - @docs/architecture: how the code is organised
 - @docs/design: what was deliberately left out, and why
+- @docs/releasing: how a tag becomes binaries, npm, PyPI and crates.io packages
 - @AGENTS: how coding agents should work in this repo
 - @skill/SKILL.md: the agent skill that `graphdown skill` prints, for any graphdown repo
 

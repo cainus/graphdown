@@ -44,6 +44,10 @@ A comment like `// Spec: @docs/auth#token-refresh` records an edge that `graphdo
 
 Three choices keep the cost down. No marker is required, so there is nothing new to learn. A reference in code must contain `/` or `#`, so documentation tags like `@param` are never misread. And nothing forces the two directions to pair up: each reference is checked on its own, so a missing back-link is never an error. See @docs/syntax#references-from-code.
 
+## Distribution
+
+Graphdown is one static binary, and every channel delivers that same binary rather than a port or a wrapper library. Agent users mostly live in JavaScript and Python repos, so npm and PyPI matter more than crates.io: `npx` and `uvx` let a repo run graphdown without anyone installing Rust. The npm name `graphdown` belongs to an unrelated 2022 package that turns ASCII diagrams into SVG, so the npm package is scoped as `@cainus/graphdown`. The PyPI and crates.io names were free. Releases are cut by tag only, so no channel can drift from the others. See @docs/releasing.
+
 ## Open questions
 
 - **`context:` frontmatter.** The one dependency that cannot be derived: a doc that should always come along in a slice even though the prose never mentions it. Add only when a real doc needs it.

@@ -66,6 +66,27 @@ pub fn check(project: &Project) -> CheckReport {
     }
 }
 
+/// A GitHub Actions workflow command that shows `p` as an error annotation
+/// on its line in a pull request.
+///
+/// Spec: @docs/cli#check
+pub fn github_annotation(p: &Problem) -> String {
+    let data = |s: &str| {
+        s.replace('%', "%25")
+            .replace('\r', "%0D")
+            .replace('\n', "%0A")
+    };
+    let prop = |s: &str| data(s).replace(':', "%3A").replace(',', "%2C");
+    format!(
+        "::error file={},line={},col={},title={}::{}",
+        prop(&p.file),
+        p.line,
+        p.col,
+        prop(&format!("broken reference {}", p.reference)),
+        data(&p.message)
+    )
+}
+
 pub fn resolve_ref(project: &Project, r: &Ref) -> Result<Resolved, String> {
     let spec = r.target.as_ref().map_err(|e| e.clone())?;
     project.resolve(spec)

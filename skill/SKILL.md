@@ -35,4 +35,4 @@ Do not add `imports:` or `exports:` lists, ids or symbol indexes to frontmatter.
 - Renaming a heading changes its slug. Run `graphdown refs` on the old target first, then update each reference it lists.
 - Never rewrite the `@` lines in `CLAUDE.md`: Claude Code reads them as file imports. `graphdown fmt` already skips that file.
 
-`graphdown --help` and `graphdown <command> --help` have the flags. If the binary is missing, install it with `cargo install --git https://github.com/cainus/graphdown`, or work without it and say so.
+`graphdown --help` and `graphdown <command> --help` have the flags. If the binary is missing, run it with `npx @cainus/graphdown` or `uvx graphdown` (same arguments), or install it with `cargo install graphdown`. If none of those work, carry on without it and say so.

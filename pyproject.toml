@@ -1,0 +1,30 @@
+# Packages the graphdown binary as Python wheels, so `pip install graphdown`
+# and `uvx graphdown` work. There is no Python code: maturin's "bin" bindings
+# put the compiled executable on PATH. The version comes from Cargo.toml.
+[build-system]
+requires = ["maturin>=1.8,<2"]
+build-backend = "maturin"
+
+[project]
+name = "graphdown"
+description = "Navigate markdown docs like code: checked @references, outlines, find-references and context slices"
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.8"
+keywords = ["markdown", "documentation", "agents", "llm", "linter"]
+classifiers = [
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "Programming Language :: Rust",
+    "Topic :: Documentation",
+    "Topic :: Software Development :: Quality Assurance",
+]
+dynamic = ["version"]
+
+[project.urls]
+Repository = "https://github.com/cainus/graphdown"
+Documentation = "https://github.com/cainus/graphdown/tree/main/docs"
+
+[tool.maturin]
+bindings = "bin"
+strip = true
