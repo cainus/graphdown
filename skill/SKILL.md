@@ -35,6 +35,7 @@ Do not add `imports:` or `exports:` lists, ids or symbol indexes to frontmatter.
 ## Keeping references valid
 
 - Run `graphdown check` after editing docs, renaming or moving a heading, file or function, and before you finish. It prints `file:line:col: reference: reason`, often with a "did you mean". Fix every report.
+- In a git repo, `check` also lists doc lines that reference or name code you changed but that you didn't edit. Open each one and either update it or decide it still holds. They don't fail the check, so it is easy to skip them; don't.
 - Renaming a heading changes its slug. Run `graphdown refs` on the old target first, then update each reference it lists.
 - Never rewrite the `@` lines in `CLAUDE.md`: Claude Code reads them as file imports. `graphdown fmt` already skips that file.
 

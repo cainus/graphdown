@@ -490,3 +490,78 @@ fn refs_lists_unlinked_mentions_separately() {
         "{out}"
     );
 }
+
+#[test]
+fn check_lists_docs_that_name_changed_code() {
+    let p = Project::new(&[
+        (
+            "src/server.ts",
+            "export function createServer() {\n  const server = {\n    ssrFixStacktrace(e: Error) {\n      return e\n    },\n    listen() {\n      return 1\n    },\n  }\n  return server\n}\n",
+        ),
+        (
+            "docs/api.md",
+            "# API\n\n## Errors\n\nCall `server.ssrFixStacktrace` on SSR errors.\n\n## Server\n\nSee @src/server.ts#createServer.\n",
+        ),
+        ("docs/other.md", "# Other\n\nThe main thing is `listen`.\n"),
+    ]);
+    let git = |args: &[&str]| {
+        let ok = Command::new("git")
+            .args([
+                "-c",
+                "user.name=t",
+                "-c",
+                "user.email=t@t",
+                "-c",
+                "commit.gpgsign=false",
+            ])
+            .args(args)
+            .current_dir(p.path())
+            .output()
+            .unwrap()
+            .status
+            .success();
+        assert!(ok, "git {args:?}");
+    };
+    git(&["init", "-q"]);
+    git(&["add", "."]);
+    git(&["commit", "-q", "-m", "init"]);
+
+    // Nothing changed yet: nothing to list.
+    let (code, out) = p.run(&["check"]);
+    assert_eq!(code, 0, "{out}");
+    assert!(!out.contains("changed code"), "{out}");
+
+    // Edit inside the object-literal method; the doc line isn't touched.
+    let src = p
+        .read("src/server.ts")
+        .replace("return e\n", "return new Error(e.message)\n");
+    fs::write(p.path().join("src/server.ts"), src).unwrap();
+    let (code, out) = p.run(&["check"]);
+    assert_eq!(code, 0, "notes don't fail the check: {out}");
+    assert!(
+        out.contains(
+            "docs/api.md:5 (#errors)  mentions `ssrFixStacktrace` (@src/server.ts#createServer)"
+        ),
+        "{out}"
+    );
+    assert!(
+        out.contains("docs/api.md:9 (#server)  references @src/server.ts#createServer"),
+        "{out}"
+    );
+    assert!(!out.contains("other.md"), "{out}");
+
+    // Once the doc line is edited too, it drops off the list.
+    let doc = p
+        .read("docs/api.md")
+        .replace("on SSR errors", "on any SSR error");
+    fs::write(p.path().join("docs/api.md"), doc).unwrap();
+    let (_, out) = p.run(&["check"]);
+    assert!(!out.contains("docs/api.md:5"), "{out}");
+
+    let (_, out) = p.run(&["check", "--json"]);
+    assert!(out.contains("\"stale\""), "{out}");
+    let (_, out) = p.run(&["check", "--no-changes"]);
+    assert!(!out.contains("changed code"), "{out}");
+    let (_, out) = p.run(&["check", "--format", "github"]);
+    assert!(out.contains("::notice file=docs/api.md,line=9,"), "{out}");
+}

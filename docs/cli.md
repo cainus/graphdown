@@ -10,9 +10,24 @@ One binary, `graphdown`, run anywhere inside a project. Targets on the command l
 graphdown check                  # exit 1 if any reference is broken
 graphdown check --json           # same as --format json
 graphdown check --format github  # GitHub Actions annotations
+graphdown check --since main     # compare against main, not HEAD
+graphdown check --no-changes     # skip the changed-code list
 ```
 
 Resolves every reference in every doc and in every code comment (@docs/syntax#references-from-code). A broken one is reported as `file:line:col: reference: reason`, with a "did you mean" when a heading or symbol is close. Put it in CI and in a pre-commit hook; it is the type checker that keeps the rest of the commands honest. With `--format github`, each problem is also printed as a workflow command, so GitHub shows it as an error on that line of the pull request; the repo's own Action uses this (@docs/releasing#the-action). Implemented by @src/ops.rs#check.
+
+### Changed code
+
+In a git repository, `check` also lists the lines that name code you have changed but that the change itself didn't touch: the docs most likely to now describe the old behaviour. These are notes, not errors, and never change the exit code.
+
+It compares the working tree, staged or not, with `--since` (default `HEAD`), using `git diff` (@src/changes.rs#since). Untracked files are left out. For each changed range in a source file it takes the innermost symbol around it, and lists:
+
+- every reference to that symbol from a line outside the change, and
+- every doc line outside the change that contains its name as a whole word, the same search as `refs` mentions (@docs/cli#refs).
+
+The name is the symbol's last part, or the nearest named method or property around the edit when that isn't a symbol itself: editing `ssrFixStacktrace() {...}` inside an object literal in `createServer` searches for `ssrFixStacktrace`. Names that read like English words (`main`, `refresh`, anything without a capital after the first letter, an underscore or a digit) are not searched for, because they match ordinary prose.
+
+Each line prints as `file:line (#section)  references|mentions target  text`. With `--format github` they become `::notice` annotations; in `--json` output the report is `{"problems": [...], "stale": [...]}`. Leave changelogs and other history out with `.graphdownignore` if they get in the way. Implemented by @src/ops.rs#stale. In CI, `HEAD` is the commit being checked, so pass the base branch: `--since origin/main`.
 
 ## outline
 

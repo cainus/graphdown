@@ -25,6 +25,10 @@ Graphdown loads every markdown file in the project into memory, parses each one 
 
 At load time, @src/project.rs#Project::load parses only the source files that contain an `@` at all, and runs @src/markdown.rs#scan_at_refs over their comments to build `code_refs`. Any other source file is parsed only when a reference points into it. Either way the result is cached for the run by @src/project.rs#Project::code_file. @src/ops.rs#all_refs is the single place that merges doc and code references, so every command treats them alike. @src/ops.rs#mentions is the one text search in graphdown: it scans doc lines for a target's name and reports the lines with no reference, kept apart from real references.
 
+### changes
+
+@src/changes.rs runs `git diff` and reads which lines changed since a revision. @src/ops.rs#changed_symbols maps them to the innermost symbols, using @src/code.rs#enclosing_name for edits inside unnamed-as-symbol code like object-literal methods, and @src/ops.rs#stale lists the references and mentions those edits didn't reach. It is the only place graphdown calls another program.
+
 ### project
 
 @src/project.rs holds the loaded docs and resolves targets. @src/project.rs#Project::content turns any resolved target into the exact lines it covers; `show`, `slice` and the containment rules in `refs` all go through it. @src/project.rs#Project::parse_target reads a target typed on the command line.

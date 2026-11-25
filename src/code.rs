@@ -116,6 +116,45 @@ fn comment_ranges(root: Node) -> Vec<std::ops::Range<usize>> {
     }
 }
 
+/// The name of the innermost function, method or property around lines
+/// `start..=end` (1-based), even one that isn't a symbol, such as a method
+/// of an object literal inside a function. `None` if nothing named
+/// encloses them.
+pub fn enclosing_name(lang: Lang, source: &str, start: usize, end: usize) -> Option<String> {
+    let mut parser = Parser::new();
+    parser.set_language(&lang.language()).ok()?;
+    let tree = parser.parse(source, None)?;
+    let from = tree_sitter::Point::new(start.saturating_sub(1), 0);
+    let to = tree_sitter::Point::new(end.saturating_sub(1), usize::MAX);
+    let mut node = tree.root_node().descendant_for_point_range(from, to)?;
+    loop {
+        let named = match node.kind() {
+            "method_definition"
+            | "function_declaration"
+            | "generator_function_declaration"
+            | "function_item"
+            | "function_definition"
+            | "method_signature"
+            | "property_signature"
+            | "field_definition"
+            | "public_field_definition"
+            | "class_definition"
+            | "class_declaration" => node.child_by_field_name("name"),
+            "pair" => node.child_by_field_name("key"),
+            "variable_declarator" => node.child_by_field_name("name"),
+            _ => None,
+        };
+        if let Some(n) = named {
+            let text = n.utf8_text(source.as_bytes()).unwrap_or("");
+            let text = text.trim_matches(|c| c == '"' || c == '\'' || c == '`');
+            if !text.is_empty() {
+                return Some(text.to_string());
+            }
+        }
+        node = node.parent()?;
+    }
+}
+
 /// Looks up a symbol by name. `.` and `::` are interchangeable so that a
 /// reference reads naturally whichever language it points into.
 pub fn find<'a>(symbols: &'a [Symbol], name: &str) -> Option<&'a Symbol> {

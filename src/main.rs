@@ -31,6 +31,13 @@ enum Command {
         /// `github` prints workflow annotations, shown inline on pull requests.
         #[arg(long, value_enum, default_value_t = CheckFormat::Text)]
         format: CheckFormat,
+        /// Compare against this git revision when listing docs that describe
+        /// changed code.
+        #[arg(long, value_name = "REV", default_value = "HEAD")]
+        since: String,
+        /// Don't list docs that describe changed code.
+        #[arg(long)]
+        no_changes: bool,
     },
     /// List the headings of docs (or the symbols of code files) with line ranges.
     #[command(alias = "ls")]
@@ -133,15 +140,31 @@ fn run(cli: Cli) -> Result<ExitCode> {
     let mut out = std::io::stdout().lock();
 
     match cli.command {
-        Command::Check { json, format } => {
+        Command::Check {
+            json,
+            format,
+            since,
+            no_changes,
+        } => {
             let report = ops::check(&project);
+            let stale = if no_changes {
+                Vec::new()
+            } else {
+                graphdown::changes::since(&project.root, &since)
+                    .map(|c| ops::stale(&project, &c))
+                    .unwrap_or_default()
+            };
             let format = if json { CheckFormat::Json } else { format };
             if format == CheckFormat::Json {
-                writeln!(out, "{}", serde_json::to_string_pretty(&report.problems)?)?;
+                let body = serde_json::json!({ "problems": report.problems, "stale": stale });
+                writeln!(out, "{}", serde_json::to_string_pretty(&body)?)?;
             } else {
                 if format == CheckFormat::Github {
                     for p in &report.problems {
                         writeln!(out, "{}", ops::github_annotation(p))?;
+                    }
+                    for h in &stale {
+                        writeln!(out, "{}", ops::github_stale_notice(h))?;
                     }
                 }
                 for p in &report.problems {
@@ -155,6 +178,28 @@ fn run(cli: Cli) -> Result<ExitCode> {
                 let mut summary = format!("{} refs across {} docs", report.refs, report.docs);
                 if report.sources > 0 {
                     summary.push_str(&format!(" and {} source files", report.sources));
+                }
+                if !stale.is_empty() {
+                    writeln!(
+                        out,
+                        "changed code is named in lines the change didn't touch (check these by hand):"
+                    )?;
+                    for h in &stale {
+                        let section = h
+                            .within
+                            .as_ref()
+                            .map(|s| format!(" (#{s})"))
+                            .unwrap_or_default();
+                        let kind = match h.kind {
+                            ops::IncomingKind::Reference => "references",
+                            ops::IncomingKind::Mention => "mentions",
+                        };
+                        writeln!(
+                            out,
+                            "{}:{}{section}  {kind} {}  {}",
+                            h.file, h.line, h.target, h.reference
+                        )?;
+                    }
                 }
                 if n == 0 {
                     writeln!(out, "ok: {summary}")?;

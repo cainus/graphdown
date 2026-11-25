@@ -4,6 +4,7 @@ use std::collections::{BTreeSet, VecDeque};
 
 use serde::Serialize;
 
+use crate::changes::Changes;
 use crate::markdown::{Doc, Ref, RefForm};
 use crate::project::{Project, Resolved};
 
@@ -84,6 +85,26 @@ pub fn github_annotation(p: &Problem) -> String {
         p.col,
         prop(&format!("broken reference {}", p.reference)),
         data(&p.message)
+    )
+}
+
+/// A GitHub Actions notice for a line that names changed code; notices show
+/// on the pull request without failing the check.
+///
+/// Spec: @docs/cli#changed-code
+pub fn github_stale_notice(h: &Incoming) -> String {
+    let data = |s: &str| {
+        s.replace('%', "%25")
+            .replace('\r', "%0D")
+            .replace('\n', "%0A")
+    };
+    let prop = |s: &str| data(s).replace(':', "%3A").replace(',', "%2C");
+    format!(
+        "::notice file={},line={},title={}::{}",
+        prop(&h.file),
+        h.line,
+        prop(&format!("names changed code {}", h.target)),
+        data("This line names a definition the change edited. Check it still holds.")
     )
 }
 
@@ -195,6 +216,105 @@ pub fn mentions(project: &Project, target: &Resolved, terms: &[String]) -> Vec<I
             }
         }
     }
+    out
+}
+
+/// A definition that a change touched, and the name to search docs for.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+pub struct Changed {
+    pub symbol: Resolved,
+    /// Usually the symbol's last name part. When the edit sits inside
+    /// something named that isn't a symbol (a method of an object literal
+    /// inside a function), that name, since docs describe it by that name.
+    pub name: String,
+}
+
+/// The innermost definitions that a change touches: for each changed range
+/// in a source file, the symbols it overlaps that have no overlapping symbol
+/// nested inside them. Editing one method names the method, not its class.
+pub fn changed_symbols(project: &Project, changes: &Changes) -> Vec<Changed> {
+    let mut out = BTreeSet::new();
+    for (path, ranges) in changes {
+        let Some(lang) = crate::code::Lang::for_path(path) else {
+            continue;
+        };
+        let Ok(file) = project.code_file(path) else {
+            continue;
+        };
+        for range in ranges {
+            let (start, end) = (*range.start(), *range.end());
+            let hit: Vec<_> = file
+                .symbols
+                .iter()
+                .filter(|s| s.start_line <= end && start <= s.end_line)
+                .collect();
+            for s in &hit {
+                let has_inner = hit.iter().any(|t| {
+                    s.start_line <= t.start_line
+                        && t.end_line <= s.end_line
+                        && (t.start_line, t.end_line) != (s.start_line, s.end_line)
+                });
+                if has_inner {
+                    continue;
+                }
+                let own = s.name.rsplit(['.', ':']).next().unwrap_or(&s.name);
+                let lo = start.max(s.start_line);
+                let hi = end.min(s.end_line);
+                let name = crate::code::enclosing_name(lang, &file.source, lo, hi)
+                    .unwrap_or_else(|| own.to_string());
+                out.insert(Changed {
+                    symbol: Resolved::Symbol {
+                        path: path.clone(),
+                        name: s.name.clone(),
+                    },
+                    name,
+                });
+            }
+        }
+    }
+    out.into_iter().collect()
+}
+
+/// Whether `word` looks like an identifier rather than an English word:
+/// it has a capital after the first letter, an underscore or a digit.
+/// `ssrFixStacktrace` and `DEFAULT_TIMEOUT` pass; `main` and `refresh`
+/// don't, because they would match ordinary prose.
+fn looks_like_identifier(word: &str) -> bool {
+    word.chars().count() >= 4
+        && (word.chars().skip(1).any(char::is_uppercase)
+            || word.contains('_')
+            || word.chars().any(|c| c.is_ascii_digit()))
+}
+
+/// References to and mentions of changed definitions that sit on lines the
+/// change didn't touch: the docs that may now describe the old behaviour.
+///
+/// Spec: @docs/cli#changed-code
+pub fn stale(project: &Project, changes: &Changes) -> Vec<Incoming> {
+    let mut seen = BTreeSet::new();
+    let mut out = Vec::new();
+    for changed in changed_symbols(project, changes) {
+        let target = &changed.symbol;
+        let terms: Vec<String> = Some(changed.name.clone())
+            .filter(|n| looks_like_identifier(n))
+            .into_iter()
+            .collect();
+        let found = incoming(project, target)
+            .into_iter()
+            .chain(mentions(project, target, &terms));
+        for mut hit in found {
+            let edited = changes
+                .get(&hit.file)
+                .is_some_and(|r| crate::changes::touches(r, hit.line));
+            if !edited && seen.insert((hit.file.clone(), hit.line)) {
+                if hit.kind == IncomingKind::Mention {
+                    hit.target = format!("`{}` ({target})", changed.name);
+                }
+                out.push(hit);
+            }
+        }
+    }
+    out.sort_by(|a, b| (&a.file, a.line).cmp(&(&b.file, b.line)));
     out
 }
 

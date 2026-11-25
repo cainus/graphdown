@@ -58,6 +58,10 @@ Graphdown is one static binary, and every channel delivers that same binary rath
 
 The pilots kept finding the same failure: prose that names a function or restates a rule without linking it, which no reference check can see (@docs/benchmark-pilot-3#results). `refs` now lists those lines too, but separately and labelled as mentions, and `check` never fails on them. Text matching can't know that `refresh` in a sentence means `Session::refresh`, so treating a mention as an edge would make `check` noisy and `slice` pull in unrelated prose. Short names are skipped for the same reason.
 
+## `check` reads git, but only for notes
+
+Agents in @docs/benchmark-pilot-4 had `refs` mentions available and didn't call them once grep had found something, but they all ran `check` before finishing. So `check` lists lines that name changed code (@docs/cli#changed-code). Knowing what changed means asking git; graphdown otherwise reads only the files in front of it (@docs/design#no-committed-index). The git call is allowed because its output is advisory: outside a repository, or with git missing, the list is just empty, and it never fails the check. Errors stay purely a function of the files.
+
 ## Open questions
 
 - **`context:` frontmatter.** The one dependency that cannot be derived: a doc that should always come along in a slice even though the prose never mentions it. Add only when a real doc needs it.

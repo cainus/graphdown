@@ -18,7 +18,10 @@ inputs:
     required: false
     default: "."
   args:
-    description: Extra arguments for `graphdown check`.
+    description: >-
+      Extra arguments for `graphdown check`. On pull requests, pass
+      `--since origin/<base branch>` (with a checkout that fetches it)
+      to annotate docs that name changed code.
     required: false
     default: ""
 
