@@ -1,0 +1,307 @@
+[
+  {
+    "id": "c1",
+    "type": "change-and-update",
+    "prompt": "When a book doesn't configure a build directory, mdBook currently writes the rendered output into a folder named `book`. I'd like the default to be a folder named `output` instead. Books that set `build.build-dir`, or runs that pass `--dest-dir`, should behave exactly as before. Keep the docs consistent.",
+    "key": {
+      "code": [
+        {
+          "file": "crates/mdbook-core/src/config.rs",
+          "symbol": "impl Default for BuildConfig / BuildConfig::default",
+          "current": "build_dir: PathBuf::from(\"book\"),",
+          "change": "default to PathBuf::from(\"output\")"
+        },
+        {
+          "file": "src/cmd/command_prelude.rs",
+          "symbol": "CommandExt::arg_dest_dir",
+          "current": "If omitted, mdBook uses build.build-dir from book.toml \\\n                    or defaults to `./book`.",
+          "change": "user-visible --dest-dir help text must say `./output`"
+        }
+      ],
+      "docs": [
+        {
+          "file": "guide/src/format/configuration/general.md",
+          "heading": "Build options",
+          "text": "- **build-dir:** The directory to put the rendered book in. By default this is\n  `book/` in the book's root directory."
+        },
+        {
+          "file": "guide/src/cli/build.md",
+          "heading": "`--dest-dir`",
+          "text": "If\nnot specified it will default to the value of the `build.build-dir` key in\n`book.toml`, or to `./book`."
+        },
+        {
+          "file": "guide/src/cli/clean.md",
+          "heading": "`--dest-dir`",
+          "text": "If not specified it will default to the\nvalue of the `build.build-dir` key in `book.toml`, or to `./book`."
+        },
+        {
+          "file": "guide/src/cli/serve.md",
+          "heading": "`--dest-dir`",
+          "text": "If\nnot specified it will default to the value of the `build.build-dir` key in\n`book.toml`, or to `./book`."
+        },
+        {
+          "file": "guide/src/cli/watch.md",
+          "heading": "`--dest-dir`",
+          "text": "If\nnot specified it will default to the value of the `build.build-dir` key in\n`book.toml`, or to `./book`."
+        },
+        {
+          "file": "guide/src/format/configuration/renderers.md",
+          "heading": "Output tables",
+          "text": "If there is only one backend, then it places its output directly in the `book` directory (see [`build.build-dir`] to override this location).\nIf there is more than one backend, then each backend is placed in a separate directory underneath `book`.\nFor example, the above would have directories `book/html` and `book/wordcount`."
+        },
+        {
+          "file": "guide/src/cli/init.md",
+          "heading": "The init command",
+          "text": "Directory tree sample output shows `├── book` under `book-test/`; and the bullet: \"- The `book` directory is where your book is rendered. All the output is ready\n  to be uploaded to a server to be seen by your audience.\""
+        },
+        {
+          "file": "guide/src/cli/init.md",
+          "heading": "`--ignore`",
+          "text": "Create a `.gitignore` file configured to ignore the `book` directory created when [building] a book."
+        },
+        {
+          "file": "guide/src/guide/creating.md",
+          "heading": "Publishing a book",
+          "text": "This will generate a directory named `book` which contains the HTML content of your book."
+        },
+        {
+          "file": "guide/src/continuous-integration.md",
+          "heading": "Deploying",
+          "text": "The basic outline is that you need to run `mdbook build` to generate the output, and then transfer the files (which are in the `book` directory) to the correct location."
+        },
+        {
+          "file": "guide/src/format/theme/fonts.md",
+          "heading": "Custom fonts",
+          "text": "Sample shell output (non-obvious place): \"$ ls book/fonts/\" followed by \"fonts-f9156add.css  Roboto-27bccdc7.ttf\" -- the path should become output/fonts/."
+        }
+      ],
+      "not_required": "The `build-dir = \"book\"` line in the illustrative [build] example block in general.md (Build options) may be updated but is not required. Repo plumbing that relies on guide/book (.gitignore entry `guide/book`, ci/publish-guide.sh, tests/testsuite expectations) is outside the docs key; a solver may also pin `build-dir = \"book\"` in guide/book.toml. History files (CHANGELOG.md) must not be edited."
+    },
+    "key_sections": [
+      "crates/mdbook-core/src/config.rs#BuildConfig",
+      "src/cmd/command_prelude.rs#arg_dest_dir",
+      "guide/src/format/configuration/general.md#build-options",
+      "guide/src/cli/build.md#--dest-dir",
+      "guide/src/cli/clean.md#--dest-dir",
+      "guide/src/cli/serve.md#--dest-dir",
+      "guide/src/cli/watch.md#--dest-dir",
+      "guide/src/format/configuration/renderers.md#output-tables",
+      "guide/src/cli/init.md#the-init-command",
+      "guide/src/cli/init.md#--ignore",
+      "guide/src/guide/creating.md#publishing-a-book",
+      "guide/src/continuous-integration.md#deploying",
+      "guide/src/format/theme/fonts.md#custom-fonts"
+    ],
+    "must_touch": [
+      "crates/mdbook-core/src/config.rs",
+      "src/cmd/command_prelude.rs",
+      "guide/src/format/configuration/general.md",
+      "guide/src/cli/build.md",
+      "guide/src/cli/clean.md",
+      "guide/src/cli/serve.md",
+      "guide/src/cli/watch.md",
+      "guide/src/format/configuration/renderers.md",
+      "guide/src/cli/init.md",
+      "guide/src/guide/creating.md",
+      "guide/src/continuous-integration.md",
+      "guide/src/format/theme/fonts.md"
+    ]
+  },
+  {
+    "id": "c2",
+    "type": "change-and-update",
+    "prompt": "Definition lists and admonitions should become opt-in in the HTML output: a book only gets them if it turns them on in its configuration. Smart punctuation should stay as it is. Keep the docs consistent.",
+    "key": {
+      "code": [
+        {
+          "file": "crates/mdbook-core/src/config.rs",
+          "symbol": "impl Default for HtmlConfig / HtmlConfig::default",
+          "current": "definition_lists: true,\n            admonitions: true,",
+          "change": "both default to false"
+        }
+      ],
+      "docs": [
+        {
+          "file": "guide/src/format/configuration/renderers.md",
+          "heading": "HTML renderer options",
+          "text": "- **definition-lists:** Enables [definition lists](../markdown.md#definition-lists). Defaults to `true`."
+        },
+        {
+          "file": "guide/src/format/configuration/renderers.md",
+          "heading": "HTML renderer options",
+          "text": "- **admonitions:** Enables [admonitions](../markdown.md#admonitions). Defaults to `true`."
+        },
+        {
+          "file": "guide/src/format/markdown.md",
+          "heading": "Definition lists",
+          "text": "This feature is enabled by default.\nTo disable it, see the [`output.html.definition-lists`] config option."
+        },
+        {
+          "file": "guide/src/format/markdown.md",
+          "heading": "Admonitions",
+          "text": "This feature is enabled by default.\nTo disable it, see the [`output.html.admonitions`] config option."
+        },
+        {
+          "file": "guide/book.toml",
+          "heading": "[output.html]",
+          "text": "Non-obvious consequence: the guide's own config sets `smart-punctuation = true` and `mathjax-support = true` but not definition-lists/admonitions. The guide relies on them for its live demos in markdown.md (\"This will render as:\" under Definition lists and \"These will render as:\" under Admonitions), so `definition-lists = true` and `admonitions = true` must be added to [output.html] or those demos stop rendering as described."
+        }
+      ],
+      "not_required": "The renderers.md example block already sets `definition-lists = true` and `admonitions = true` explicitly, so it stays correct. Changing the defaults of MarkdownOptions in crates/mdbook-markdown/src/lib.rs (library API) is optional; the HTML renderer copies the values from HtmlConfig. The smart-punctuation lines must NOT change."
+    },
+    "key_sections": [
+      "crates/mdbook-core/src/config.rs#HtmlConfig",
+      "guide/src/format/configuration/renderers.md#html-renderer-options",
+      "guide/src/format/markdown.md#definition-lists",
+      "guide/src/format/markdown.md#admonitions",
+      "guide/book.toml#outputhtml"
+    ],
+    "must_touch": [
+      "crates/mdbook-core/src/config.rs",
+      "guide/src/format/configuration/renderers.md",
+      "guide/src/format/markdown.md",
+      "guide/book.toml"
+    ]
+  },
+  {
+    "id": "c3",
+    "type": "change-and-update",
+    "prompt": "mdBook silently creates chapter files that are listed in SUMMARY.md but don't exist on disk. I want that to be opt-in everywhere: it should only happen when a book sets `create-missing = true`, and otherwise mdBook should report the missing file as an error like it already does when that option is off. Keep the docs consistent.",
+    "key": {
+      "code": [
+        {
+          "file": "crates/mdbook-core/src/config.rs",
+          "symbol": "impl Default for BuildConfig / BuildConfig::default",
+          "current": "create_missing: true,",
+          "change": "default to false (load_book in crates/mdbook-driver/src/load.rs already honours the flag)"
+        }
+      ],
+      "docs": [
+        {
+          "file": "guide/src/format/configuration/general.md",
+          "heading": "Build options",
+          "text": "- **create-missing:** By default, any missing files specified in `SUMMARY.md`\n  will be created when the book is built (i.e. `create-missing = true`)."
+        },
+        {
+          "file": "guide/src/cli/build.md",
+          "heading": "The build command",
+          "text": "Note that this will also create files\nmentioned in `SUMMARY.md` which are not yet present."
+        },
+        {
+          "file": "guide/src/cli/watch.md",
+          "heading": "The watch command",
+          "text": "But using `mdbook watch` once will watch your files and will trigger a\nbuild automatically whenever you modify a file; this includes re-creating\ndeleted files still mentioned in `SUMMARY.md`!"
+        },
+        {
+          "file": "guide/src/cli/serve.md",
+          "heading": "The serve command",
+          "text": "The `serve` command  watches the book's `src` directory for\nchanges, rebuilding the book and refreshing clients for each change; this includes\nre-creating deleted files still mentioned in `SUMMARY.md`!"
+        },
+        {
+          "file": "guide/src/guide/creating.md",
+          "heading": "`SUMMARY.md`",
+          "text": "If any of the chapter files do not exist, `mdbook` will automatically create them for you."
+        },
+        {
+          "file": "guide/src/cli/init.md",
+          "heading": "Tip: Generate chapters from SUMMARY.md",
+          "text": "When a `SUMMARY.md` file already exists, the `init` command will first parse it\nand generate the missing files according to the paths used in the `SUMMARY.md`."
+        }
+      ],
+      "not_required": "The illustrative [build] example block in general.md (`create-missing = true             # whether or not to create missing pages`) may be updated but is not required. init's own stub (SUMMARY.md + chapter_1.md for a brand-new book) is written by BookBuilder::create_stub_files and is unaffected. CHANGELOG.md must not be edited."
+    },
+    "key_sections": [
+      "crates/mdbook-core/src/config.rs#BuildConfig",
+      "guide/src/format/configuration/general.md#build-options",
+      "guide/src/cli/build.md#the-build-command",
+      "guide/src/cli/watch.md#the-watch-command",
+      "guide/src/cli/serve.md#the-serve-command",
+      "guide/src/guide/creating.md#summarymd",
+      "guide/src/cli/init.md#tip-generate-chapters-from-summarymd"
+    ],
+    "must_touch": [
+      "crates/mdbook-core/src/config.rs",
+      "guide/src/format/configuration/general.md",
+      "guide/src/cli/build.md",
+      "guide/src/cli/watch.md",
+      "guide/src/cli/serve.md",
+      "guide/src/guide/creating.md",
+      "guide/src/cli/init.md"
+    ]
+  },
+  {
+    "id": "c4",
+    "type": "change-and-update",
+    "prompt": "Rename the default theme override folder: instead of a `theme` folder at the book root, mdBook should look for (and `mdbook init --theme` should create) a folder called `custom-theme`. Books that set `output.html.theme` explicitly should be unaffected. Keep the docs consistent.",
+    "key": {
+      "code": [
+        {
+          "file": "crates/mdbook-core/src/config.rs",
+          "symbol": "HtmlConfig::theme_dir",
+          "current": "None => root.join(\"theme\"),",
+          "change": "default to \"custom-theme\" (also its doc comment: 'append the default directory of \"theme\"')"
+        },
+        {
+          "file": "crates/mdbook-html/src/html_handlebars/hbs_renderer.rs",
+          "symbol": "HtmlHandlebars::render (impl Renderer)",
+          "current": "None => ctx.root.join(\"theme\"),",
+          "change": "use \"custom-theme\" (or HtmlConfig::theme_dir)"
+        },
+        {
+          "file": "src/cmd/init.rs",
+          "symbol": "execute",
+          "current": "let theme_dir = book_dir.join(\"theme\");",
+          "change": "use \"custom-theme\" so the printed path and overwrite prompt match where Theme::copy_theme writes"
+        }
+      ],
+      "docs": [
+        {
+          "file": "guide/src/format/theme/README.md",
+          "heading": "Theme",
+          "text": "The theme is totally customizable, you can selectively replace every file from\nthe theme by your own by adding a `theme` directory next to `src` folder in your\nproject root."
+        },
+        {
+          "file": "guide/src/cli/init.md",
+          "heading": "`--theme`",
+          "text": "When you use the `--theme` flag, the default theme will be copied into a\ndirectory called `theme` in your source directory so that you can modify it."
+        },
+        {
+          "file": "guide/src/format/theme/syntax-highlighting.md",
+          "heading": "Custom theme",
+          "text": "If you want to use another theme for `highlight.js` download it from their\nwebsite, or make it yourself, rename it to `highlight.css` and put it in\nthe `theme` folder of your book."
+        },
+        {
+          "file": "guide/src/format/theme/editor.md",
+          "heading": "Customizing the editor",
+          "text": "Note that for the editor changes to function correctly, the `book.js` inside of\nthe `theme` folder will need to be overridden as it has some couplings with the\ndefault Ace editor."
+        },
+        {
+          "file": "guide/src/format/theme/fonts.md",
+          "heading": "Custom fonts",
+          "text": "As a reminder, all fonts living under `./theme/fonts/` will be considered static and will be fingerprinted.  \nAlso, according to [the theme documentation](index.html#theme), additional fonts can be declared in `./theme/fonts/fonts.css`, which is also considered static.\n\nThat allows us to leverage the [`resource` helper](index-hbs.html#resource) inside `/theme/fonts/fonts.css`:"
+        }
+      ],
+      "not_required": "renderers.md's `theme` option bullet and example (`theme = \"my-theme\"`) describe an explicit setting and stay correct. Other uses of the word 'theme' (colour themes like light/navy, 'default theme') are unrelated."
+    },
+    "key_sections": [
+      "crates/mdbook-core/src/config.rs#theme_dir",
+      "crates/mdbook-html/src/html_handlebars/hbs_renderer.rs#render",
+      "src/cmd/init.rs#execute",
+      "guide/src/format/theme/README.md#theme",
+      "guide/src/cli/init.md#--theme",
+      "guide/src/format/theme/syntax-highlighting.md#custom-theme",
+      "guide/src/format/theme/editor.md#customizing-the-editor",
+      "guide/src/format/theme/fonts.md#custom-fonts"
+    ],
+    "must_touch": [
+      "crates/mdbook-core/src/config.rs",
+      "crates/mdbook-html/src/html_handlebars/hbs_renderer.rs",
+      "src/cmd/init.rs",
+      "guide/src/format/theme/README.md",
+      "guide/src/cli/init.md",
+      "guide/src/format/theme/syntax-highlighting.md",
+      "guide/src/format/theme/editor.md",
+      "guide/src/format/theme/fonts.md"
+    ]
+  }
+]

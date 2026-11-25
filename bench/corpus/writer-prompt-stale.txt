@@ -1,0 +1,23 @@
+You are writing evaluation tasks for coding agents. The repository is at REPO (a fresh clone; read-only for you: do not modify it). Write exactly 4 change tasks. Each asks for a small code change whose old behaviour is stated literally in the repository's markdown documentation, so that after the change some doc text is plainly false.
+
+Each task must meet all of these:
+- The code change is small (one to three code locations).
+- At least three markdown files, or three separate sections, contain text that becomes false after the change: a value, a default, a name, a command, an option, sample output, a table row or an example. Copy each such sentence exactly into the key.
+- At least one of those places would not show up when searching for the obvious words in the task. For example: it gives the value in a different form (5 vs "five", `5.0` vs "5 seconds"), it is sample output or an example, it sits in a doc whose title has nothing to do with the task, or it describes the behaviour indirectly.
+- Every doc place in the key must be clearly wrong after the change, so that any careful reviewer would agree it needs editing. Leave out places where updating is a matter of taste or style.
+- Ignore history: changelogs, release notes, blog posts, migration guides for past versions. Never put those in the key.
+
+Rules:
+- Use only what is really in this checkout. Verify every fact in your keys by reading the files.
+- Tasks must be doable without installing dependencies or running test suites.
+- Do not mention any particular tool to use, and give no hints about where to look.
+- Write the task text as a user would, and end it with "Keep the docs consistent." and nothing more specific.
+
+Write the result as JSON to OUT: a list of 4 objects with fields
+  "id": "c1" to "c4",
+  "type": "change-and-update",
+  "prompt": the task text,
+  "key": every code location to change and every doc place that becomes false, each with its file, heading and the exact current text, specific enough for a grader who has not read the repo,
+  "key_sections": list of "path#heading-slug" or "path#symbol" a good run must have touched (heading slugs: lowercase, spaces to hyphens, punctuation dropped),
+  "must_touch": every file a correct change must modify.
+Then reply with just the word done.

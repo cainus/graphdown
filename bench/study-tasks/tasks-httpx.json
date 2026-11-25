@@ -1,0 +1,327 @@
+[
+ {
+  "id": "c1",
+  "type": "change-and-update",
+  "prompt": "We keep getting spurious timeouts when talking to slow upstream services with the default settings. Please raise httpx's default timeout from 5 seconds to 10 seconds (applying to connect, read, write and pool alike). Explicitly passed timeouts should behave exactly as before. Keep the docs consistent.",
+  "key": {
+   "code": [
+    {
+     "file": "httpx/_config.py",
+     "symbol": "DEFAULT_TIMEOUT_CONFIG",
+     "current": "DEFAULT_TIMEOUT_CONFIG = Timeout(timeout=5.0)",
+     "change": "Timeout(timeout=10.0). This single constant is the default used by Client, AsyncClient and every top-level function in httpx/_api.py."
+    }
+   ],
+   "docs": [
+    {
+     "file": "docs/quickstart.md",
+     "heading": "## Timeouts",
+     "current": "The default timeout for network inactivity is five seconds. You can modify the",
+     "note": "value written as a word ('five'), not '5'"
+    },
+    {
+     "file": "docs/advanced/timeouts.md",
+     "heading": "(page intro, before the first heading)",
+     "current": "The default behavior is to raise a `TimeoutException` after 5 seconds of",
+     "note": "sentence continues 'network inactivity.'"
+    },
+    {
+     "file": "docs/advanced/timeouts.md",
+     "heading": "## Setting a default timeout on a client",
+     "current": "client = httpx.Client()              # Use a default 5s timeout everywhere.",
+     "note": "code comment in example; written as '5s'"
+    },
+    {
+     "file": "docs/logging.md",
+     "heading": "# Logging",
+     "current": "DEBUG [2024-09-28 17:27:40] httpcore.connection - connect_tcp.started host='www.example.com' port=443 local_address=None timeout=5.0 socket_options=None",
+     "note": "sample debug output of httpx.get(...) with default settings; timeout=5.0 should become timeout=10.0"
+    },
+    {
+     "file": "docs/logging.md",
+     "heading": "# Logging",
+     "current": "DEBUG [2024-09-28 17:27:41] httpcore.connection - start_tls.started ssl_context=SSLContext(verify=True) server_hostname='www.example.com' timeout=5.0",
+     "note": "same sample output, second line; timeout=5.0 should become timeout=10.0"
+    }
+   ],
+   "not_in_key": "docs/advanced/timeouts.md line 'client = httpx.Client(timeout=10.0)  # Use a default 10s timeout everywhere.' stays true (explicit value). docs/advanced/extensions.md examples pass explicit 5.0 values and stay true. CHANGELOG.md is history and must not be edited."
+  },
+  "key_sections": [
+   "httpx/_config.py#DEFAULT_TIMEOUT_CONFIG",
+   "docs/quickstart.md#timeouts",
+   "docs/advanced/timeouts.md#setting-a-default-timeout-on-a-client",
+   "docs/logging.md#logging"
+  ],
+  "must_touch": [
+   "httpx/_config.py",
+   "docs/quickstart.md",
+   "docs/advanced/timeouts.md",
+   "docs/logging.md"
+  ]
+ },
+ {
+  "id": "c2",
+  "type": "change-and-update",
+  "prompt": "The reason phrase in a Response's repr is noisy and depends on whatever the server sent. Change the repr of httpx.Response to show only the status code, so a successful response displays as `<Response [200]>` instead of `<Response [200 OK]>`. Keep the docs consistent.",
+  "key": {
+   "code": [
+    {
+     "file": "httpx/_models.py",
+     "symbol": "Response.__repr__",
+     "current": "return f\"<Response [{self.status_code} {self.reason_phrase}]>\"",
+     "change": "return f\"<Response [{self.status_code}]>\""
+    },
+    {
+     "file": "httpx/_api.py",
+     "symbol": "request (docstring)",
+     "current": "    <Response [200 OK]>",
+     "change": "docstring usage example (rendered into docs/api.md via '::: httpx.request') should show <Response [200]>"
+    },
+    {
+     "file": "tests/models/test_responses.py",
+     "symbol": "test_response_repr",
+     "current": "assert repr(response) == \"<Response [200 OK]>\"",
+     "change": "expect <Response [200]>"
+    },
+    {
+     "file": "tests/client/test_client.py",
+     "symbol": "test_get",
+     "current": "assert repr(response) == \"<Response [200 OK]>\"",
+     "change": "expect <Response [200]>"
+    },
+    {
+     "file": "tests/client/test_async_client.py",
+     "symbol": "test_get",
+     "current": "assert repr(response) == \"<Response [200 OK]>\"",
+     "change": "expect <Response [200]>"
+    }
+   ],
+   "docs": [
+    {
+     "file": "README.md",
+     "heading": "(intro example, before '## Features')",
+     "current": "<Response [200 OK]>"
+    },
+    {
+     "file": "docs/index.md",
+     "heading": "(intro example, before '## Features')",
+     "current": "<Response [200 OK]>"
+    },
+    {
+     "file": "docs/quickstart.md",
+     "heading": "# QuickStart (opening example)",
+     "current": "<Response [200 OK]>"
+    },
+    {
+     "file": "docs/quickstart.md",
+     "heading": "## Redirection and History",
+     "current": "[<Response [301 Moved Permanently]>]",
+     "note": "non-200 form; not found by searching '200 OK'"
+    },
+    {
+     "file": "docs/quickstart.md",
+     "heading": "## Authentication",
+     "current": "<Response [200 OK]>",
+     "note": "after '>>> httpx.get(\"https://example.com\", auth=auth)'"
+    },
+    {
+     "file": "docs/async.md",
+     "heading": "## Making Async requests",
+     "current": "<Response [200 OK]>"
+    },
+    {
+     "file": "docs/advanced/authentication.md",
+     "heading": "## Basic authentication",
+     "current": "<Response [200 OK]>"
+    },
+    {
+     "file": "docs/advanced/authentication.md",
+     "heading": "## Digest authentication",
+     "current": "<Response [200 OK]>"
+    },
+    {
+     "file": "docs/advanced/authentication.md",
+     "heading": "## Digest authentication",
+     "current": "[<Response [401 UNAUTHORIZED]>]",
+     "note": "non-200 form in response.history output"
+    },
+    {
+     "file": "docs/advanced/ssl.md",
+     "heading": "### Enabling and disabling verification",
+     "current": "<Response [200 OK]>",
+     "note": "after httpx.get(\"https://expired.badssl.com/\", verify=False)"
+    },
+    {
+     "file": "docs/advanced/clients.md",
+     "heading": "## Making requests",
+     "current": "<Response [200 OK]>"
+    }
+   ],
+   "not_in_key": "Response.reason_phrase itself is unchanged, so docs/api.md '.reason_phrase - **str**' stays true. CHANGELOG.md must not be edited."
+  },
+  "key_sections": [
+   "httpx/_models.py#Response.__repr__",
+   "httpx/_api.py#request",
+   "docs/quickstart.md#quickstart",
+   "docs/quickstart.md#redirection-and-history",
+   "docs/quickstart.md#authentication",
+   "docs/async.md#making-async-requests",
+   "docs/advanced/authentication.md#basic-authentication",
+   "docs/advanced/authentication.md#digest-authentication",
+   "docs/advanced/ssl.md#enabling-and-disabling-verification",
+   "docs/advanced/clients.md#making-requests"
+  ],
+  "must_touch": [
+   "httpx/_models.py",
+   "httpx/_api.py",
+   "tests/models/test_responses.py",
+   "tests/client/test_client.py",
+   "tests/client/test_async_client.py",
+   "README.md",
+   "docs/index.md",
+   "docs/quickstart.md",
+   "docs/async.md",
+   "docs/advanced/authentication.md",
+   "docs/advanced/ssl.md",
+   "docs/advanced/clients.md"
+  ]
+ },
+ {
+  "id": "c3",
+  "type": "change-and-update",
+  "prompt": "Make httpx.URL's repr match the angle-bracket style that Response and Request use: `httpx.URL(\"https://example.com/\")` should display as `<URL 'https://example.com/'>` instead of `URL('https://example.com/')`. Password masking in the repr must keep working as it does now. Keep the docs consistent.",
+  "key": {
+   "code": [
+    {
+     "file": "httpx/_urls.py",
+     "symbol": "URL.__repr__",
+     "current": "return f\"{self.__class__.__name__}({url!r})\"",
+     "change": "return f\"<{self.__class__.__name__} {url!r}>\" (masking of the password component above it unchanged)"
+    },
+    {
+     "file": "httpx/_client.py",
+     "symbol": "BaseClient._merge_url (comments)",
+     "current": "# URL('https://www.example.com/subpath/')  and  # URL('https://www.example.com/subpath/path')",
+     "change": "comments showing the repr should use the new form (secondary)"
+    },
+    {
+     "file": "tests/models/test_url.py",
+     "symbol": "repr assertions (lines asserting URL(...) repr)",
+     "current": "assert repr(url) == \"URL('https://www.example.com/')\"",
+     "change": "also the second assertion \"URL('https://example.org:123/path/to/somewhere?abc=123#anchor')\""
+    },
+    {
+     "file": "tests/client/test_auth.py",
+     "symbol": "test_auth_hidden_url",
+     "current": "expected = \"URL('http://example-username:[secure]@example.org/')\"",
+     "change": "expect <URL 'http://example-username:[secure]@example.org/'>"
+    }
+   ],
+   "docs": [
+    {
+     "file": "docs/quickstart.md",
+     "heading": "## Passing Parameters in URLs",
+     "current": "URL('https://httpbin.org/get?key2=value2&key1=value1')"
+    },
+    {
+     "file": "docs/quickstart.md",
+     "heading": "## Passing Parameters in URLs",
+     "current": "URL('https://httpbin.org/get?key1=value1&key2=value2&key2=value3')"
+    },
+    {
+     "file": "docs/quickstart.md",
+     "heading": "## Redirection and History",
+     "current": "URL('https://github.com/')",
+     "note": "output of '>>> r.url' after follow_redirects=True"
+    },
+    {
+     "file": "docs/advanced/clients.md",
+     "heading": "## Merging of configuration",
+     "current": "URL('https://example.com?client_id=client1&request_id=request1')",
+     "note": "sample output in a section about merging headers/params"
+    },
+    {
+     "file": "docs/advanced/clients.md",
+     "heading": "## Other Client-only configuration options",
+     "current": "URL('http://httpbin.org/headers')",
+     "note": "sample output in the base_url example"
+    }
+   ],
+   "not_in_key": "Constructor calls such as docs/api.md '>>> url = URL(\"https://example.org/\")' are code, not repr output, and stay true. docs/quickstart.md '<Request('GET', 'https://github.com/')>' is Request's repr (uses str(url)) and is unchanged. CHANGELOG.md must not be edited."
+  },
+  "key_sections": [
+   "httpx/_urls.py#URL.__repr__",
+   "docs/quickstart.md#passing-parameters-in-urls",
+   "docs/quickstart.md#redirection-and-history",
+   "docs/advanced/clients.md#merging-of-configuration",
+   "docs/advanced/clients.md#other-client-only-configuration-options"
+  ],
+  "must_touch": [
+   "httpx/_urls.py",
+   "tests/models/test_url.py",
+   "tests/client/test_auth.py",
+   "docs/quickstart.md",
+   "docs/advanced/clients.md"
+  ]
+ },
+ {
+  "id": "c4",
+  "type": "change-and-update",
+  "prompt": "We want httpx to stop shipping its own CA bundle. When verify=True and neither SSL_CERT_FILE nor SSL_CERT_DIR applies, use the platform's default trust store (what ssl.create_default_context() loads on its own) instead of certifi, and drop certifi from the package's runtime dependencies. Keep the docs consistent.",
+  "key": {
+   "code": [
+    {
+     "file": "httpx/_config.py",
+     "symbol": "create_ssl_context",
+     "current": "import certifi  ...  # Default case...\n            ctx = ssl.create_default_context(cafile=certifi.where())",
+     "change": "remove the certifi import and use ssl.create_default_context() in the default branch; SSL_CERT_FILE / SSL_CERT_DIR branches unchanged"
+    },
+    {
+     "file": "pyproject.toml",
+     "symbol": "[project] dependencies",
+     "current": "    \"certifi\",",
+     "change": "remove certifi from the runtime dependencies list"
+    }
+   ],
+   "docs": [
+    {
+     "file": "docs/advanced/ssl.md",
+     "heading": "### Configuring client instances",
+     "current": "By default the [certifi CA bundle](https://certifiio.readthedocs.io/en/latest/) is used for SSL verification."
+    },
+    {
+     "file": "docs/advanced/ssl.md",
+     "heading": "### Configuring client instances",
+     "current": "# This SSL context is equivalent to the default `verify=True`.",
+     "note": "the example that follows builds ctx = ssl.create_default_context(cafile=certifi.where()) (with 'import certifi'), which is no longer equivalent to the default; example must change (e.g. ssl.create_default_context()) or the comment must be corrected"
+    },
+    {
+     "file": "README.md",
+     "heading": "## Dependencies",
+     "current": "* `certifi` - SSL certificates.",
+     "note": "dependency list row; does not mention CA bundle or verification"
+    },
+    {
+     "file": "docs/index.md",
+     "heading": "## Dependencies",
+     "current": "* `certifi` - SSL certificates.",
+     "note": "same row in the docs home page"
+    }
+   ],
+   "not_in_key": "docs/environment_variables.md SSL_CERT_FILE/SSL_CERT_DIR text ('instead of the default location') stays true. docs/advanced/ssl.md truststore example stays valid. tests/test_config.py imports certifi only as a convenient path source; certifi remains installed transitively via httpcore, so the tests need no change. CHANGELOG.md must not be edited."
+  },
+  "key_sections": [
+   "httpx/_config.py#create_ssl_context",
+   "docs/advanced/ssl.md#configuring-client-instances",
+   "README.md#dependencies",
+   "docs/index.md#dependencies"
+  ],
+  "must_touch": [
+   "httpx/_config.py",
+   "pyproject.toml",
+   "docs/advanced/ssl.md",
+   "README.md",
+   "docs/index.md"
+  ]
+ }
+]

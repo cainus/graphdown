@@ -1,0 +1,298 @@
+[
+ {
+  "id": "c1",
+  "type": "change-and-update",
+  "prompt": "Vite's default cache directory is node_modules/.vite. Our CI already wipes node_modules/.cache/ between runs, so I'd like Vite to cache under node_modules/.cache/vite by default instead, wherever it currently falls back to node_modules/.vite (the bare `.vite` fallback for projects with no node_modules at all can stay as it is). An explicitly configured cacheDir should behave exactly as before. Keep the docs consistent.",
+  "key": {
+   "code": [
+    {
+     "file": "packages/vite/src/node/config.ts",
+     "symbol": "resolveConfig",
+     "current": "cacheDir = path.join(pkgDir, `node_modules/.vite`)",
+     "change": "default to node_modules/.cache/vite"
+    },
+    {
+     "file": "packages/vite/src/node/config.ts",
+     "symbol": "resolveConfig",
+     "current": "? path.join(nodeModulesDir, `.vite`)",
+     "change": "use path.join(nodeModulesDir, '.cache/vite') (no-package.json-but-node_modules case); the final `: path.join(resolvedRoot, `.vite`)` fallback stays"
+    },
+    {
+     "file": "packages/vite/src/node/config.ts",
+     "symbol": "UserConfig.cacheDir (JSDoc)",
+     "current": "* @default 'node_modules/.vite'",
+     "change": "update @default to 'node_modules/.cache/vite'"
+    }
+   ],
+   "docs": [
+    {
+     "file": "docs/config/shared-options.md",
+     "heading": "cacheDir",
+     "current": "- **Default:** `\"node_modules/.vite\"`"
+    },
+    {
+     "file": "docs/guide/dep-pre-bundling.md",
+     "heading": "File System Cache",
+     "current": "Vite caches the pre-bundled dependencies in `node_modules/.vite`. It determines whether it needs to re-run the pre-bundling step based on a few sources:"
+    },
+    {
+     "file": "docs/guide/dep-pre-bundling.md",
+     "heading": "File System Cache",
+     "current": "If for some reason you want to force Vite to re-bundle deps, you can either start the dev server with the `--force` command line option, or manually delete the `node_modules/.vite` cache directory."
+    },
+    {
+     "file": "docs/guide/features.md",
+     "heading": "npm Dependency Resolving and Pre-Bundling",
+     "current": "2. Rewrite the imports to valid URLs like `/node_modules/.vite/deps/my-dep.js?v=f3sf2ebd` so that the browser can import them properly.",
+     "note": "example URL; pre-bundled deps are served from <cacheDir>/deps, so it becomes /node_modules/.cache/vite/deps/..."
+    }
+   ],
+   "not_in_key": "docs/config/index.md mentions node_modules/.vite-temp (config bundling temp dir), which is a different directory and is unaffected. The sentence 'Default to `.vite` when no `package.json` is detected.' in shared-options.md#cachedir stays true."
+  },
+  "key_sections": [
+   "packages/vite/src/node/config.ts#resolveConfig",
+   "docs/config/shared-options.md#cachedir",
+   "docs/guide/dep-pre-bundling.md#file-system-cache",
+   "docs/guide/features.md#npm-dependency-resolving-and-pre-bundling"
+  ],
+  "must_touch": [
+   "packages/vite/src/node/config.ts",
+   "docs/config/shared-options.md",
+   "docs/guide/dep-pre-bundling.md",
+   "docs/guide/features.md"
+  ]
+ },
+ {
+  "id": "c2",
+  "type": "change-and-update",
+  "prompt": "In library mode, a build with a single entry currently produces `es` and `umd` output by default. Hardly anyone consumes UMD any more, so please make the default for a single entry `es` and `cjs`, the same as it already is for multiple entries. Anyone who still wants UMD can list it in build.lib.formats explicitly. Keep the docs consistent.",
+  "key": {
+   "code": [
+    {
+     "file": "packages/vite/src/node/build.ts",
+     "symbol": "resolveBuildOutputs",
+     "current": "(libHasMultipleEntries ? ['es', 'cjs'] : ['es', 'umd'])",
+     "change": "default to ['es', 'cjs'] for a single entry too"
+    },
+    {
+     "file": "packages/vite/src/node/build.ts",
+     "symbol": "LibraryOptions.formats (JSDoc)",
+     "current": "* Output bundle formats. Defaults to `['es', 'umd']` for a single entry, or ... * @default ['es', 'umd']",
+     "change": "update default in JSDoc to ['es', 'cjs']"
+    }
+   ],
+   "docs": [
+    {
+     "file": "docs/config/build-options.md",
+     "heading": "build.lib",
+     "current": "Default `formats` are `['es', 'umd']`, or `['es', 'cjs']`, if multiple entries are used."
+    },
+    {
+     "file": "docs/guide/build.md",
+     "heading": "Library Mode",
+     "current": "- `es` and `umd` (for single entry)"
+    },
+    {
+     "file": "docs/guide/build.md",
+     "heading": "Library Mode",
+     "current": "dist/my-lib.umd.cjs 0.30 kB / gzip: 0.16 kB",
+     "note": "sample `vite build` output; the single-entry build now emits dist/my-lib.cjs instead"
+    },
+    {
+     "file": "docs/guide/build.md",
+     "heading": "Library Mode",
+     "current": "\"main\": \"./dist/my-lib.umd.cjs\", ... \"require\": \"./dist/my-lib.umd.cjs\"",
+     "note": "in the `package.json (single entry)` recommended example; the file no longer exists by default (should be ./dist/my-lib.cjs)"
+    },
+    {
+     "file": "docs/guide/build.md",
+     "heading": "CSS support",
+     "current": "\"main\": \"./dist/my-lib.umd.cjs\", ... \"require\": \"./dist/my-lib.umd.cjs\"",
+     "note": "package.json example under CSS support also points at the UMD file that is no longer produced by default"
+    }
+   ],
+   "not_in_key": "The '// Provide global variables to use in the UMD build' comments in the build.md config examples and the requirement that `name` is needed when formats include 'umd' or 'iife' are not strictly false and are optional to edit."
+  },
+  "key_sections": [
+   "packages/vite/src/node/build.ts#resolveBuildOutputs",
+   "docs/config/build-options.md#buildlib",
+   "docs/guide/build.md#library-mode",
+   "docs/guide/build.md#css-support"
+  ],
+  "must_touch": [
+   "packages/vite/src/node/build.ts",
+   "docs/config/build-options.md",
+   "docs/guide/build.md"
+  ]
+ },
+ {
+  "id": "c3",
+  "type": "change-and-update",
+  "prompt": "When build.manifest or build.ssrManifest is set to true, Vite writes the file inside a `.vite/` subfolder of the output directory. Our deploy tooling expects them at the top level, so with `true` please write them straight into the output directory as `manifest.json` and `ssr-manifest.json`. Passing a string path should keep working exactly as it does now, and nothing else about the output should change. Keep the docs consistent.",
+  "key": {
+   "code": [
+    {
+     "file": "packages/vite/src/node/plugins/manifest.ts",
+     "symbol": "manifestPlugin",
+     "current": ": '.vite/manifest.json'",
+     "change": "default to 'manifest.json'"
+    },
+    {
+     "file": "packages/vite/src/node/ssr/ssrManifestPlugin.ts",
+     "symbol": "ssrManifestPlugin",
+     "current": ": '.vite/ssr-manifest.json',",
+     "change": "default to 'ssr-manifest.json'"
+    },
+    {
+     "file": "packages/vite/src/node/build.ts",
+     "symbol": "BuildEnvironmentOptions.manifest (JSDoc)",
+     "current": "* Whether to emit a .vite/manifest.json in the output dir to map hash-less filenames",
+     "change": "comment should say manifest.json (optional but expected)"
+    }
+   ],
+   "docs": [
+    {
+     "file": "docs/config/build-options.md",
+     "heading": "build.manifest",
+     "current": "When the value is a string, it will be used as the manifest file path relative to `build.outDir`. When set to `true`, the path would be `.vite/manifest.json`."
+    },
+    {
+     "file": "docs/config/build-options.md",
+     "heading": "build.ssrManifest",
+     "current": "When the value is a string, it will be used as the manifest file path relative to `build.outDir`. When set to `true`, the path would be `.vite/ssr-manifest.json`."
+    },
+    {
+     "file": "docs/guide/backend-integration.md",
+     "heading": "Backend Integration",
+     "current": "// generate .vite/manifest.json in outDir",
+     "note": "comment in the step 1 vite.config.js example"
+    },
+    {
+     "file": "docs/guide/backend-integration.md",
+     "heading": "Backend Integration",
+     "current": "3. For production, after running `vite build`, a `.vite/manifest.json` file will be generated alongside other asset files. An example manifest file looks like this:"
+    },
+    {
+     "file": "docs/guide/backend-integration.md",
+     "heading": "Backend Integration",
+     "current": "```json [.vite/manifest.json] style:max-height:400px",
+     "note": "code block title of the example manifest"
+    },
+    {
+     "file": "docs/guide/ssr.md",
+     "heading": "Generating Preload Directives",
+     "current": "`vite build` supports the `--ssrManifest` flag which will generate `.vite/ssr-manifest.json` in build output directory:"
+    },
+    {
+     "file": "docs/guide/ssr.md",
+     "heading": "Generating Preload Directives",
+     "current": "The above script will now generate `dist/client/.vite/ssr-manifest.json` for the client build (Yes, the SSR manifest is generated from the client build because we want to map module IDs to client files).",
+     "note": "full output path, should become dist/client/ssr-manifest.json"
+    }
+   ],
+   "not_in_key": "build.license still writes .vite/license.md (docs/config/build-options.md#build.license and docs/guide/features.md#License stay true); docs/guide/api-environment-frameworks.md on environment.manifest names no path."
+  },
+  "key_sections": [
+   "packages/vite/src/node/plugins/manifest.ts#manifestPlugin",
+   "packages/vite/src/node/ssr/ssrManifestPlugin.ts#ssrManifestPlugin",
+   "docs/config/build-options.md#buildmanifest",
+   "docs/config/build-options.md#buildssrmanifest",
+   "docs/guide/backend-integration.md#backend-integration",
+   "docs/guide/ssr.md#generating-preload-directives"
+  ],
+  "must_touch": [
+   "packages/vite/src/node/plugins/manifest.ts",
+   "packages/vite/src/node/ssr/ssrManifestPlugin.ts",
+   "docs/config/build-options.md",
+   "docs/guide/backend-integration.md",
+   "docs/guide/ssr.md"
+  ]
+ },
+ {
+  "id": "c4",
+  "type": "change-and-update",
+  "prompt": "Please change the dev server's default port from 5173 to 5273. Only the dev server; vite preview keeps its own default. Keep the docs consistent.",
+  "key": {
+   "code": [
+    {
+     "file": "packages/vite/src/node/constants.ts",
+     "symbol": "DEFAULT_DEV_PORT",
+     "current": "export const DEFAULT_DEV_PORT = 5173",
+     "change": "5273"
+    }
+   ],
+   "docs": [
+    {
+     "file": "docs/config/server-options.md",
+     "heading": "server.port",
+     "current": "- **Default:** `5173`"
+    },
+    {
+     "file": "docs/config/server-options.md",
+     "heading": "server.proxy",
+     "current": "// http://localhost:5173/foo   |   // http://localhost:5173/api/bar   |   // http://localhost:5173/fallback/   |   // ws://localhost:5173/socket.io",
+     "note": "comments in the proxy example showing which dev-server URL is proxied (the example config sets no port); the targets (localhost:4567, localhost:5174) are backend servers and need not change"
+    },
+    {
+     "file": "docs/guide/index.md",
+     "heading": "Manual Installation",
+     "current": "The `index.html` will be served on `http://localhost:5173`."
+    },
+    {
+     "file": "docs/guide/features.md",
+     "heading": "HTML",
+     "current": "- `<root>/index.html` -> `http://localhost:5173/`\n- `<root>/about.html` -> `http://localhost:5173/about.html`\n- `<root>/blog/index.html` -> `http://localhost:5173/blog/index.html`"
+    },
+    {
+     "file": "docs/guide/api-plugin.md",
+     "heading": "Authoring a Plugin",
+     "current": "After installing, you can visit `localhost:5173/__inspect/` to inspect the modules and transformation stack of your project."
+    },
+    {
+     "file": "packages/create-vite/template-qwik/README.md",
+     "heading": "`npm run dev`",
+     "current": "Open [http://localhost:5173](http://localhost:5173) to view it in the browser."
+    },
+    {
+     "file": "packages/create-vite/template-qwik-ts/README.md",
+     "heading": "`npm run dev`",
+     "current": "Open [http://localhost:5173](http://localhost:5173) to view it in the browser."
+    },
+    {
+     "file": "packages/create-vite/template-solid/README.md",
+     "heading": "`npm run dev`",
+     "current": "Open [http://localhost:5173](http://localhost:5173) to view it in the browser."
+    },
+    {
+     "file": "packages/create-vite/template-solid-ts/README.md",
+     "heading": "`npm run dev`",
+     "current": "Open [http://localhost:5173](http://localhost:5173) to view it in the browser."
+    }
+   ],
+   "not_in_key": "Places where 5173 is a user-chosen value rather than the default are not false: docs/config/index.md (`port: env.APP_PORT ? Number(env.APP_PORT) : 5173`), docs/guide/ssr.md (`app.listen(5173)` for the user's own server). docs/guide/backend-integration.md uses `http://localhost:5173` as a placeholder to 'substitute ... with the local URL Vite is running at'; updating it is optional. Preview port 4173 (docs/config/preview-options.md, docs/guide/static-deploy.md) must not change."
+  },
+  "key_sections": [
+   "packages/vite/src/node/constants.ts#DEFAULT_DEV_PORT",
+   "docs/config/server-options.md#serverport",
+   "docs/config/server-options.md#serverproxy",
+   "docs/guide/index.md#manual-installation",
+   "docs/guide/features.md#html",
+   "docs/guide/api-plugin.md#authoring-a-plugin",
+   "packages/create-vite/template-qwik/README.md#npm-run-dev",
+   "packages/create-vite/template-qwik-ts/README.md#npm-run-dev",
+   "packages/create-vite/template-solid/README.md#npm-run-dev",
+   "packages/create-vite/template-solid-ts/README.md#npm-run-dev"
+  ],
+  "must_touch": [
+   "packages/vite/src/node/constants.ts",
+   "docs/config/server-options.md",
+   "docs/guide/index.md",
+   "docs/guide/features.md",
+   "docs/guide/api-plugin.md",
+   "packages/create-vite/template-qwik/README.md",
+   "packages/create-vite/template-qwik-ts/README.md",
+   "packages/create-vite/template-solid/README.md",
+   "packages/create-vite/template-solid-ts/README.md"
+  ]
+ }
+]

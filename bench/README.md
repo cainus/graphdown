@@ -21,3 +21,5 @@ Run directories get neutral names (`r01`, `r02`, ...) so nothing in a path tells
 `pilot-2026-11-25d/` holds the fourth pilot (the same hard tasks, rerun with mentions in `refs`), written up in @docs/benchmark-pilot-4.
 
 `pilot-2026-11-25e/` holds the fifth pilot (the vite flag task only, testing the changed-code list in `check`), written up in @docs/benchmark-pilot-5.
+
+`study-tasks/` holds the tasks for the larger study: four change tasks each for httpx, vite and mdBook, written with `corpus/writer-prompt-stale.txt`. Each is a small code change that leaves at least three doc passages plainly false, and every key was checked against the checkout before any run.
