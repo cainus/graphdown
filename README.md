@@ -59,6 +59,7 @@ These docs are written in graphdown and checked in CI.
 - @docs/cli: every command and flag
 - @docs/architecture: how the code is organised
 - @docs/design: what was deliberately left out, and why
+- @docs/benchmark: how we'll test whether agents actually do better with graphdown
 - @docs/releasing: how a tag becomes binaries, npm, PyPI and crates.io packages
 - @AGENTS: how coding agents should work in this repo
 - @skill/SKILL.md: the agent skill that `graphdown skill` prints, for any graphdown repo
