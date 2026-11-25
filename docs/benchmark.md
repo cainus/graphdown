@@ -58,6 +58,28 @@ Set before running:
 - **Pitch the convention, not the tool,** if C captures most of B's gain.
 - **Reposition as a link checker** if B is within noise of A on correctness and cost.
 
+## When it doesn't help
+
+A null result is only useful if it says why. Graphdown can fail at four separate points, and the plan measures each one so the fix can be aimed at the right one.
+
+| Where it can fail | How we'd see it | What we'd try |
+| --- | --- | --- |
+| **Adoption:** the agent never runs graphdown, or gives up on it | Share of arm-B runs that call graphdown at all, and how early | Sharper skill description, an `AGENTS.md` line, a hook that suggests `graphdown show` when an agent opens a doc, an MCP server |
+| **Usage:** it runs, but the wrong command or too broadly | Command mix per run, output size of each call, tokens spent on graphdown output against tokens saved elsewhere | Token budgets on `slice` and `outline`, `outline` filtered to a folder, better examples in the skill |
+| **Retrieval:** used well, but the output lacks what the task needs | Retrieval recall: whether the task's key sections, listed in advance, ever appeared in the transcript | Denser references (a command that suggests missing ones), `Spec:` back-links, parent-section context in `show` |
+| **Reasoning:** the right text was found, the answer is still wrong | Key sections retrieved but task failed | Not a graphdown problem; note it and move on |
+
+Two extra arms, run on a subset of tasks, separate adoption from usefulness:
+
+- **B-forced:** arm B, but the prompt names the graphdown command to start with, for example "begin with `graphdown slice docs/auth#token-refresh`". This is a ceiling: the most the tool can give when used perfectly.
+- **B-no-skill:** the CLI is installed but no skill is given, to see whether the skill is what makes agents use it.
+
+Reading them together: if B-forced beats A but B does not, the tool works and agents aren't using it, so fix adoption. If even B-forced doesn't beat A, the output itself isn't good enough, so look at usage and retrieval.
+
+Two properties of the corpus may explain results, so each is recorded per repo: **size** (doc count and total tokens; at small sizes plain grep may already be enough) and **reference density** (references per doc section; docs with few links give `slice` little to follow). Plotting the gain against both shows whether graphdown only pays off past some size or density, which would say who it is for.
+
+Every graphdown call, with its arguments and output size, is logged alongside the transcript so these numbers can be computed after the fact without rerunning anything.
+
 ## Pilot
 
 Run 6 tasks (some of each type) on this repo, 2 runs per arm. The goal is to debug the harness, grading and transcript parsing, not to draw conclusions. Then fix the tasks that turn out ambiguous and move to the real corpus.
