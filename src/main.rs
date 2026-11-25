@@ -35,8 +35,15 @@ enum Command {
     /// List the headings of docs (or the symbols of code files) with line ranges.
     #[command(alias = "ls")]
     Outline {
-        /// Docs or code files. Defaults to every doc.
+        /// Docs, code files or folders. Defaults to every doc. A doc or code
+        /// file lists its headings or definitions; a folder lists its docs.
         targets: Vec<String>,
+        /// Only list headings (or nested definitions) down to this level.
+        #[arg(long)]
+        depth: Option<u8>,
+        /// List headings for every doc, not just one line per doc.
+        #[arg(long)]
+        full: bool,
         #[arg(long)]
         json: bool,
     },
@@ -154,28 +161,78 @@ fn run(cli: Cli) -> Result<ExitCode> {
                 ExitCode::FAILURE
             });
         }
-        Command::Outline { targets, json } => {
-            let targets: Vec<Resolved> = if targets.is_empty() {
-                project
+        Command::Outline {
+            targets,
+            depth,
+            full,
+            json,
+        } => {
+            // A folder (or nothing) means "the docs in it", one line each,
+            // unless --full; a doc or code file means its headings.
+            let mut items: Vec<(Resolved, bool)> = Vec::new();
+            let mut folder_list: Vec<String> = if targets.is_empty() {
+                vec![String::new()]
+            } else {
+                Vec::new()
+            };
+            for t in &targets {
+                let clean = t.trim_start_matches("./").trim_end_matches('/');
+                if clean.is_empty() || clean == "." || project.root.join(clean).is_dir() {
+                    folder_list.push(if clean == "." {
+                        String::new()
+                    } else {
+                        clean.to_string()
+                    });
+                } else {
+                    items.push((target(t)?, true));
+                }
+            }
+            for folder in &folder_list {
+                let prefix = if folder.is_empty() {
+                    String::new()
+                } else {
+                    format!("{folder}/")
+                };
+                let docs: Vec<&String> = project
                     .docs
                     .keys()
-                    .map(|p| Resolved::Doc { path: p.clone() })
-                    .collect()
-            } else {
-                targets.iter().map(|t| target(t)).collect::<Result<_>>()?
-            };
-            let outlines = targets
-                .iter()
-                .map(|t| ops::outline(&project, t, true).map_err(anyhow::Error::msg))
-                .collect::<Result<Vec<_>>>()?;
+                    .filter(|p| p.starts_with(&prefix))
+                    .collect();
+                if docs.is_empty() {
+                    bail!("no docs under `{folder}`");
+                }
+                items.extend(
+                    docs.into_iter()
+                        .map(|p| (Resolved::Doc { path: p.clone() }, full)),
+                );
+            }
+            let mut outlines = Vec::new();
+            for (t, with_entries) in &items {
+                let mut o = ops::outline(&project, t, true).map_err(anyhow::Error::msg)?;
+                if !with_entries {
+                    o.entries.clear();
+                } else if let Some(d) = depth {
+                    o.entries.retain(|e| e.level <= d);
+                }
+                outlines.push((o, *with_entries));
+            }
             if json {
-                writeln!(out, "{}", serde_json::to_string_pretty(&outlines)?)?;
+                let plain: Vec<&ops::Outline> = outlines.iter().map(|(o, _)| o).collect();
+                writeln!(out, "{}", serde_json::to_string_pretty(&plain)?)?;
             } else {
-                for (i, o) in outlines.iter().enumerate() {
-                    if i > 0 {
-                        writeln!(out)?;
+                let compact = outlines.iter().filter(|(_, e)| !e).count();
+                for (i, (o, with_entries)) in outlines.iter().enumerate() {
+                    if *with_entries {
+                        if i > 0 {
+                            writeln!(out)?;
+                        }
+                        write!(out, "{}", ops::render_outline(o))?;
+                    } else {
+                        writeln!(out, "{}", ops::render_outline_line(o))?;
                     }
-                    write!(out, "{}", ops::render_outline(o))?;
+                }
+                if compact > 0 {
+                    writeln!(out, "\n{compact} docs. `graphdown outline <doc>` lists a doc's headings; `graphdown outline <folder>` narrows this list.")?;
                 }
             }
         }

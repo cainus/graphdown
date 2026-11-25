@@ -410,3 +410,37 @@ fn comment_tags_that_look_like_paths_are_ignored() {
     assert!(!out.contains("typescript-eslint"), "{out}");
     assert!(out.contains("src/x.ts:2"), "{out}");
 }
+
+#[test]
+fn outline_lists_one_line_per_doc_by_default() {
+    let p = sample();
+    let (code, out) = p.run(&["outline"]);
+    assert_eq!(code, 0, "{out}");
+    assert!(
+        out.starts_with(
+            "@docs/auth  Auth session: Short-lived tokens with silent renewal.  (16 lines, 2 in)\n"
+        ),
+        "{out}"
+    );
+    assert!(!out.contains("#token-ttl"), "{out}");
+    assert!(out.contains("2 docs."), "{out}");
+    let (_, full) = p.run(&["outline", "--full"]);
+    assert!(full.contains("#token-ttl"), "{full}");
+}
+
+#[test]
+fn outline_narrows_to_a_folder_and_a_depth() {
+    let p = Project::new(&[
+        ("docs/guide/a.md", "# A\n\n## Deep\n\n### Deeper\n"),
+        ("docs/ref/b.md", "# B\n"),
+    ]);
+    let (_, out) = p.run(&["outline", "docs/guide"]);
+    assert!(
+        out.contains("@docs/guide/a") && !out.contains("@docs/ref/b"),
+        "{out}"
+    );
+    let (_, out) = p.run(&["outline", "docs/guide/a", "--depth", "2"]);
+    assert!(out.contains("#deep") && !out.contains("#deeper"), "{out}");
+    let (code, out) = p.run(&["outline", "nowhere/"]);
+    assert_ne!(code, 0, "{out}");
+}

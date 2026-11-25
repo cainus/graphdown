@@ -341,6 +341,37 @@ pub fn outline(
     })
 }
 
+/// One line for a doc: its reference, title, summary and size, so a whole
+/// repo's docs fit in a few thousand tokens.
+///
+/// Spec: @docs/cli#outline
+pub fn render_outline_line(o: &Outline) -> String {
+    let mut line = o.target.clone();
+    let mut about = String::new();
+    if let Some(t) = &o.title {
+        about.push_str(t);
+    }
+    if let Some(s) = &o.summary {
+        if !about.is_empty() {
+            about.push_str(": ");
+        }
+        about.push_str(s);
+    }
+    if about.chars().count() > 110 {
+        about = about.chars().take(107).collect::<String>() + "...";
+    }
+    if !about.is_empty() {
+        line.push_str("  ");
+        line.push_str(&about);
+    }
+    line.push_str(&format!("  ({} lines", o.lines));
+    if o.incoming > 0 {
+        line.push_str(&format!(", {} in", o.incoming));
+    }
+    line.push(')');
+    line
+}
+
 pub fn render_outline(o: &Outline) -> String {
     let mut out = format!("{}  ({} lines", o.target, o.lines);
     if o.incoming > 0 {

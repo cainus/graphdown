@@ -43,7 +43,7 @@ Broken references fail the job and show up as annotations on the lines that cont
 
 ```sh
 graphdown check                                 # every reference resolves, or exit 1
-graphdown outline                               # every doc: summary, headings, line ranges
+graphdown outline                               # every doc, one line each; add a doc for its headings
 graphdown show docs/auth#token-refresh          # print one section
 graphdown refs src/auth.rs#Session::refresh     # who points at this?
 graphdown slice docs/auth#token-refresh         # the section plus everything it depends on

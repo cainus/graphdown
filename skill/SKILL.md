@@ -11,10 +11,11 @@ Graphdown treats markdown like code: every heading is a symbol, and `@path#fragm
 
 Do this instead of listing folders and opening files:
 
-1. `graphdown outline`: a map of every doc, with its summary, headings, slugs and line ranges. Start here.
-2. `graphdown show docs/auth#token-refresh`: print one section, with its subsections.
-3. `graphdown slice docs/auth#token-refresh`: that section plus everything it references, transitively, each piece once. Use it to gather context for a task in one read. Add `--depth 1` to stay close, or `--no-code` for prose only.
-4. `graphdown outline src/auth.rs` and `graphdown show src/auth.rs#Session::refresh` work on code the same way.
+1. `graphdown outline`: one line per doc, with its title and summary. Start here. Add a folder (`graphdown outline docs/guide`) to narrow it.
+2. `graphdown outline docs/auth`: one doc's headings, with slugs and line ranges. `--depth 2` keeps only the top levels of a long doc.
+3. `graphdown show docs/auth#token-refresh`: print one section, with its subsections.
+4. `graphdown slice docs/auth#token-refresh`: that section plus everything it references, transitively, each piece once. Use it to gather context for a task in one read. Add `--depth 1` to stay close, or `--no-code` for prose only.
+5. `graphdown outline src/auth.rs` and `graphdown show src/auth.rs#Session::refresh` work on code the same way.
 
 Before changing a function or a doc section, run `graphdown refs <target>` to see every doc and code comment that points at it. Those are what your change may make wrong.
 

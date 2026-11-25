@@ -17,13 +17,16 @@ Resolves every reference in every doc and in every code comment (@docs/syntax#re
 ## outline
 
 ```sh
-graphdown outline                     # every doc: summary and headings
-graphdown outline docs/syntax         # one doc
-graphdown outline src/project.rs      # the definitions in a source file
+graphdown outline                         # every doc, one line each: title, summary, size
+graphdown outline docs/guide              # the docs in one folder
+graphdown outline docs/syntax             # one doc's headings, with line ranges and fragments
+graphdown outline docs/syntax --depth 2   # only # and ## headings
+graphdown outline src/project.rs          # the definitions in a source file
+graphdown outline --full                  # headings for every doc
 graphdown outline --json
 ```
 
-Prints each heading (or definition) with its line range and fragment, plus how many references point at the file. Run with no arguments it is the map of the whole doc set, the job a committed `SYMBOLS.json` would otherwise do, but always current. Alias: `ls`.
+With no arguments, or a folder, it prints one line per doc: its reference, title, summary, length and how many references point at it. A doc or code file lists every heading or definition with its line range and fragment. That two-step map does the job a committed `SYMBOLS.json` would otherwise do, but always current, and stays small on big repos: vite's 82 docs fit in about 11,000 characters as one line each, against 166,000 with every heading (@docs/benchmark-pilot-2#results). Alias: `ls`.
 
 ## show
 
