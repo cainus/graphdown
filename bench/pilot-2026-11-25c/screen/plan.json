@@ -1,0 +1,98 @@
+[
+ {
+  "run": "en01",
+  "repo": "vite",
+  "task": "c1",
+  "arm": "A",
+  "rep": 1,
+  "dir": "/tmp/bench3/screen/runs/en01"
+ },
+ {
+  "run": "en02",
+  "repo": "vite",
+  "task": "c2",
+  "arm": "A",
+  "rep": 1,
+  "dir": "/tmp/bench3/screen/runs/en02"
+ },
+ {
+  "run": "en03",
+  "repo": "httpx",
+  "task": "q2",
+  "arm": "A",
+  "rep": 1,
+  "dir": "/tmp/bench3/screen/runs/en03"
+ },
+ {
+  "run": "en04",
+  "repo": "vite",
+  "task": "q1",
+  "arm": "A",
+  "rep": 1,
+  "dir": "/tmp/bench3/screen/runs/en04"
+ },
+ {
+  "run": "en05",
+  "repo": "vite",
+  "task": "c3",
+  "arm": "A",
+  "rep": 1,
+  "dir": "/tmp/bench3/screen/runs/en05"
+ },
+ {
+  "run": "en06",
+  "repo": "httpx",
+  "task": "q1",
+  "arm": "A",
+  "rep": 1,
+  "dir": "/tmp/bench3/screen/runs/en06"
+ },
+ {
+  "run": "en07",
+  "repo": "httpx",
+  "task": "c1",
+  "arm": "A",
+  "rep": 1,
+  "dir": "/tmp/bench3/screen/runs/en07"
+ },
+ {
+  "run": "en08",
+  "repo": "httpx",
+  "task": "q3",
+  "arm": "A",
+  "rep": 1,
+  "dir": "/tmp/bench3/screen/runs/en08"
+ },
+ {
+  "run": "en09",
+  "repo": "httpx",
+  "task": "c3",
+  "arm": "A",
+  "rep": 1,
+  "dir": "/tmp/bench3/screen/runs/en09"
+ },
+ {
+  "run": "en10",
+  "repo": "vite",
+  "task": "q3",
+  "arm": "A",
+  "rep": 1,
+  "dir": "/tmp/bench3/screen/runs/en10"
+ },
+ {
+  "run": "en11",
+  "repo": "httpx",
+  "task": "c2",
+  "arm": "A",
+  "rep": 1,
+  "dir": "/tmp/bench3/screen/runs/en11"
+ },
+ {
+  "run": "en12",
+  "repo": "vite",
+  "task": "q2",
+  "arm": "A",
+  "rep": 1,
+  "dir": "/tmp/bench3/screen/runs/en12"
+ }
+]

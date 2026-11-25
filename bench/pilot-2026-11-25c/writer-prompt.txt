@@ -1,0 +1,23 @@
+You are writing hard evaluation tasks for coding agents. The repository is at REPO (a fresh clone; read-only for you: do not modify it). Write exactly 6 tasks that a strong agent working quickly, mostly by searching for obvious keywords, would be likely to get partly wrong. They must depend on the repository's markdown documentation.
+
+Make them hard in these ways (use several):
+- the answer needs facts from three or more different files, at least two of them markdown docs
+- the key fact lives in a doc whose name and headings don't match the obvious search terms
+- two places in the repo disagree (a stale doc versus the code or another doc) and the agent must notice which is right
+- a change must be reflected in four or more places, including docs that describe the behaviour only indirectly (examples, sample output, tables, migration notes, READMEs of sub-packages)
+- a rule that constrains a code change is stated in a contributor or design doc, not near the code
+
+Write 3 questions (ids "q1", "q2", "q3", type "question") and 3 changes (ids "c1", "c2", "c3", type "constrained-change" or "change-and-update"). Changes must be small in code but broad in what must stay consistent.
+
+Rules:
+- Use only what is really in this checkout. Verify every fact in your keys by reading the files.
+- Tasks must be doable without installing dependencies or running test suites.
+- Do not mention any particular tool to use, and give no hints about where to look.
+- Write the task text as a user would.
+
+Write the result as JSON to OUT: a list of 6 objects with fields
+  "id", "type", "prompt" (the task text),
+  "key" (what a fully correct answer or change contains, including every hidden point, specific enough for a grader who has not read the repo),
+  "key_sections" (list of "path#heading-slug" or "path#symbol" a good run must have read),
+  "must_touch" (for changes, every file a correct change must modify; [] for questions).
+Then reply with just the word done.

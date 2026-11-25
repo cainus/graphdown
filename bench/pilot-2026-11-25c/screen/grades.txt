@@ -1,0 +1,4 @@
+Single strict blind grader on the screening runs (arm A only).
+g01 en09 httpx c3 1 | g02 en07 httpx c1 0.5 (logging.md left; no test) | g03 en04 vite q1 1 | g04 en02 vite c2 0.5 (migration guide paragraph)
+g05 en03 httpx q2 0.5 (missed ValueError for scheme-less proxy=) | g06 en06 httpx q1 1 | g07 en11 httpx c2 1 | g08 en10 vite q3 1
+g09 en08 httpx q3 1 | g10 en01 vite c1 1 | g11 en05 vite c3 1 | g12 en12 vite q2 0.5 (sharedConfigBuild has no flag)

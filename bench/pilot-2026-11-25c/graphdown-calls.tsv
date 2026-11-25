@@ -1,0 +1,82 @@
+in02	1795632786	3584	outline --root .
+in02	1795632790	2917	show docs/environment_variables --root .
+in02	1795632790	985	outline httpx/_utils.py --root .
+in02	1795632790	7755	outline httpx/_client.py --root .
+in02	1795632793	2213	show httpx/_utils.py#get_environment_proxies --root .
+in02	1795632793	3898	show httpx/_utils.py#URLPattern --root .
+in02	1795632793	593	show httpx/_client.py#BaseClient._get_proxy_map --root .
+in02	1795632793	2823	show httpx/_client.py#Client.__init__ --root .
+in02	1795632804	235	show httpx/_utils.py#is_ipv4_hostname --root .
+in02	1795632804	1150	outline httpx/_config.py --root .
+in02	1795632804	815	show httpx/_config.py#Proxy.__init__ --root .
+in02	1795632804	510	show httpx/_client.py#Client._transport_for_url --root .
+in02	1795632804	672	show httpx/_client.py#Client._init_transport --root .
+in04	1795632788	3584	--root . outline
+in04	1795632793	57	--root . refs httpx/_config.py#DEFAULT_TIMEOUT_CONFIG
+in04	1795632809	1140	--root . check
+in05	1795632790	3584	--root . outline
+in05	1795632795	57	--root . refs httpx/_config.py#DEFAULT_TIMEOUT_CONFIG
+in05	1795632795	2829	--root . show docs/advanced/timeouts
+in05	1795632811	1140	--root . check
+in06	1795632792	11109	--root /tmp/bench3/main/runs/in06 outline
+in06	1795632796	1574	--root /tmp/bench3/main/runs/in06 show docs/changes/index
+in06	1795632797	3605	--root /tmp/bench3/main/runs/in06 show docs/changes/hotupdate-hook
+in06	1795632797	2342	--root /tmp/bench3/main/runs/in06 show docs/changes/per-environment-apis
+in06	1795632798	1355	--root /tmp/bench3/main/runs/in06 show docs/changes/ssr-using-modulerunner
+in06	1795632798	2472	--root /tmp/bench3/main/runs/in06 show docs/changes/this-environment-in-hooks
+in06	1795632803	4468	--root /tmp/bench3/main/runs/in06 outline docs/config/shared-options
+in06	1795632803	456	--root /tmp/bench3/main/runs/in06 show docs/config/shared-options#future
+in07	1795632853	11109	outline --root /tmp/bench3/main/runs/in07
+in07	1795632854	11109	outline --root /tmp/bench3/main/runs/in07
+in07	1795632858	1574	show docs/changes/index --root /tmp/bench3/main/runs/in07
+in07	1795632858	3605	show docs/changes/hotupdate-hook --root /tmp/bench3/main/runs/in07
+in07	1795632859	2342	show docs/changes/per-environment-apis --root /tmp/bench3/main/runs/in07
+in07	1795632863	4468	outline docs/config/shared-options --root /tmp/bench3/main/runs/in07
+in07	1795632863	456	show docs/config/shared-options#future --root /tmp/bench3/main/runs/in07
+in07	1795632864	2472	show docs/changes/this-environment-in-hooks --root /tmp/bench3/main/runs/in07
+in07	1795632864	1355	show docs/changes/ssr-using-modulerunner --root /tmp/bench3/main/runs/in07
+in07	1795632864	2348	show docs/changes/shared-plugins-during-build --root /tmp/bench3/main/runs/in07
+in11	1795632857	3584	--root . outline
+in11	1795632860	2917	--root . show docs/environment_variables
+in11	1795632860	3626	--root . show docs/advanced/proxies
+in11	1795632860	985	--root . outline httpx/_utils.py
+in11	1795632860	7755	--root . outline httpx/_client.py
+in11	1795632864	2213	--root . show httpx/_utils.py#get_environment_proxies
+in11	1795632864	3898	--root . show httpx/_utils.py#URLPattern
+in11	1795632864	235	--root . show httpx/_utils.py#is_ipv4_hostname
+in11	1795632864	593	--root . show httpx/_client.py#BaseClient._get_proxy_map
+in11	1795632864	2823	--root . show httpx/_client.py#Client.__init__
+in11	1795632864	7755	--root . outline httpx/_client.py
+in11	1795632872	510	--root . show httpx/_client.py#Client._transport_for_url
+in11	1795632872	672	--root . show httpx/_client.py#Client._init_transport
+in13	1795632938	11109	--root . outline
+in13	1795632939	11109	--root . outline
+in13	1795632943	1574	--root . show docs/changes/index
+in13	1795632943	4468	--root . outline docs/config/shared-options
+in13	1795632947	456	--root . show docs/config/shared-options#future
+in13	1795632947	2472	--root . show docs/changes/this-environment-in-hooks
+in13	1795632948	3605	--root . show docs/changes/hotupdate-hook
+in13	1795632948	1355	--root . show docs/changes/ssr-using-modulerunner
+in13	1795632948	2342	--root . show docs/changes/per-environment-apis
+in13	1795632949	2348	--root . show docs/changes/shared-plugins-during-build
+in14	1795632939	11109	--root . outline
+in14	1795632949	456	--root . show docs/config/shared-options#future
+in14	1795632952	225	--root . refs docs/changes/ssr-using-modulerunner
+in14	1795632962	3970	--root . check
+in14	1795632966	3970	--root . check
+in14	1795632966	3970	--root . check
+in15	1795632939	3584	--root . outline
+in15	1795632947	57	--root . refs httpx/_config.py#DEFAULT_TIMEOUT_CONFIG
+in15	1795632947	109	--root . refs docs/advanced/timeouts
+in15	1795632964	1140	--root . check
+in17	1795632943	11109	outline --root .
+in17	1795632976	3970	check --root /tmp/bench3/main/runs/in17
+in17	1795632979	3970	check --root .
+in21	1795633010	3584	outline --root .
+in21	1795633013	2917	show docs/environment_variables --root .
+in21	1795633013	3626	show docs/advanced/proxies --root .
+in21	1795633016	2213	show httpx/_utils.py#get_environment_proxies --root .
+in24	1795633017	11109	--root . outline
+in24	1795633037	3970	--root . check
+in24	1795633041	3970	--root . check
+in24	1795633041	3970	--root . check

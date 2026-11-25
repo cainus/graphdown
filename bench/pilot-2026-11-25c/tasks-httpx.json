@@ -1,0 +1,130 @@
+[
+  {
+    "id": "q1",
+    "type": "question",
+    "prompt": "We're about to cut the 1.0.0 release from master. What exactly does the release PR need to contain, how does the git tag have to be named, and is there anything currently in the repo that would make the release fail or publish wrong information? Please be specific.",
+    "key": "A fully correct answer covers: (1) Release PR contents per the maintainer release process: an update to CHANGELOG.md in keepachangelog format (turn '## 1.0.0 (Unreleased)' into a dated heading; list added/changed/deprecated/removed features and bug fixes, not docs/tests/tooling changes) and a version bump in httpx/__version__.py (it already reads 1.0.0). (2) Version consistency is enforced by scripts/sync-version, which is run by scripts/check (CI 'Run linting checks' step, and scripts/test locally): it takes the SECOND semver string in CHANGELOG.md (the first is the 1.0.0 in the keepachangelog URL near the top) and requires it to equal the version in httpx/__version__.py, so the release heading must be the first version heading and must say 1.0.0. (3) Tag: the GitHub release tag must be exactly '1.0.0' (no 'v' prefix), release title 'Version 1.0.0', description copied from the changelog; scripts/publish fails if GITHUB_REF != refs/tags/<__version__>. Publishing happens on tag push via .github/workflows/publish.yml (twine upload + mkdocs gh-deploy). (4) Blocking problem: .github/workflows/publish.yml sets up Python 3.9, but pyproject.toml has requires-python '>=3.10' (CHANGELOG 1.0.0 says minimum is now 3.10, and the test matrix starts at 3.10); scripts/install does 'pip install -r requirements.txt' which includes '-e .[...]', so the publish job would fail on 3.9 -- publish.yml must be bumped to >=3.10. (5) Wrong published info: README.md (used as the PyPI long description via hatch-fancy-pypi-readme) and docs/index.md (deployed docs) both say 'HTTPX requires Python 3.9+', contradicting requires-python >=3.10; README/docs/index.md also list 'sniffio' as a dependency while pyproject depends on anyio (minor). Bonus: the PyPI description appends only the first '###' changelog subsection up to the next '## ' heading (pattern '\\n(###.+?\\n)## '), so the 1.0.0 bullet about the minimum Python version, which sits above '### Added', would not appear in the PyPI 'Release Information'.",
+    "key_sections": [
+      "docs/contributing.md#releasing",
+      "scripts/sync-version",
+      "scripts/publish",
+      "scripts/check",
+      ".github/workflows/publish.yml",
+      ".github/workflows/test-suite.yml",
+      "pyproject.toml",
+      "CHANGELOG.md#100-unreleased",
+      "README.md#installation",
+      "docs/index.md#installation",
+      "httpx/__version__.py#__version__"
+    ],
+    "must_touch": []
+  },
+  {
+    "id": "q2",
+    "type": "question",
+    "prompt": "Our pods have HTTPS_PROXY=corp-proxy:3128 (no scheme) and NO_PROXY=localhost,.svc.cluster.local,10.0.0.0/8 set, and no HTTP_PROXY. With a plain httpx.Client(), which of these go direct and which go through the proxy: https://api.svc.cluster.local, https://svc.cluster.local, https://10.2.3.4, http://localhost:8080/health, http://example.com, https://example.com? Then two teammates changed the code: one switched to httpx.Client(transport=httpx.HTTPTransport(retries=3)) to get retries, the other to httpx.Client(proxy=os.environ['HTTPS_PROXY']) to 'be explicit'. What does each of those do?",
+    "key": "Plain Client() (trust_env defaults True; env proxies come from urllib getproxies via httpx._utils.get_environment_proxies): HTTPS_PROXY without a scheme is accepted and turned into 'http://corp-proxy:3128' mounted on 'https://' only (docs say 'a URL' but scheme-less is accepted). NO_PROXY entries: 'localhost' -> 'all://localhost'; '.svc.cluster.local' -> 'all://*.svc.cluster.local' which matches strict subdomains only (same semantics as '*.example.com' in the transports routing docs); '10.0.0.0/8' is recognised as IPv4 but becomes 'all://10.0.0.0/8', whose host is just 10.0.0.0 -- CIDR ranges are NOT supported (only the exact address matches), despite the code comment suggesting 192.168.0.0/16 works. Results: https://api.svc.cluster.local -> direct; https://svc.cluster.local -> via proxy (leading dot excludes the bare domain); https://10.2.3.4 -> via proxy; http://localhost:8080/health -> direct; http://example.com -> direct (no HTTP_PROXY, HTTPS_PROXY applies only to https:// URLs); https://example.com -> via http://corp-proxy:3128 (tunnelled over an HTTP proxy). Teammate A: passing transport= disables environment proxies entirely (allow_env_proxies = trust_env and transport is None in the client), so everything goes direct; to keep retries and the proxy use HTTPTransport(proxy='http://corp-proxy:3128', retries=3) in mounts (e.g. 'https://' plus None entries for exclusions) or similar. Teammate B: httpx.Proxy requires a URL with scheme http/https/socks5/socks5h, so 'corp-proxy:3128' raises ValueError('Unknown scheme for proxy URL ...') at client construction; even with 'http://' added, an explicit proxy= maps 'all://' to the proxy and ignores the environment completely (including NO_PROXY), so all traffic -- http and https, localhost and cluster hosts -- would go through the proxy.",
+    "key_sections": [
+      "docs/environment_variables.md#http_proxy-https_proxy-all_proxy",
+      "docs/environment_variables.md#no_proxy",
+      "docs/advanced/transports.md#domain-routing",
+      "docs/advanced/transports.md#environment-variables",
+      "docs/advanced/proxies.md#http-proxies",
+      "httpx/_utils.py#get_environment_proxies",
+      "httpx/_utils.py#URLPattern",
+      "httpx/_utils.py#is_ipv4_hostname",
+      "httpx/_client.py#BaseClient._get_proxy_map",
+      "httpx/_client.py#Client.__init__",
+      "httpx/_config.py#Proxy"
+    ],
+    "must_touch": []
+  },
+  {
+    "id": "q3",
+    "type": "question",
+    "prompt": "We're migrating from requests. One upstream API sends Content-Type: text/plain with no charset, and the body is really Windows-1252. With requests .text looked fine; with httpx we get replacement characters. The compatibility guide says httpx guesses the encoding with charset_normalizer, so what's going on? What does r.encoding return for these responses, and what's the cleanest fix for a client that talks to many such endpoints, including the places where we stream the body with iter_text()?",
+    "key": "HTTPX does not auto-detect encodings by default: when the Content-Type has no (known) charset it uses the client's default_encoding, which defaults to 'utf-8', and decodes with errors='replace', hence U+FFFD characters. The compatibility guide's 'Content encoding' paragraph (charset_normalizer guessing) is stale -- charset_normalizer is not a dependency in pyproject.toml and the code (Response.encoding) just uses default_encoding; the Text Encodings guide is the accurate doc. The quickstart is also stale where it shows r.encoding returning None and says HTTPX will 'attempt to automatically determine' the encoding: Response.encoding always returns a string, here 'utf-8'. Fixes: set httpx.Client(default_encoding='cp1252') (or 'windows-1252'), or pass a callable for autodetection (e.g. using chardet or charset-normalizer, which must be installed separately) -- default_encoding is a Client/AsyncClient (and Response) option, not a top-level httpx.get() argument; per-response you can set r.encoding = 'cp1252' but only before .text is accessed (afterwards it raises ValueError). A charset present in the header always takes precedence; an unknown charset falls back to default_encoding. Streaming catch: a callable default_encoding is only invoked when the full body has already been read (the code checks for _content), so with client.stream(...)/iter_text() before reading, the callable is skipped and encoding falls back to (and caches) 'utf-8'; a string default_encoding like 'cp1252' does apply to iter_text(), so a fixed string (or setting response.encoding before iterating) is the fix for streamed responses.",
+    "key_sections": [
+      "docs/compatibility.md#content-encoding",
+      "docs/advanced/text-encodings.md#using-an-explicit-encoding",
+      "docs/advanced/text-encodings.md#using-auto-detection",
+      "docs/quickstart.md#response-content",
+      "httpx/_models.py#Response.encoding",
+      "httpx/_models.py#Response.iter_text",
+      "httpx/_decoders.py#TextDecoder",
+      "pyproject.toml"
+    ],
+    "must_touch": []
+  },
+  {
+    "id": "c1",
+    "type": "change-and-update",
+    "prompt": "Five seconds is too aggressive for our users. Change httpx's default timeout to 10 seconds, and make sure everything that describes the default is consistent with that.",
+    "key": "Code: DEFAULT_TIMEOUT_CONFIG in httpx/_config.py becomes Timeout(timeout=10.0) (client and top-level API defaults all use it). Docs that state the default must change: docs/advanced/timeouts.md intro ('after 5 seconds of network inactivity') and the 'Setting a default timeout on a client' comment ('Use a default 5s timeout everywhere'); docs/quickstart.md Timeouts section ('The default timeout for network inactivity is five seconds'); docs/logging.md sample debug output shows timeout=5.0 on connect_tcp.started and start_tls.started for a default httpx.get -- both should become timeout=10.0. CHANGELOG.md: an entry under the existing '## 1.0.0 (Unreleased)' heading (e.g. a '### Changed' bullet), not a new version heading (scripts/sync-version requires the changelog's version to match __version__.py; the release process says changed features must be listed). Must NOT change: Limits keepalive_expiry default 5.0 and its 'Default 5' in docs/advanced/resource-limits.md; the explicit 5.0 examples in the Timeout docstring, the extensions.md timeout example, or tests that construct Timeout(5.0) explicitly. A test asserting the new default (e.g. httpx.Client().timeout == httpx.Timeout(10.0)) is expected per the contributor checklist.",
+    "key_sections": [
+      "httpx/_config.py#DEFAULT_TIMEOUT_CONFIG",
+      "docs/advanced/timeouts.md#setting-a-default-timeout-on-a-client",
+      "docs/quickstart.md#timeouts",
+      "docs/logging.md",
+      "docs/advanced/resource-limits.md",
+      "docs/contributing.md#releasing",
+      "CHANGELOG.md#100-unreleased"
+    ],
+    "must_touch": [
+      "httpx/_config.py",
+      "docs/advanced/timeouts.md",
+      "docs/quickstart.md",
+      "docs/logging.md",
+      "CHANGELOG.md"
+    ]
+  },
+  {
+    "id": "c2",
+    "type": "change-and-update",
+    "prompt": "We're dropping Python 3.10 for 1.0. Make 3.11 the minimum supported Python version everywhere.",
+    "key": "pyproject.toml: requires-python '>=3.11' and remove the 'Programming Language :: Python :: 3.10' classifier. .github/workflows/test-suite.yml: drop '3.10' from the matrix. .github/workflows/publish.yml: currently pins python-version 3.9 (already below the old minimum) -- must be raised to 3.11 or later or the publish job cannot install the package. README.md ('HTTPX requires Python 3.9+.', also the PyPI description) and docs/index.md ('HTTPX requires Python 3.9+') are stale and must say 3.11+. CHANGELOG.md: edit the existing 1.0.0 (Unreleased) bullet 'Minimum supported Python version is now 3.10' to 3.11 rather than adding a contradictory entry or a new version heading (sync-version check). Optional/nice: remove the now-dead test_netrc_auth_nopassword_parse_error in tests/client/test_auth.py (skipped for Python >= 3.11, so it can never run); docs/async.md 'Python 3.9+ with python -m asyncio' may be updated but is about the asyncio REPL, not a support claim.",
+    "key_sections": [
+      "pyproject.toml",
+      ".github/workflows/test-suite.yml",
+      ".github/workflows/publish.yml",
+      "README.md#installation",
+      "docs/index.md#installation",
+      "CHANGELOG.md#100-unreleased",
+      "tests/client/test_auth.py#test_netrc_auth_nopassword_parse_error",
+      "scripts/sync-version"
+    ],
+    "must_touch": [
+      "pyproject.toml",
+      ".github/workflows/test-suite.yml",
+      ".github/workflows/publish.yml",
+      "README.md",
+      "docs/index.md",
+      "CHANGELOG.md"
+    ]
+  },
+  {
+    "id": "c3",
+    "type": "constrained-change",
+    "prompt": "For 1.0, passing raw bytes, text or byte iterators via data= should be an error rather than a deprecation warning. Please make that change in a way that would get through the project's CI and review.",
+    "key": "httpx/_content.py encode_request: when data is not None and not a Mapping, raise TypeError (message pointing users to content=<...>) instead of warnings.warn + encode_content; mapping form data and multipart (data + files) behaviour unchanged. Remove the now-unused 'import warnings' (ruff F401 would fail scripts/check). tests/test_content.py: the three 'Support data for compat with requests' blocks (bytes in test_bytes_content, sync iterator in test_iterator_content, async iterator in test_aiterator_content) use pytest.warns(DeprecationWarning) and must become pytest.raises(TypeError) (pytest.warns would fail with no warning); the project requires 100% coverage (scripts/coverage --fail-under=100), so the new raise must be exercised by a test. docs/compatibility.md 'Request Content' section says data=<text/byte content> 'will raise a deprecation warning, and is expected to be fully removed with the HTTPX 1.0 release' -- update to say it now raises an error. CHANGELOG.md: entry under the existing '## 1.0.0 (Unreleased)' heading (e.g. '### Removed' per keepachangelog), no new version heading (sync-version). PR template/contributing: tests and docs updated in the same change.",
+    "key_sections": [
+      "httpx/_content.py#encode_request",
+      "tests/test_content.py#test_bytes_content",
+      "tests/test_content.py#test_iterator_content",
+      "tests/test_content.py#test_aiterator_content",
+      "docs/compatibility.md#request-content",
+      "docs/contributing.md#releasing",
+      "docs/contributing.md#python-3x-job-failed",
+      ".github/PULL_REQUEST_TEMPLATE.md",
+      "scripts/coverage",
+      "scripts/check",
+      "CHANGELOG.md#100-unreleased"
+    ],
+    "must_touch": [
+      "httpx/_content.py",
+      "tests/test_content.py",
+      "docs/compatibility.md",
+      "CHANGELOG.md"
+    ]
+  }
+]

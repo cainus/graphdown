@@ -1,0 +1,693 @@
+You are grading coding-agent runs blind. For each ITEM you get the task, the grading key, the agent's final summary, and for change tasks the actual diff. Judge the work, not the writing.
+Output one JSON object per line and nothing else: {"id": "gNN", "score": 0|0.5|1, "hidden_point": true|false|null, "note": "<=20 words"}.
+score 1 = fully correct per the key, every point in it; 0.5 = mostly right with a real omission or error; 0 = wrong or missing the main point. For questions judge the answer's facts; for changes judge the diff.
+hidden_point: true if the run got the key's hardest or hidden point (the one a hasty agent would miss), false if not.
+
+=== ITEM g01 (httpx c3, constrained-change)
+TASK: For 1.0, passing raw bytes, text or byte iterators via data= should be an error rather than a deprecation warning. Please make that change in a way that would get through the project's CI and review.
+KEY: httpx/_content.py encode_request: when data is not None and not a Mapping, raise TypeError (message pointing users to content=<...>) instead of warnings.warn + encode_content; mapping form data and multipart (data + files) behaviour unchanged. Remove the now-unused 'import warnings' (ruff F401 would fail scripts/check). tests/test_content.py: the three 'Support data for compat with requests' blocks (bytes in test_bytes_content, sync iterator in test_iterator_content, async iterator in test_aiterator_content) use pytest.warns(DeprecationWarning) and must become pytest.raises(TypeError) (pytest.warns would fail with no warning); the project requires 100% coverage (scripts/coverage --fail-under=100), so the new raise must be exercised by a test. docs/compatibility.md 'Request Content' section says data=<text/byte content> 'will raise a deprecation warning, and is expected to be fully removed with the HTTPX 1.0 release' -- update to say it now raises an error. CHANGELOG.md: entry under the existing '## 1.0.0 (Unreleased)' heading (e.g. '### Removed' per keepachangelog), no new version heading (sync-version). PR template/contributing: tests and docs updated in the same change.
+SUMMARY: httpx/_content.py encode_request raises TypeError for non-mapping data= with message pointing to content=; removed unused warnings import (ruff F401). tests/test_content.py: test_bytes_content and test_iterator_content now check TypeError; removed pytestmark DeprecationWarning filter. docs/compatibility.md Request Content now says TypeError. CHANGELOG Changed entry.
+DIFF:
+diff --git a/CHANGELOG.md b/CHANGELOG.md
+index a3fa798..931c581 100644
+--- a/CHANGELOG.md
++++ b/CHANGELOG.md
+@@ -12,6 +12,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
+ 
+ * Expose `FunctionAuth` from the public API. (#3699)
+ 
++### Removed
++
++* Passing raw bytes, text or byte iterators via `data=<...>` now raises a `TypeError`, rather than a deprecation warning. Use `content=<...>` instead.
++
+ ## 0.28.1 (6th December, 2024)
+ 
+ * Fix SSL case where `verify=False` together with client side certificates.
+diff --git a/docs/compatibility.md b/docs/compatibility.md
+index 9686167..98595a2 100644
+--- a/docs/compatibility.md
++++ b/docs/compatibility.md
+@@ -86,8 +86,8 @@ And using `data=...` to send form data:
+ httpx.post(..., data={"message": "Hello, world"})
+ ```
+ 
+-Using the `data=<text/byte content>` will raise a deprecation warning,
+-and is expected to be fully removed with the HTTPX 1.0 release.
++Using `data=<text/byte content>` was deprecated in HTTPX 0.18, and as of
++HTTPX 1.0 it raises a `TypeError`. Use `content=...` instead.
+ 
+ ## Upload files
+ 
+diff --git a/httpx/_content.py b/httpx/_content.py
+index 6f479a0..eeed251 100644
+--- a/httpx/_content.py
++++ b/httpx/_content.py
+@@ -1,7 +1,6 @@
+ from __future__ import annotations
+ 
+ import inspect
+-import warnings
+ from json import dumps as json_dumps
+ from typing import (
+     Any,
+@@ -195,16 +194,18 @@ def encode_request(
+     returning a two-tuple of (<headers>, <stream>).
+     """
+     if data is not None and not isinstance(data, Mapping):
+-        # We prefer to separate `content=<bytes|str|byte iterator|bytes aiterator>`
++        # We separate `content=<bytes|str|byte iterator|bytes aiterator>`
+         # for raw request content, and `data=<form data>` for url encoded or
+         # multipart form content.
+         #
+-        # However for compat with requests, we *do* still support
+-        # `data=<bytes...>` usages. We deal with that case here, treating it
+-        # as if `content=<...>` had been supplied instead.
+-        message = "Use 'content=<...>' to upload raw bytes/text content."
+-        warnings.warn(message, DeprecationWarning, stacklevel=2)
+-        return encode_content(data)
++        # Passing raw content via `data=<...>` was deprecated in 0.18 and is
++        # no longer supported.
++        message = (
++            "The 'data' argument must be a mapping of form data, "
++            f"not {type(data).__name__!r}. "
++            "Use 'content=<...>' to upload raw bytes/text content."
++        )
++        raise TypeError(message)
+ 
+     if content is not None:
+         return encode_content(content)
+diff --git a/tests/test_content.py b/tests/test_content.py
+index 9bfe983..dd07fbe 100644
+--- a/tests/test_content.py
++++ b/tests/test_content.py
+@@ -36,18 +36,11 @@ async def test_bytes_content():
+     assert sync_content == b"Hello, world!"
+     assert async_content == b"Hello, world!"
+ 
+-    # Support 'data' for compat with requests.
+-    with pytest.warns(DeprecationWarning):
+-        request = httpx.Request(method, url, data=b"Hello, world!")  # type: ignore
+-    assert isinstance(request.stream, typing.Iterable)
+-    assert isinstance(request.stream, typing.AsyncIterable)
+-
+-    sync_content = b"".join(list(request.stream))
+-    async_content = b"".join([part async for part in request.stream])
+-
+-    assert request.headers == {"Host": "www.example.com", "Content-Length": "13"}
+-    assert sync_content == b"Hello, world!"
+-    assert async_content == b"Hello, world!"
++    # Raw content via 'data' is not supported. Use 'content' instead.
++    with pytest.raises(TypeError):
++        httpx.Request(method, url, data=b"Hello, world!")  # type: ignore
++    with pytest.raises(TypeError):
++        httpx.Request(method, url, data="Hello, world!")  # type: ignore
+ 
+ 
+ @pytest.mark.anyio
+@@ -111,19 +104,9 @@ async def test_iterator_content():
+     with pytest.raises(httpx.StreamConsumed):
+         list(request.stream)
+ 
+-    # Support 'data' for compat with requests.
+-    with pytest.warns(DeprecationWarning):
+-        request = httpx.Request(method, url, data=hello_world())  # type: ignore
+-    assert isinstance(request.stream, typing.Iterable)
+-    assert not isinstance(request.stream, typing.AsyncIterable)
+-
+-    content = b"".join(list(request.stream))
+-
+-    assert request.headers == {
+-        "Host": "www.example.com",
+-        "Transfer-Encoding": "chunked",
+-    }
+-    assert content == b"Hello, world!"
++    # Raw content via 'data' is not supported. Use 'content' instead.
++    with pytest.raises(TypeError):
++        httpx.Request(method, url, data=hello_world())  # type: ignore
+ 
+ 
+ @pytest.mark.anyio
+@@ -147,19 +130,9 @@ async def test_aiterator_content():
+     with pytest.raises(httpx.StreamConsumed):
+         [part async for part in request.stream]
+ 
+-    # Support 'data' for compat with requests.
+-    with pytest.warns(DeprecationWarning):
+-        request = httpx.Request(method, url, data=hello_world())  # type: ignore
+-    assert not isinstance(request.stream, typing.Iterable)
+-    assert isinstance(request.stream, typing.AsyncIterable)
+-
+-    content = b"".join([part async for part in request.stream])
+-
+-    assert request.headers == {
+-        "Host": "www.example.com",
+-        "Transfer-Encoding": "chunked",
+-    }
+-    assert content == b"Hello, world!"
++    # Raw content via 'data' is not supported. Use 'content' instead.
++    with pytest.raises(TypeError):
++        httpx.Request(method, url, data=hello_world())  # type: ignore
+ 
+ 
+ @pytest.mark.anyio
+
+=== ITEM g02 (httpx c1, change-and-update)
+TASK: Five seconds is too aggressive for our users. Change httpx's default timeout to 10 seconds, and make sure everything that describes the default is consistent with that.
+KEY: Code: DEFAULT_TIMEOUT_CONFIG in httpx/_config.py becomes Timeout(timeout=10.0) (client and top-level API defaults all use it). Docs that state the default must change: docs/advanced/timeouts.md intro ('after 5 seconds of network inactivity') and the 'Setting a default timeout on a client' comment ('Use a default 5s timeout everywhere'); docs/quickstart.md Timeouts section ('The default timeout for network inactivity is five seconds'); docs/logging.md sample debug output shows timeout=5.0 on connect_tcp.started and start_tls.started for a default httpx.get -- both should become timeout=10.0. CHANGELOG.md: an entry under the existing '## 1.0.0 (Unreleased)' heading (e.g. a '### Changed' bullet), not a new version heading (scripts/sync-version requires the changelog's version to match __version__.py; the release process says changed features must be listed). Must NOT change: Limits keepalive_expiry default 5.0 and its 'Default 5' in docs/advanced/resource-limits.md; the explicit 5.0 examples in the Timeout docstring, the extensions.md timeout example, or tests that construct Timeout(5.0) explicitly. A test asserting the new default (e.g. httpx.Client().timeout == httpx.Timeout(10.0)) is expected per the contributor checklist.
+SUMMARY: DEFAULT_TIMEOUT_CONFIG = Timeout(timeout=10.0). docs/quickstart.md 'ten seconds'; docs/advanced/timeouts.md intro and comment 10s, custom example to 20.0; httpx/_main.py --timeout default and both help strings 10.0; CHANGELOG entry. Left alone: docstring examples, docs/advanced/extensions.md, docs/logging.md, tests.
+DIFF:
+diff --git a/CHANGELOG.md b/CHANGELOG.md
+index a3fa798..25d58de 100644
+--- a/CHANGELOG.md
++++ b/CHANGELOG.md
+@@ -8,6 +8,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
+ 
+ * Minimum supported Python version is now 3.10
+ 
++### Changed
++
++* The default timeout is now 10 seconds, increased from 5 seconds.
++
+ ### Added
+ 
+ * Expose `FunctionAuth` from the public API. (#3699)
+diff --git a/docs/advanced/timeouts.md b/docs/advanced/timeouts.md
+index aedcfb6..32f9693 100644
+--- a/docs/advanced/timeouts.md
++++ b/docs/advanced/timeouts.md
+@@ -1,6 +1,6 @@
+ HTTPX is careful to enforce timeouts everywhere by default.
+ 
+-The default behavior is to raise a `TimeoutException` after 5 seconds of
++The default behavior is to raise a `TimeoutException` after 10 seconds of
+ network inactivity.
+ 
+ ## Setting and disabling timeouts
+@@ -33,8 +33,8 @@ You can set a timeout on a client instance, which results in the given
+ `timeout` being used as the default for requests made with this client:
+ 
+ ```python
+-client = httpx.Client()              # Use a default 5s timeout everywhere.
+-client = httpx.Client(timeout=10.0)  # Use a default 10s timeout everywhere.
++client = httpx.Client()              # Use a default 10s timeout everywhere.
++client = httpx.Client(timeout=20.0)  # Use a default 20s timeout everywhere.
+ client = httpx.Client(timeout=None)  # Disable all timeouts by default.
+ ```
+ 
+diff --git a/docs/quickstart.md b/docs/quickstart.md
+index e140b53..cd7011c 100644
+--- a/docs/quickstart.md
++++ b/docs/quickstart.md
+@@ -454,7 +454,7 @@ HTTPX defaults to including reasonable timeouts for all network operations,
+ meaning that if a connection is not properly established then it should always
+ raise an error rather than hanging indefinitely.
+ 
+-The default timeout for network inactivity is five seconds. You can modify the
++The default timeout for network inactivity is ten seconds. You can modify the
+ value to be more or less strict:
+ 
+ ```pycon
+diff --git a/httpx/_config.py b/httpx/_config.py
+index 467a6c9..d10b32a 100644
+--- a/httpx/_config.py
++++ b/httpx/_config.py
+@@ -243,6 +243,6 @@ class Proxy:
+         return f"Proxy({url_str}{auth_str}{headers_str})"
+ 
+ 
+-DEFAULT_TIMEOUT_CONFIG = Timeout(timeout=5.0)
++DEFAULT_TIMEOUT_CONFIG = Timeout(timeout=10.0)
+ DEFAULT_LIMITS = Limits(max_connections=100, max_keepalive_connections=20)
+ DEFAULT_MAX_REDIRECTS = 20
+diff --git a/httpx/_main.py b/httpx/_main.py
+index cffa4bb..480bc52 100644
+--- a/httpx/_main.py
++++ b/httpx/_main.py
+@@ -81,7 +81,7 @@ def print_help() -> None:
+     table.add_row(
+         "--timeout [cyan]FLOAT",
+         "Timeout value to use for network operations, such as establishing the"
+-        " connection, reading some data, etc... [Default: 5.0]",
++        " connection, reading some data, etc... [Default: 10.0]",
+     )
+ 
+     table.add_row("--follow-redirects", "Automatically follow redirects.")
+@@ -400,10 +400,10 @@ def handle_help(
+     "--timeout",
+     "timeout",
+     type=float,
+-    default=5.0,
++    default=10.0,
+     help=(
+         "Timeout value to use for network operations, such as establishing the "
+-        "connection, reading some data, etc... [Default: 5.0]"
++        "connection, reading some data, etc... [Default: 10.0]"
+     ),
+ )
+ @click.option(
+
+=== ITEM g03 (vite q1, question)
+TASK: Our app uses @vitejs/plugin-legacy with its default options, and in vite.config we also set build.target to ['chrome111', 'edge111', 'firefox114', 'safari16.4'] because we figured that is what Vite does by default anyway. When we run vite build, what JS target and what CSS target do the modern chunks actually get built with? How does that compare to Vite's own default target, and what Baseline date is Vite's default pinned to? A colleague insists the default corresponds to Baseline Widely Available on 2025-05-01. Who is right?
+KEY: 1) plugin-legacy's config hook (only for the build command and non-SSR builds) overwrites build.target. With modernTargets unset it sets build.target to its built-in modern list ['es2020', 'edge105', 'firefox106', 'chrome105', 'safari16.4', 'ios16.4'] (browserslist form 'edge>=105, firefox>=106, chrome>=105, safari>=16.4, chromeAndroid>=105, iOS>=16.4', which is the documented modernTargets default in the plugin README). The user's build.target is discarded, not merged. Because legacy chunks are generated (renderLegacyChunks defaults to true) and build.target was set, the plugin logs the warning "plugin-legacy overrode 'build.target'. You should pass 'targets' as an option to this plugin with the list of legacy browsers to support instead." The supported way to change the modern range is the plugin's modernTargets option, which is converted with browserslist-to-esbuild and triggers its own warning that it overrode the built-in modern targets. 2) CSS: when legacy chunks are generated and build.cssTarget is not set, the plugin sets build.cssTarget to 'chrome61', to avoid #RGBA hex colors. Without the plugin, cssTarget defaults to the same value as build.target. 3) Vite's own default ('baseline-widely-available') resolves to ['chrome111', 'edge111', 'firefox114', 'safari16.4', 'ios16.4']. That is higher than plugin-legacy's modern floor of chrome/edge 105 and firefox 106, so the plugin deliberately targets a wider range than Vite does. 4) The date is 2026-01-01, not 2025-05-01. build-options.md, guide/build.md, migration.md, the build.ts JSDoc for target and scripts/generateTarget.ts (targetDate = '2026-01-01') all agree on 2026-01-01. The '2025-05-01' only appears in a stale JSDoc comment above ESBUILD_BASELINE_WIDELY_AVAILABLE_TARGET in packages/vite/src/node/constants.ts. The colleague is wrong, and that comment is out of date. Full credit needs all four points, including naming the stale comment as the source of the wrong date.
+SUMMARY: plugin-legacy replaces build.target with modernTargetsEsbuild ['es2020','edge105','firefox106','chrome105','safari16.4','ios16.4'] regardless; warns 'plugin-legacy overrode build.target'; use modernTargets option. CSS target: plugin sets build.cssTarget 'chrome61' when legacy chunks on and cssTarget unset. Vite default 'baseline-widely-available' = chrome111, edge111, firefox114, safari16.4, ios16.4. User's array omits ios16.4 (moot). Baseline date 2026-01-01 (generateTarget.ts targetDate, docs, migration, JSDoc); the 2025-05-01 in constants.ts comment is stale.
+
+=== ITEM g04 (vite c2, change-and-update)
+TASK: Users who opt into the future deprecation warnings for server.ssrLoadModule complain that they also get spammed by warnings from server.ssrFixStacktrace and server.ssrRewriteStacktrace, which they call from their error handlers. Split those two out into their own future flag named removeSsrFixStacktrace, so removeSsrLoadModule only covers ssrLoadModule itself. Make sure everything that lists or documents the future flags stays consistent.
+KEY: packages/vite/src/node/config.ts: (1) add removeSsrFixStacktrace?: 'warn' to the FutureOptions interface. (2) Add removeSsrFixStacktrace: 'warn' to the object that `future: 'warn'` expands into in resolveConfig. That object is checked with `satisfies Required<FutureOptions>`, so leaving it out is a type error. (3) Adding removeSsrFixStacktrace: undefined to the config defaults' future block is expected for consistency, but not essential. packages/vite/src/node/deprecations.ts: (4) add removeSsrFixStacktrace to deprecationCode. Both deprecationCode and deprecationMessages are checked with `satisfies Record<keyof FutureOptions, string>`. The code value builds the docs link vite.dev/changes/<code>, so it must be an existing page slug, namely 'ssr-using-modulerunner', not a made-up page. (5) Add a deprecationMessages entry for the new flag, for example saying ssrFixStacktrace/ssrRewriteStacktrace are not needed with Module Runners. packages/vite/src/node/server/index.ts: (6) the ssrFixStacktrace and ssrRewriteStacktrace methods of the ViteDevServer object built in _createServer switch from warnFutureDeprecation(config, 'removeSsrLoadModule', ...) to 'removeSsrFixStacktrace' (keeping or moving their extra messages). ssrLoadModule keeps 'removeSsrLoadModule'. Internal ssrFixStacktrace calls (for example ssrModuleLoader's fixStacktrace path) must not start warning. Docs: (7) docs/changes/ssr-using-modulerunner.md must document the new flag. Its 'Future Deprecation' box currently tells users to set only future.removeSsrLoadModule, and its Migration Guide paragraph about ssrFixStacktrace/ssrRewriteStacktrace should name future.removeSsrFixStacktrace. No new docs/changes page and no change to docs/changes/index.md is needed. A run that only adds the interface key, or forgets the 'warn' expansion or the deprecationCode/Message entries, is incomplete.
+SUMMARY: Added future flag removeSsrFixStacktrace: config.ts FutureOptions type, future defaults, and the future: 'warn' expansion; deprecations.ts docs link to ssr-using-modulerunner and warning message (both maps must cover every flag); server/index.ts ssrFixStacktrace and ssrRewriteStacktrace now warn under the new flag; docs/changes/ssr-using-modulerunner.md future deprecation box mentions it. Also added two missing defaults. Behaviour change noted. Old CHANGELOG entry left; shared-options.md has no flag list.
+DIFF:
+diff --git a/docs/changes/ssr-using-modulerunner.md b/docs/changes/ssr-using-modulerunner.md
+index 47c334f..0a6edfd 100644
+--- a/docs/changes/ssr-using-modulerunner.md
++++ b/docs/changes/ssr-using-modulerunner.md
+@@ -9,7 +9,7 @@ Give us feedback at [Environment API feedback discussion](https://github.com/vit
+ Affected scope: `Vite Plugin Authors`
+ 
+ ::: warning Future Deprecation
+-`ModuleRunner` was first introduced in `v6.0`. The deprecation of `server.ssrLoadModule` is planned for a future major. To identify your usage, set `future.removeSsrLoadModule` to `"warn"` in your vite config.
++`ModuleRunner` was first introduced in `v6.0`. The deprecation of `server.ssrLoadModule` is planned for a future major. To identify your usage, set `future.removeSsrLoadModule` to `"warn"` in your vite config. To also identify usage of `server.ssrFixStacktrace` and `server.ssrRewriteStacktrace`, set `future.removeSsrFixStacktrace` to `"warn"`.
+ :::
+ 
+ ## Motivation
+diff --git a/packages/vite/src/node/config.ts b/packages/vite/src/node/config.ts
+index 016a97a..25d0bc9 100644
+--- a/packages/vite/src/node/config.ts
++++ b/packages/vite/src/node/config.ts
+@@ -598,6 +598,7 @@ export interface FutureOptions {
+   removeServerWarmupRequest?: 'warn'
+ 
+   removeSsrLoadModule?: 'warn'
++  removeSsrFixStacktrace?: 'warn'
+ }
+ 
+ export interface ExperimentalOptions {
+@@ -929,10 +930,13 @@ const configDefaults = Object.freeze({
+     removePluginHookHandleHotUpdate: undefined,
+     removePluginHookSsrArgument: undefined,
+     removeServerModuleGraph: undefined,
++    removeServerReloadModule: undefined,
++    removeServerPluginContainer: undefined,
+     removeServerHot: undefined,
+     removeServerTransformRequest: undefined,
+     removeServerWarmupRequest: undefined,
+     removeSsrLoadModule: undefined,
++    removeSsrFixStacktrace: undefined,
+   },
+   legacy: {
+     skipWebSocketTokenCheck: false,
+@@ -2161,6 +2165,7 @@ export async function resolveConfig(
+             removeServerTransformRequest: 'warn',
+             removeServerWarmupRequest: 'warn',
+             removeSsrLoadModule: 'warn',
++            removeSsrFixStacktrace: 'warn',
+           } satisfies Required<FutureOptions>)
+         : config.future,
+ 
+diff --git a/packages/vite/src/node/deprecations.ts b/packages/vite/src/node/deprecations.ts
+index f51b71c..e7c071a 100644
+--- a/packages/vite/src/node/deprecations.ts
++++ b/packages/vite/src/node/deprecations.ts
+@@ -15,6 +15,7 @@ const deprecationCode = {
+   removeServerWarmupRequest: 'per-environment-apis',
+ 
+   removeSsrLoadModule: 'ssr-using-modulerunner',
++  removeSsrFixStacktrace: 'ssr-using-modulerunner',
+ } satisfies Record<keyof FutureOptions, string>
+ 
+ const deprecationMessages = {
+@@ -37,6 +38,8 @@ const deprecationMessages = {
+ 
+   removeSsrLoadModule:
+     'The `server.ssrLoadModule` is replaced with Environment Runner.',
++  removeSsrFixStacktrace:
++    'The `server.ssrFixStacktrace` and `server.ssrRewriteStacktrace` are replaced with Environment Runner.',
+ } satisfies Record<keyof FutureOptions, string>
+ 
+ let _ignoreDeprecationWarnings = false
+diff --git a/packages/vite/src/node/server/index.ts b/packages/vite/src/node/server/index.ts
+index 0442117..ef5d8f0 100644
+--- a/packages/vite/src/node/server/index.ts
++++ b/packages/vite/src/node/server/index.ts
+@@ -720,7 +720,7 @@ export async function _createServer(
+     ssrFixStacktrace(e) {
+       warnFutureDeprecation(
+         config,
+-        'removeSsrLoadModule',
++        'removeSsrFixStacktrace',
+         "ssrFixStacktrace doesn't need to be used for Environment Module Runners.",
+       )
+       ssrFixStacktrace(e, server.environments.ssr.moduleGraph)
+@@ -728,7 +728,7 @@ export async function _createServer(
+     ssrRewriteStacktrace(stack: string) {
+       warnFutureDeprecation(
+         config,
+-        'removeSsrLoadModule',
++        'removeSsrFixStacktrace',
+         "ssrRewriteStacktrace doesn't need to be used for Environment Module Runners.",
+       )
+       return ssrRewriteStacktrace(stack, server.environments.ssr.moduleGraph)
+
+=== ITEM g05 (httpx q2, question)
+TASK: Our pods have HTTPS_PROXY=corp-proxy:3128 (no scheme) and NO_PROXY=localhost,.svc.cluster.local,10.0.0.0/8 set, and no HTTP_PROXY. With a plain httpx.Client(), which of these go direct and which go through the proxy: https://api.svc.cluster.local, https://svc.cluster.local, https://10.2.3.4, http://localhost:8080/health, http://example.com, https://example.com? Then two teammates changed the code: one switched to httpx.Client(transport=httpx.HTTPTransport(retries=3)) to get retries, the other to httpx.Client(proxy=os.environ['HTTPS_PROXY']) to 'be explicit'. What does each of those do?
+KEY: Plain Client() (trust_env defaults True; env proxies come from urllib getproxies via httpx._utils.get_environment_proxies): HTTPS_PROXY without a scheme is accepted and turned into 'http://corp-proxy:3128' mounted on 'https://' only (docs say 'a URL' but scheme-less is accepted). NO_PROXY entries: 'localhost' -> 'all://localhost'; '.svc.cluster.local' -> 'all://*.svc.cluster.local' which matches strict subdomains only (same semantics as '*.example.com' in the transports routing docs); '10.0.0.0/8' is recognised as IPv4 but becomes 'all://10.0.0.0/8', whose host is just 10.0.0.0 -- CIDR ranges are NOT supported (only the exact address matches), despite the code comment suggesting 192.168.0.0/16 works. Results: https://api.svc.cluster.local -> direct; https://svc.cluster.local -> via proxy (leading dot excludes the bare domain); https://10.2.3.4 -> via proxy; http://localhost:8080/health -> direct; http://example.com -> direct (no HTTP_PROXY, HTTPS_PROXY applies only to https:// URLs); https://example.com -> via http://corp-proxy:3128 (tunnelled over an HTTP proxy). Teammate A: passing transport= disables environment proxies entirely (allow_env_proxies = trust_env and transport is None in the client), so everything goes direct; to keep retries and the proxy use HTTPTransport(proxy='http://corp-proxy:3128', retries=3) in mounts (e.g. 'https://' plus None entries for exclusions) or similar. Teammate B: httpx.Proxy requires a URL with scheme http/https/socks5/socks5h, so 'corp-proxy:3128' raises ValueError('Unknown scheme for proxy URL ...') at client construction; even with 'http://' added, an explicit proxy= maps 'all://' to the proxy and ignores the environment completely (including NO_PROXY), so all traffic -- http and https, localhost and cluster hosts -- would go through the proxy.
+SUMMARY: Plain Client: HTTPS_PROXY without scheme becomes http://corp-proxy:3128 for https:// only; no HTTP_PROXY so http:// direct. NO_PROXY: localhost -> all://localhost; .svc.cluster.local -> all://*.svc.cluster.local (subdomains only, not bare); 10.0.0.0/8 -> all://10.0.0.0/8 but URLPattern doesn't do CIDR so never matches. Results: api.svc.cluster.local direct; svc.cluster.local proxy; 10.2.3.4 proxy; http://localhost direct; http://example.com direct; https://example.com proxy. (a) proxy= ignores env incl NO_PROXY: all via proxy incl http. (b) mounts={"https://": transport}: env proxies still read, user mount replaces https:// env mount; api.svc direct, others https direct via custom transport, proxy no longer used for https; http direct. Docs: environment_variables.md says URL required; NO_PROXY examples misleading for CIDR/bare domain; proxies.md doesn't say proxy= disables env; mounts override undocumented.
+
+=== ITEM g06 (httpx q1, question)
+TASK: We're about to cut the 1.0.0 release from master. What exactly does the release PR need to contain, how does the git tag have to be named, and is there anything currently in the repo that would make the release fail or publish wrong information? Please be specific.
+KEY: A fully correct answer covers: (1) Release PR contents per the maintainer release process: an update to CHANGELOG.md in keepachangelog format (turn '## 1.0.0 (Unreleased)' into a dated heading; list added/changed/deprecated/removed features and bug fixes, not docs/tests/tooling changes) and a version bump in httpx/__version__.py (it already reads 1.0.0). (2) Version consistency is enforced by scripts/sync-version, which is run by scripts/check (CI 'Run linting checks' step, and scripts/test locally): it takes the SECOND semver string in CHANGELOG.md (the first is the 1.0.0 in the keepachangelog URL near the top) and requires it to equal the version in httpx/__version__.py, so the release heading must be the first version heading and must say 1.0.0. (3) Tag: the GitHub release tag must be exactly '1.0.0' (no 'v' prefix), release title 'Version 1.0.0', description copied from the changelog; scripts/publish fails if GITHUB_REF != refs/tags/<__version__>. Publishing happens on tag push via .github/workflows/publish.yml (twine upload + mkdocs gh-deploy). (4) Blocking problem: .github/workflows/publish.yml sets up Python 3.9, but pyproject.toml has requires-python '>=3.10' (CHANGELOG 1.0.0 says minimum is now 3.10, and the test matrix starts at 3.10); scripts/install does 'pip install -r requirements.txt' which includes '-e .[...]', so the publish job would fail on 3.9 -- publish.yml must be bumped to >=3.10. (5) Wrong published info: README.md (used as the PyPI long description via hatch-fancy-pypi-readme) and docs/index.md (deployed docs) both say 'HTTPX requires Python 3.9+', contradicting requires-python >=3.10; README/docs/index.md also list 'sniffio' as a dependency while pyproject depends on anyio (minor). Bonus: the PyPI description appends only the first '###' changelog subsection up to the next '## ' heading (pattern '\n(###.+?\n)## '), so the 1.0.0 bullet about the minimum Python version, which sits above '### Added', would not appear in the PyPI 'Release Information'.
+SUMMARY: Release PR: CHANGELOG update (keepachangelog; date the 1.0.0 (Unreleased) heading; user-facing changes only) and version bump in httpx/__version__.py (already 1.0.0; scripts/sync-version checks second semver in CHANGELOG). Tag: 1.0.0 with no v prefix, title 'Version 1.0.0'; scripts/publish requires GITHUB_REF refs/tags/<__version__>. Problems: publish.yml uses python 3.9 but requires-python >=3.10, install fails (blocker); README.md and docs/index.md (and docs/async.md) say Python 3.9+; PyPI readme fragment regex drops the 'Minimum supported Python version' line above ### Added; Unreleased label; Development Status Beta classifier.
+
+=== ITEM g07 (httpx c2, change-and-update)
+TASK: We're dropping Python 3.10 for 1.0. Make 3.11 the minimum supported Python version everywhere.
+KEY: pyproject.toml: requires-python '>=3.11' and remove the 'Programming Language :: Python :: 3.10' classifier. .github/workflows/test-suite.yml: drop '3.10' from the matrix. .github/workflows/publish.yml: currently pins python-version 3.9 (already below the old minimum) -- must be raised to 3.11 or later or the publish job cannot install the package. README.md ('HTTPX requires Python 3.9+.', also the PyPI description) and docs/index.md ('HTTPX requires Python 3.9+') are stale and must say 3.11+. CHANGELOG.md: edit the existing 1.0.0 (Unreleased) bullet 'Minimum supported Python version is now 3.10' to 3.11 rather than adding a contradictory entry or a new version heading (sync-version check). Optional/nice: remove the now-dead test_netrc_auth_nopassword_parse_error in tests/client/test_auth.py (skipped for Python >= 3.11, so it can never run); docs/async.md 'Python 3.9+ with python -m asyncio' may be updated but is about the asyncio REPL, not a support claim.
+SUMMARY: pyproject.toml requires-python >=3.11 and removed 3.10 classifier; test-suite.yml matrix drops 3.10; publish.yml python 3.9 -> 3.11; README.md, docs/index.md, docs/async.md 'Python 3.9+' -> 'Python 3.11+'; CHANGELOG 1.0.0 entry now says 3.11; removed a test that only ran below 3.11 and unused imports. Left fixture and older changelog entries.
+DIFF:
+diff --git a/.github/workflows/publish.yml b/.github/workflows/publish.yml
+index a16f258..1fc7893 100644
+--- a/.github/workflows/publish.yml
++++ b/.github/workflows/publish.yml
+@@ -17,7 +17,7 @@ jobs:
+       - uses: "actions/checkout@v4"
+       - uses: "actions/setup-python@v6"
+         with:
+-          python-version: 3.9
++          python-version: "3.11"
+       - name: "Install dependencies"
+         run: "scripts/install"
+       - name: "Build package & docs"
+diff --git a/.github/workflows/test-suite.yml b/.github/workflows/test-suite.yml
+index f46709f..3b81164 100644
+--- a/.github/workflows/test-suite.yml
++++ b/.github/workflows/test-suite.yml
+@@ -14,7 +14,7 @@ jobs:
+ 
+     strategy:
+       matrix:
+-        python-version: ["3.10", "3.11", "3.12", "3.13", "3.14"]
++        python-version: ["3.11", "3.12", "3.13", "3.14"]
+ 
+     steps:
+       - uses: "actions/checkout@v4"
+diff --git a/CHANGELOG.md b/CHANGELOG.md
+index a3fa798..dae25a1 100644
+--- a/CHANGELOG.md
++++ b/CHANGELOG.md
+@@ -6,7 +6,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
+ 
+ ## 1.0.0 (Unreleased)
+ 
+-* Minimum supported Python version is now 3.10
++* Minimum supported Python version is now 3.11
+ 
+ ### Added
+ 
+diff --git a/README.md b/README.md
+index 2ccecd5..69affaa 100644
+--- a/README.md
++++ b/README.md
+@@ -101,7 +101,7 @@ Or, to include the optional HTTP/2 support, use:
+ $ pip install httpx[http2]
+ ```
+ 
+-HTTPX requires Python 3.9+.
++HTTPX requires Python 3.11+.
+ 
+ ## Documentation
+ 
+diff --git a/docs/async.md b/docs/async.md
+index f01715d..6c45f32 100644
+--- a/docs/async.md
++++ b/docs/async.md
+@@ -23,7 +23,7 @@ To make asynchronous requests, you'll need an `AsyncClient`.
+ ```
+ 
+ !!! tip
+-    Use [IPython](https://ipython.readthedocs.io/en/stable/) or Python 3.9+ with `python -m asyncio` to try this code interactively, as they support executing `async`/`await` expressions in the console.
++    Use [IPython](https://ipython.readthedocs.io/en/stable/) or Python 3.11+ with `python -m asyncio` to try this code interactively, as they support executing `async`/`await` expressions in the console.
+ 
+ ## API Differences
+ 
+diff --git a/docs/index.md b/docs/index.md
+index 90a4f6b..1f7d032 100644
+--- a/docs/index.md
++++ b/docs/index.md
+@@ -145,6 +145,6 @@ To include the optional brotli and zstandard decoders support, use:
+ $ pip install httpx[brotli,zstd]
+ ```
+ 
+-HTTPX requires Python 3.9+
++HTTPX requires Python 3.11+
+ 
+ [sync-support]: https://github.com/encode/httpx/issues/572
+diff --git a/pyproject.toml b/pyproject.toml
+index f2c19ab..6dff1af 100644
+--- a/pyproject.toml
++++ b/pyproject.toml
+@@ -6,7 +6,7 @@ build-backend = "hatchling.build"
+ name = "httpx"
+ description = "The next generation HTTP client."
+ license = "BSD-3-Clause"
+-requires-python = ">=3.10"
++requires-python = ">=3.11"
+ authors = [
+     { name = "Tom Christie", email = "tom@tomchristie.com" },
+ ]
+@@ -20,7 +20,6 @@ classifiers = [
+     "Operating System :: OS Independent",
+     "Programming Language :: Python :: 3",
+     "Programming Language :: Python :: 3 :: Only",
+-    "Programming Language :: Python :: 3.10",
+     "Programming Language :: Python :: 3.11",
+     "Programming Language :: Python :: 3.12",
+     "Programming Language :: Python :: 3.13",
+diff --git a/tests/client/test_auth.py b/tests/client/test_auth.py
+index 72674e6..30c8de8 100644
+--- a/tests/client/test_auth.py
++++ b/tests/client/test_auth.py
+@@ -5,9 +5,7 @@ Unit tests for auth classes also exist in tests/test_auth.py
+ """
+ 
+ import hashlib
+-import netrc
+ import os
+-import sys
+ import threading
+ import typing
+ from urllib.request import parse_keqv_list
+@@ -270,21 +268,6 @@ def test_netrc_auth_credentials_do_not_exist() -> None:
+     assert response.json() == {"auth": None}
+ 
+ 
+-@pytest.mark.skipif(
+-    sys.version_info >= (3, 11),
+-    reason="netrc files without a password are valid from Python >= 3.11",
+-)
+-def test_netrc_auth_nopassword_parse_error() -> None:  # pragma: no cover
+-    """
+-    Python has different netrc parsing behaviours with different versions.
+-    For Python < 3.11 a netrc file with no password is invalid. In this case
+-    we want to allow the parse error to be raised.
+-    """
+-    netrc_file = str(FIXTURES_DIR / ".netrc-nopassword")
+-    with pytest.raises(netrc.NetrcParseError):
+-        httpx.NetRCAuth(netrc_file)
+-
+-
+ @pytest.mark.anyio
+ async def test_auth_disable_per_request() -> None:
+     url = "https://example.org/"
+
+=== ITEM g08 (vite q3, question)
+TASK: In our repo people often have `vite` running in one terminal and `vite build --watch` in another. Sometimes they also start a second `vite --mode staging` or `vite --port 3001`. Our e2e setup also starts a dev server through the JS API with createServer() while someone may already have `vite` running. Which of these will Vite refuse to start? Where does it keep track of running processes, and what happens if a dev server crashed and left that state behind?
+KEY: 1) Only the CLI commands take process locks: `vite` (dev/serve), `vite build` and `vite preview`. cli.ts adds commandLockPlugin to dev and preview and calls createCommandLock for build. The JS API (createServer/build/preview called directly) neither creates nor checks locks, so the e2e createServer() is never blocked and never blocks anyone. `vite optimize` does not lock either. 2) A conflict happens only when the command type (dev, build or preview), the resolved project root, the config file and the mode are all the same (isSameCommand). So `vite` plus `vite build --watch` is fine (different command), and `vite` plus `vite --mode staging` is fine (different mode). A second plain `vite` with the same root, config and mode is refused, even with a different --port, because the port is not part of the match. The refusal is the error "Found another Vite dev process for this project at <url> (PID <pid>). Pass --bypass-lock to bypass this check.", after which the CLI exits with code 1. --bypass-lock is a global flag that turns off both writing and checking locks for that process. 3) Lock files are JSON records (command, root, configFile, mode, pid, startTime, urls) in the `lock` subdirectory of cacheDir, so by default node_modules/.vite/lock/<hash>.json, or .vite/lock when there is no package.json. The cacheDir default comes from the shared-options doc and the subdirectory from the CLI doc's process-locks section. 4) Stale state: when scanning, a lock whose PID is no longer alive is deleted and ignored. If the PID is alive but the recorded process start time differs from the actual one (PID reuse after a crash or reboot), the lock is also deleted. Only a live process with a matching start time blocks. Locks are removed on normal exit and SIGINT (and SIGTERM for build), and on server close.
+SUMMARY: Lock in commandLock.ts, wired by cli.ts, documented in docs/guide/cli.md Process locks. Refused only when another live process has same command, root, config file and mode; port not compared. vite + vite build --watch: both start. Second vite --port 3001: refused. Second vite --mode staging: starts. createServer() from e2e: starts; only the CLI adds the lock (commandLockPlugin / createCommandLock), JS API neither checks nor writes. State: <cacheDir>/lock/<hash>.json (node_modules/.vite/lock/), JSON with command, root, configFile, mode, pid, startTime, urls; removed on close/exit/SIGINT (build also SIGTERM). Stale: dead PID file deleted; live PID compared by startTime (/proc, PowerShell, ps); unknown start time treated as running; --bypass-lock or delete file.
+
+=== ITEM g09 (httpx q3, question)
+TASK: We're migrating from requests. One upstream API sends Content-Type: text/plain with no charset, and the body is really Windows-1252. With requests .text looked fine; with httpx we get replacement characters. The compatibility guide says httpx guesses the encoding with charset_normalizer, so what's going on? What does r.encoding return for these responses, and what's the cleanest fix for a client that talks to many such endpoints, including the places where we stream the body with iter_text()?
+KEY: HTTPX does not auto-detect encodings by default: when the Content-Type has no (known) charset it uses the client's default_encoding, which defaults to 'utf-8', and decodes with errors='replace', hence U+FFFD characters. The compatibility guide's 'Content encoding' paragraph (charset_normalizer guessing) is stale -- charset_normalizer is not a dependency in pyproject.toml and the code (Response.encoding) just uses default_encoding; the Text Encodings guide is the accurate doc. The quickstart is also stale where it shows r.encoding returning None and says HTTPX will 'attempt to automatically determine' the encoding: Response.encoding always returns a string, here 'utf-8'. Fixes: set httpx.Client(default_encoding='cp1252') (or 'windows-1252'), or pass a callable for autodetection (e.g. using chardet or charset-normalizer, which must be installed separately) -- default_encoding is a Client/AsyncClient (and Response) option, not a top-level httpx.get() argument; per-response you can set r.encoding = 'cp1252' but only before .text is accessed (afterwards it raises ValueError). A charset present in the header always takes precedence; an unknown charset falls back to default_encoding. Streaming catch: a callable default_encoding is only invoked when the full body has already been read (the code checks for _content), so with client.stream(...)/iter_text() before reading, the callable is skipped and encoding falls back to (and caches) 'utf-8'; a string default_encoding like 'cp1252' does apply to iter_text(), so a fixed string (or setting response.encoding before iterating) is the fix for streamed responses.
+SUMMARY: docs/compatibility.md is out of date: charset_normalizer fallback removed in 0.23.0 (CHANGELOG #2165), not a dependency. r.encoding: explicit value, else Content-Type charset, else client default_encoding 'utf-8'; so 'utf-8' and cp1252 bytes become U+FFFD. requests used ISO-8859-1 for text/*. Fix: httpx.Client(default_encoding='cp1252'); applies only when no charset; covers streaming. Callable autodetect only runs if body already read, not for streams. Per-response r.encoding must be set before .text, else ValueError.
+
+=== ITEM g10 (vite c1, change-and-update)
+TASK: We're starting the next major on main. Bump Vite's default production browser target to Baseline Widely Available as of 2026-07-01. I already ran the generator locally and it printed ['chrome116', 'edge116', 'firefox118', 'safari17.0', 'ios17.0'], so use exactly those. Update everything that states the default, but don't write the migration guide for the new major. That will be done separately.
+KEY: Code: (a) ESBUILD_BASELINE_WIDELY_AVAILABLE_TARGET in packages/vite/src/node/constants.ts becomes ['chrome116', 'edge116', 'firefox118', 'safari17.0', 'ios17.0'], and its JSDoc date is corrected to 2026-07-01. That comment currently says 2025-05-01, which was already stale, so leaving any old date there is a miss. (b) targetDate in packages/vite/scripts/generateTarget.ts becomes '2026-07-01'. (c) The JSDoc of BuildEnvironmentOptions.target in packages/vite/src/node/build.ts says 'Baseline Widely Available on 2026-01-01. (Chrome 111+, Edge 111+, Firefox 114+, Safari 16.4+)' and must show the new date and versions. Docs: (d) docs/config/build-options.md#build-target: the '2026-01-01 for this major' text, the widelyAvailableOnDate=2026-01-01 URL parameter and the explicit array all change. (e) docs/guide/build.md#browser-compatibility: the list becomes Chrome >=116, Edge >=116, Firefox >=118, Safari >=17.0. (f) docs/guide/index.md#browser-support: the production paragraph's link (widelyAvailableOnDate=2026-01-01) changes, and the phrase 'browser versions released around mid-2023' must be reworded or removed so it is no longer wrong. Must NOT change: docs/guide/migration.md 'Default Browser Target Change', which records the v7 to v8 change; the separate dev-runtime 'Newly Available (2026-01-01 for this major)' sentence in guide/index.md, which is not the production target (the run should leave it or point it out, not silently retarget it); plugin-legacy's modern targets (edge105/firefox106/chrome105/safari16.4), which are deliberately independent of Vite's default; and the CLI '--target' help and cli.md, which only name 'baseline-widely-available'. Lightning CSS default targets and the dep optimizer use the constant, so they follow automatically. A run that only edits constants.ts, or only the files that contain the literal 'chrome111', misses the build.ts JSDoc, generateTarget.ts, the date links and index.md.
+SUMMARY: Changed ESBUILD_BASELINE_WIDELY_AVAILABLE_TARGET to chrome116, edge116, firefox118, safari17.0, ios17.0 (2026-07-01). Files: constants.ts (array and stale comment -> 2026-07-01), build.ts target JSDoc, scripts/generateTarget.ts targetDate, docs/config/build-options.md (date, link, array), docs/guide/build.md Browser Compatibility list, docs/guide/index.md production-target sentence (link and 'mid-2023' reworded to 'second half of 2023'). Left: migration.md, blog posts, plugin-legacy targets, index.md dev-server Newly Available line.
+DIFF:
+diff --git a/docs/config/build-options.md b/docs/config/build-options.md
+index f1eb571..1b9cb36 100644
+--- a/docs/config/build-options.md
++++ b/docs/config/build-options.md
+@@ -8,7 +8,7 @@ Unless noted, the options in this section are only applied to build.
+ - **Default:** `'baseline-widely-available'`
+ - **Related:** [Browser Compatibility](/guide/build#browser-compatibility)
+ 
+-Browser compatibility target for the final bundle. The default value is a Vite special value, `'baseline-widely-available'`, which targets the minimum browser versions compatible with [Baseline](https://web-platform-dx.github.io/baseline/) Widely Available as of a date fixed for each major release ([2026-01-01 for this major](https://web-platform-dx.github.io/supported-browsers/?widelyAvailableOnDate=2026-01-01)). Specifically, it is `['chrome111', 'edge111', 'firefox114', 'safari16.4', 'ios16.4']`.
++Browser compatibility target for the final bundle. The default value is a Vite special value, `'baseline-widely-available'`, which targets the minimum browser versions compatible with [Baseline](https://web-platform-dx.github.io/baseline/) Widely Available as of a date fixed for each major release ([2026-07-01 for this major](https://web-platform-dx.github.io/supported-browsers/?widelyAvailableOnDate=2026-07-01)). Specifically, it is `['chrome116', 'edge116', 'firefox118', 'safari17.0', 'ios17.0']`.
+ 
+ Another special value is `'esnext'` - which assumes native dynamic imports support and will only perform minimal transpiling.
+ 
+diff --git a/docs/guide/build.md b/docs/guide/build.md
+index a75bc79..dcd0548 100644
+--- a/docs/guide/build.md
++++ b/docs/guide/build.md
+@@ -10,10 +10,10 @@ By default, the production bundle targets the minimum browser versions compatibl
+ 
+ <!-- Search for the `ESBUILD_BASELINE_WIDELY_AVAILABLE_TARGET` constant for more information -->
+ 
+-- Chrome >=111
+-- Edge >=111
+-- Firefox >=114
+-- Safari >=16.4
++- Chrome >=116
++- Edge >=116
++- Firefox >=118
++- Safari >=17.0
+ 
+ You can specify custom targets via the [`build.target` config option](/config/build-options.md#build-target), where the lowest target is `es2015`. If a lower target is set, Vite will still require these minimum browser support ranges as it relies on [native ESM dynamic import](https://caniuse.com/es6-module-dynamic-import), and [`import.meta`](https://caniuse.com/mdn-javascript_operators_import_meta):
+ 
+diff --git a/docs/guide/index.md b/docs/guide/index.md
+index 96b4d55..0f8062b 100644
+--- a/docs/guide/index.md
++++ b/docs/guide/index.md
+@@ -24,7 +24,7 @@ You can learn more about the rationale behind the project in the [Why Vite](./wh
+ 
+ During development, Vite assumes that a modern browser is used. This means the browser supports most of the latest JavaScript and CSS features. For that reason, Vite sets [`esnext` as the transform target](https://oxc.rs/docs/guide/usage/transformer/lowering.html#target). This prevents syntax lowering, letting Vite serve modules as close as possible to the original source code. Vite injects some runtime code to make the development server work. This code uses features included in [Baseline](https://web-platform-dx.github.io/baseline/) Newly Available at the time of each major release (2026-01-01 for this major).
+ 
+-For production builds, Vite by default targets [Baseline](https://web-platform-dx.github.io/baseline/) Widely Available browser versions as of a date fixed for each major release. For this major, that corresponds to [browser versions released around mid-2023](https://web-platform-dx.github.io/supported-browsers/?widelyAvailableOnDate=2026-01-01). The target can be lowered via configuration. Additionally, legacy browsers can be supported via the official [@vitejs/plugin-legacy](https://github.com/vitejs/vite/tree/main/packages/plugin-legacy). See the [Building for Production](./build) section for more details.
++For production builds, Vite by default targets [Baseline](https://web-platform-dx.github.io/baseline/) Widely Available browser versions as of a date fixed for each major release. For this major, that corresponds to [browser versions released around the second half of 2023](https://web-platform-dx.github.io/supported-browsers/?widelyAvailableOnDate=2026-07-01). The target can be lowered via configuration. Additionally, legacy browsers can be supported via the official [@vitejs/plugin-legacy](https://github.com/vitejs/vite/tree/main/packages/plugin-legacy). See the [Building for Production](./build) section for more details.
+ 
+ ## Trying Vite Online
+ 
+diff --git a/packages/vite/scripts/generateTarget.ts b/packages/vite/scripts/generateTarget.ts
+index 5efc429..20357b1 100644
+--- a/packages/vite/scripts/generateTarget.ts
++++ b/packages/vite/scripts/generateTarget.ts
+@@ -1,7 +1,7 @@
+ import { getCompatibleVersions } from 'baseline-browser-mapping'
+ 
+ // Update on each major release
+-const targetDate = '2026-01-01'
++const targetDate = '2026-07-01'
+ 
+ // https://esbuild.github.io/api/#target
+ const baselineToEsbuildTargetMap: Record<string, string> = {
+diff --git a/packages/vite/src/node/build.ts b/packages/vite/src/node/build.ts
+index 214cff3..4de5b89 100644
+--- a/packages/vite/src/node/build.ts
++++ b/packages/vite/src/node/build.ts
+@@ -96,8 +96,8 @@ export interface BuildEnvironmentOptions {
+    * handles syntax transformation and does not cover polyfills
+    *
+    * Default: 'baseline-widely-available' - transpile targeting browsers that
+-   * are included in the Baseline Widely Available on 2026-01-01.
+-   * (Chrome 111+, Edge 111+, Firefox 114+, Safari 16.4+).
++   * are included in the Baseline Widely Available on 2026-07-01.
++   * (Chrome 116+, Edge 116+, Firefox 118+, Safari 17.0+).
+    *
+    * Another special value is 'esnext' - which only performs minimal transpiling
+    * (for minification compat).
+diff --git a/packages/vite/src/node/constants.ts b/packages/vite/src/node/constants.ts
+index 2e34e42..f77d4a6 100644
+--- a/packages/vite/src/node/constants.ts
++++ b/packages/vite/src/node/constants.ts
+@@ -77,18 +77,18 @@ export const DEFAULT_EXTENSIONS: string[] = [
+ ]
+ 
+ /**
+- * The browser versions that are included in the Baseline Widely Available on 2025-05-01.
++ * The browser versions that are included in the Baseline Widely Available on 2026-07-01.
+  *
+  * This value would be bumped on each major release of Vite.
+  *
+  * The value is generated by `pnpm generate-target` script.
+  */
+ export const ESBUILD_BASELINE_WIDELY_AVAILABLE_TARGET: string[] = [
+-  'chrome111',
+-  'edge111',
+-  'firefox114',
+-  'safari16.4',
+-  'ios16.4',
++  'chrome116',
++  'edge116',
++  'firefox118',
++  'safari17.0',
++  'ios17.0',
+ ]
+ 
+ export const DEFAULT_CONFIG_FILES: string[] = [
+
+=== ITEM g11 (vite c3, constrained-change)
+TASK: Some of our users still have an element with id="vite-legacy-entry" left over from an old custom HTML template, and it collides with the script tag @vitejs/plugin-legacy injects. Please rename the two ids the legacy plugin injects into HTML to vite-plugin-legacy-entry and vite-plugin-legacy-polyfill. Keep everything else working and consistent, and give me the commit message you'd use.
+KEY: Code: in packages/plugin-legacy/src/snippets.ts set legacyEntryId = 'vite-plugin-legacy-entry' and legacyPolyfillId = 'vite-plugin-legacy-polyfill'. index.ts uses the constants, so it needs no id edits. Hidden consistency rule: the README's Content Security Policy section lists the sha256 hashes of the inline scripts, and src/__tests__/readme.spec.ts asserts they equal the exported cspHashes exactly and in order (safari10NoModuleFix, systemJSInlineCode, detectModernBrowserCode, dynamicFallbackInlineCode). systemJSInlineCode embeds the entry id, and dynamicFallbackInlineCode embeds the polyfill id and the whole systemJSInlineCode, so TWO hashes change: the 2nd becomes `sha256-TCDoeszx55yicdH8kFDHCP1F/r8h9p1dOhPqEez2XRk=` and the 4th becomes `sha256-Se+5W6GOBQfIyqjoooB5cqhXNaCluIxMetR8e8m+NW0=`. The 1st (MS6/3FCg4WjP9gwgaBGwLpRCY6fZBgwmhVCdrPrNf3E=) and 3rd (w36slEqa9euNKxfvkw+LLGsDIr++3rsZXpZxtmRh8Aw=) stay the same. A run that updates only one hash, leaves the README stale, or reorders the list fails. The Safari snippet is marked 'DO NOT ALTER' and must not change. Playground e2e specs that query the old ids must be updated: playground/legacy/__tests__/no-polyfills-no-systemjs/legacy-no-polyfills-no-systemjs.spec.ts ('#vite-legacy-entry' twice, '#vite-legacy-polyfill' once) and playground/legacy/__tests__/no-polyfills/legacy-no-polyfills.spec.ts ('#vite-legacy-polyfill', '#vite-legacy-entry'). Contributor rules: CHANGELOG.md must not be hand-edited, because the release PR generates it (CONTRIBUTING release flow). The commit message must follow .github/commit-convention.md: it matches /^(revert: )?(feat|fix|docs|style|refactor|perf|test|build|ci|chore)(\(.+\))?!?: .{1,50}/, the subject is imperative and lowercase-first with no trailing period, for example 'fix(legacy): rename injected script ids to avoid collisions'. Marking it breaking with '!' or noting that the CSP hashes changed is a plus, since users who pinned hashes must update them.
+SUMMARY: Renamed vite-legacy-entry -> vite-plugin-legacy-entry and vite-legacy-polyfill -> vite-plugin-legacy-polyfill in packages/plugin-legacy/src/snippets.ts. Updated two CSP hashes in packages/plugin-legacy/README.md (computed with node; readme.spec.ts checks them). Updated playground tests legacy-no-polyfills.spec.ts and legacy-no-polyfills-no-systemjs.spec.ts. Commit message: 'fix(legacy)!: rename injected script ids to avoid collisions' with body and BREAKING CHANGE footer.
+DIFF:
+diff --git a/packages/plugin-legacy/README.md b/packages/plugin-legacy/README.md
+index e503b0c..049a122 100644
+--- a/packages/plugin-legacy/README.md
++++ b/packages/plugin-legacy/README.md
+@@ -180,9 +180,9 @@ import { cspHashes } from '@vitejs/plugin-legacy'
+ The current values are:
+ 
+ - `sha256-MS6/3FCg4WjP9gwgaBGwLpRCY6fZBgwmhVCdrPrNf3E=`
+-- `sha256-tQjf8gvb2ROOMapIxFvFAYBeUJ0v1HCbOcSmDNXGtDo=`
++- `sha256-TCDoeszx55yicdH8kFDHCP1F/r8h9p1dOhPqEez2XRk=`
+ - `sha256-w36slEqa9euNKxfvkw+LLGsDIr++3rsZXpZxtmRh8Aw=`
+-- `sha256-+5XkZFazzJo8n0iOP4ti/cLCMUudTf//Mzkb7xNPXIc=`
++- `sha256-Se+5W6GOBQfIyqjoooB5cqhXNaCluIxMetR8e8m+NW0=`
+ 
+ <!--
+ Run `node --input-type=module -e "import {cspHashes} from '@vitejs/plugin-legacy'; console.log(cspHashes.map(h => 'sha256-'+h))"` to retrieve the value.
+diff --git a/packages/plugin-legacy/src/snippets.ts b/packages/plugin-legacy/src/snippets.ts
+index 3b241d2..310895a 100644
+--- a/packages/plugin-legacy/src/snippets.ts
++++ b/packages/plugin-legacy/src/snippets.ts
+@@ -2,8 +2,8 @@
+ // DO NOT ALTER THIS CONTENT
+ export const safari10NoModuleFix: string = `!function(){var e=document,t=e.createElement("script");if(!("noModule"in t)&&"onbeforeload"in t){var n=!1;e.addEventListener("beforeload",(function(e){if(e.target===t)n=!0;else if(!e.target.hasAttribute("nomodule")||!n)return;e.preventDefault()}),!0),t.type="module",t.src=".",e.head.appendChild(t),t.remove()}}();`
+ 
+-export const legacyPolyfillId: string = 'vite-legacy-polyfill'
+-export const legacyEntryId: string = 'vite-legacy-entry'
++export const legacyPolyfillId: string = 'vite-plugin-legacy-polyfill'
++export const legacyEntryId: string = 'vite-plugin-legacy-entry'
+ export const systemJSInlineCode: string = `System.import(document.getElementById('${legacyEntryId}').getAttribute('data-src'))`
+ 
+ const detectModernBrowserVarName = '__vite_is_modern_browser'
+diff --git a/playground/legacy/__tests__/no-polyfills-no-systemjs/legacy-no-polyfills-no-systemjs.spec.ts b/playground/legacy/__tests__/no-polyfills-no-systemjs/legacy-no-polyfills-no-systemjs.spec.ts
+index f8d9302..d6161b0 100644
+--- a/playground/legacy/__tests__/no-polyfills-no-systemjs/legacy-no-polyfills-no-systemjs.spec.ts
++++ b/playground/legacy/__tests__/no-polyfills-no-systemjs/legacy-no-polyfills-no-systemjs.spec.ts
+@@ -5,10 +5,10 @@ test.runIf(isBuild)('includes only a single script tag', async () => {
+   await page.goto(viteTestUrl + '/no-polyfills-no-systemjs.html')
+ 
+   await expect
+-    .poll(() => page.getAttribute('#vite-legacy-entry', 'data-src'))
++    .poll(() => page.getAttribute('#vite-plugin-legacy-entry', 'data-src'))
+     .toMatch(/.\/assets\/index-legacy-(.+)\.js/)
+ 
+   expect(await page.locator('script').count()).toBe(1)
+-  expect(await page.locator('#vite-legacy-polyfill').count()).toBe(0)
+-  expect(await page.locator('#vite-legacy-entry').count()).toBe(1)
++  expect(await page.locator('#vite-plugin-legacy-polyfill').count()).toBe(0)
++  expect(await page.locator('#vite-plugin-legacy-entry').count()).toBe(1)
+ })
+diff --git a/playground/legacy/__tests__/no-polyfills/legacy-no-polyfills.spec.ts b/playground/legacy/__tests__/no-polyfills/legacy-no-polyfills.spec.ts
+index 4a57a83..c66f04e 100644
+--- a/playground/legacy/__tests__/no-polyfills/legacy-no-polyfills.spec.ts
++++ b/playground/legacy/__tests__/no-polyfills/legacy-no-polyfills.spec.ts
+@@ -8,10 +8,10 @@ test('should load and execute the JS file', async () => {
+ 
+ test.runIf(isBuild)('includes a script tag for SystemJS', async () => {
+   await expect
+-    .poll(() => page.getAttribute('#vite-legacy-polyfill', 'src'))
++    .poll(() => page.getAttribute('#vite-plugin-legacy-polyfill', 'src'))
+     .toMatch(/.\/assets\/polyfills-legacy-(.+)\.js/)
+   await expect
+-    .poll(() => page.getAttribute('#vite-legacy-entry', 'data-src'))
++    .poll(() => page.getAttribute('#vite-plugin-legacy-entry', 'data-src'))
+     .toMatch(/.\/assets\/index-legacy-(.+)\.js/)
+ })
+ 
+
+=== ITEM g12 (vite q2, question)
+TASK: Before the next Vite major we want to see every deprecation warning Vite can give us. We maintain an SSR framework with a few plugins. What is the least config that turns all of these warnings on? Which exact flags exist, and what triggers each one? Separately, our server code only holds the ViteDevServer instance (we're not inside a plugin hook). What should we replace our server.hot.send(...) calls with?
+KEY: 1) The shortest config is future: 'warn'. UserConfig types future as FutureOptions | 'warn', and resolveConfig expands the string into all flags set to 'warn' (checked with `satisfies Required<FutureOptions>`). The docs for the future option (shared-options.md) only describe a record of flag names and never mention the string shorthand, so an answer that only lists the individual flags is not the least config. 2) There are exactly nine flags in FutureOptions: removePluginHookSsrArgument (a plugin reads options.ssr in resolveId/load/transform, in dev and in build), removePluginHookHandleHotUpdate (a plugin that has handleHotUpdate and no hotUpdate runs on a file 'update'), removeServerModuleGraph, removeServerReloadModule, removeServerPluginContainer, removeServerHot, removeServerTransformRequest, removeServerWarmupRequest (each fires when the matching ViteDevServer getter or method is used), and removeSsrLoadModule. removeSsrLoadModule fires for server.ssrLoadModule and also for server.ssrFixStacktrace and server.ssrRewriteStacktrace. Each warning is printed once (warnOnce), prefixed '[vite future]', with a link to vite.dev/changes/<page> (this-environment-in-hooks, hotupdate-hook, per-environment-apis or ssr-using-modulerunner) and usually a stack trace. 3) 'Shared plugins during build' (builder.sharedConfigBuild) is listed on the breaking-changes page but has no future flag and gives no warning. 4) server.hot replacement: docs/changes/per-environment-apis.md says `server.hot -> server.client.environment.hot`. That path does not exist, because ViteDevServer has no `client` property. The correct replacement from a server instance is server.environments.client.hot, which the SSR guide (docs/guide/ssr.md) uses and which matches ViteDevServer.environments. Inside plugin hooks it is this.environment.hot, which is what the deprecation message says. An answer that repeats server.client.environment.hot is wrong.
+SUMMARY: Least config: future: 'warn' (type FutureOptions | 'warn'; expands to all nine; docs don't mention the shorthand; docs default object omits removeServerReloadModule and removeServerPluginContainer). Lists nine flags with triggers: removePluginHookHandleHotUpdate, removePluginHookSsrArgument (resolveId/load/transform, dev and build), removeServerModuleGraph, removeServerReloadModule, removeServerPluginContainer, removeServerHot (reading only), removeServerTransformRequest, removeServerWarmupRequest, removeSsrLoadModule (also ssrFixStacktrace/ssrRewriteStacktrace). Replace server.hot.send with server.environments.client.hot.send; migration guide's server.client.environment.hot is wrong.
