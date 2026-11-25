@@ -19,3 +19,5 @@ Run directories get neutral names (`r01`, `r02`, ...) so nothing in a path tells
 `pilot-2026-11-25c/` holds the third pilot (hard tasks, with its screening runs under `screen/`), written up in @docs/benchmark-pilot-3.
 
 `pilot-2026-11-25d/` holds the fourth pilot (the same hard tasks, rerun with mentions in `refs`), written up in @docs/benchmark-pilot-4.
+
+`pilot-2026-11-25e/` holds the fifth pilot (the vite flag task only, testing the changed-code list in `check`), written up in @docs/benchmark-pilot-5.

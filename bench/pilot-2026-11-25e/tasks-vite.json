@@ -1,0 +1,122 @@
+[
+  {
+    "id": "q1",
+    "type": "question",
+    "prompt": "Our app uses @vitejs/plugin-legacy with its default options, and in vite.config we also set build.target to ['chrome111', 'edge111', 'firefox114', 'safari16.4'] because we figured that is what Vite does by default anyway. When we run vite build, what JS target and what CSS target do the modern chunks actually get built with? How does that compare to Vite's own default target, and what Baseline date is Vite's default pinned to? A colleague insists the default corresponds to Baseline Widely Available on 2025-05-01. Who is right?",
+    "key": "1) plugin-legacy's config hook (only for the build command and non-SSR builds) overwrites build.target. With modernTargets unset it sets build.target to its built-in modern list ['es2020', 'edge105', 'firefox106', 'chrome105', 'safari16.4', 'ios16.4'] (browserslist form 'edge>=105, firefox>=106, chrome>=105, safari>=16.4, chromeAndroid>=105, iOS>=16.4', which is the documented modernTargets default in the plugin README). The user's build.target is discarded, not merged. Because legacy chunks are generated (renderLegacyChunks defaults to true) and build.target was set, the plugin logs the warning \"plugin-legacy overrode 'build.target'. You should pass 'targets' as an option to this plugin with the list of legacy browsers to support instead.\" The supported way to change the modern range is the plugin's modernTargets option, which is converted with browserslist-to-esbuild and triggers its own warning that it overrode the built-in modern targets. 2) CSS: when legacy chunks are generated and build.cssTarget is not set, the plugin sets build.cssTarget to 'chrome61', to avoid #RGBA hex colors. Without the plugin, cssTarget defaults to the same value as build.target. 3) Vite's own default ('baseline-widely-available') resolves to ['chrome111', 'edge111', 'firefox114', 'safari16.4', 'ios16.4']. That is higher than plugin-legacy's modern floor of chrome/edge 105 and firefox 106, so the plugin deliberately targets a wider range than Vite does. 4) The date is 2026-01-01, not 2025-05-01. build-options.md, guide/build.md, migration.md, the build.ts JSDoc for target and scripts/generateTarget.ts (targetDate = '2026-01-01') all agree on 2026-01-01. The '2025-05-01' only appears in a stale JSDoc comment above ESBUILD_BASELINE_WIDELY_AVAILABLE_TARGET in packages/vite/src/node/constants.ts. The colleague is wrong, and that comment is out of date. Full credit needs all four points, including naming the stale comment as the source of the wrong date.",
+    "key_sections": [
+      "docs/guide/build.md#browser-compatibility",
+      "docs/config/build-options.md#build-target",
+      "docs/config/build-options.md#build-csstarget",
+      "docs/guide/migration.md#default-browser-target-change",
+      "packages/plugin-legacy/README.md#moderntargets",
+      "packages/plugin-legacy/src/index.ts#viteLegacyPlugin",
+      "packages/vite/src/node/constants.ts#ESBUILD_BASELINE_WIDELY_AVAILABLE_TARGET",
+      "packages/vite/scripts/generateTarget.ts#targetDate"
+    ],
+    "must_touch": []
+  },
+  {
+    "id": "q2",
+    "type": "question",
+    "prompt": "Before the next Vite major we want to see every deprecation warning Vite can give us. We maintain an SSR framework with a few plugins. What is the least config that turns all of these warnings on? Which exact flags exist, and what triggers each one? Separately, our server code only holds the ViteDevServer instance (we're not inside a plugin hook). What should we replace our server.hot.send(...) calls with?",
+    "key": "1) The shortest config is future: 'warn'. UserConfig types future as FutureOptions | 'warn', and resolveConfig expands the string into all flags set to 'warn' (checked with `satisfies Required<FutureOptions>`). The docs for the future option (shared-options.md) only describe a record of flag names and never mention the string shorthand, so an answer that only lists the individual flags is not the least config. 2) There are exactly nine flags in FutureOptions: removePluginHookSsrArgument (a plugin reads options.ssr in resolveId/load/transform, in dev and in build), removePluginHookHandleHotUpdate (a plugin that has handleHotUpdate and no hotUpdate runs on a file 'update'), removeServerModuleGraph, removeServerReloadModule, removeServerPluginContainer, removeServerHot, removeServerTransformRequest, removeServerWarmupRequest (each fires when the matching ViteDevServer getter or method is used), and removeSsrLoadModule. removeSsrLoadModule fires for server.ssrLoadModule and also for server.ssrFixStacktrace and server.ssrRewriteStacktrace. Each warning is printed once (warnOnce), prefixed '[vite future]', with a link to vite.dev/changes/<page> (this-environment-in-hooks, hotupdate-hook, per-environment-apis or ssr-using-modulerunner) and usually a stack trace. 3) 'Shared plugins during build' (builder.sharedConfigBuild) is listed on the breaking-changes page but has no future flag and gives no warning. 4) server.hot replacement: docs/changes/per-environment-apis.md says `server.hot -> server.client.environment.hot`. That path does not exist, because ViteDevServer has no `client` property. The correct replacement from a server instance is server.environments.client.hot, which the SSR guide (docs/guide/ssr.md) uses and which matches ViteDevServer.environments. Inside plugin hooks it is this.environment.hot, which is what the deprecation message says. An answer that repeats server.client.environment.hot is wrong.",
+    "key_sections": [
+      "docs/config/shared-options.md#future",
+      "docs/changes/index.md#planned",
+      "docs/changes/per-environment-apis.md#migration-guide",
+      "docs/changes/ssr-using-modulerunner.md#migration-guide",
+      "docs/changes/hotupdate-hook.md",
+      "docs/guide/ssr.md#setting-up-the-dev-server",
+      "packages/vite/src/node/config.ts#FutureOptions",
+      "packages/vite/src/node/config.ts#resolveConfig",
+      "packages/vite/src/node/deprecations.ts#warnFutureDeprecation",
+      "packages/vite/src/node/server/index.ts#_createServer"
+    ],
+    "must_touch": []
+  },
+  {
+    "id": "q3",
+    "type": "question",
+    "prompt": "In our repo people often have `vite` running in one terminal and `vite build --watch` in another. Sometimes they also start a second `vite --mode staging` or `vite --port 3001`. Our e2e setup also starts a dev server through the JS API with createServer() while someone may already have `vite` running. Which of these will Vite refuse to start? Where does it keep track of running processes, and what happens if a dev server crashed and left that state behind?",
+    "key": "1) Only the CLI commands take process locks: `vite` (dev/serve), `vite build` and `vite preview`. cli.ts adds commandLockPlugin to dev and preview and calls createCommandLock for build. The JS API (createServer/build/preview called directly) neither creates nor checks locks, so the e2e createServer() is never blocked and never blocks anyone. `vite optimize` does not lock either. 2) A conflict happens only when the command type (dev, build or preview), the resolved project root, the config file and the mode are all the same (isSameCommand). So `vite` plus `vite build --watch` is fine (different command), and `vite` plus `vite --mode staging` is fine (different mode). A second plain `vite` with the same root, config and mode is refused, even with a different --port, because the port is not part of the match. The refusal is the error \"Found another Vite dev process for this project at <url> (PID <pid>). Pass --bypass-lock to bypass this check.\", after which the CLI exits with code 1. --bypass-lock is a global flag that turns off both writing and checking locks for that process. 3) Lock files are JSON records (command, root, configFile, mode, pid, startTime, urls) in the `lock` subdirectory of cacheDir, so by default node_modules/.vite/lock/<hash>.json, or .vite/lock when there is no package.json. The cacheDir default comes from the shared-options doc and the subdirectory from the CLI doc's process-locks section. 4) Stale state: when scanning, a lock whose PID is no longer alive is deleted and ignored. If the PID is alive but the recorded process start time differs from the actual one (PID reuse after a crash or reboot), the lock is also deleted. Only a live process with a matching start time blocks. Locks are removed on normal exit and SIGINT (and SIGTERM for build), and on server close.",
+    "key_sections": [
+      "docs/guide/cli.md#process-locks",
+      "docs/config/shared-options.md#cachedir",
+      "packages/vite/src/node/commandLock.ts#scanCommandLocks",
+      "packages/vite/src/node/commandLock.ts#isSameCommand",
+      "packages/vite/src/node/commandLock.ts#commandLockPlugin",
+      "packages/vite/src/node/cli.ts#cli",
+      "packages/vite/src/node/processStartTime.ts#getProcessStartTime"
+    ],
+    "must_touch": []
+  },
+  {
+    "id": "c1",
+    "type": "change-and-update",
+    "prompt": "We're starting the next major on main. Bump Vite's default production browser target to Baseline Widely Available as of 2026-07-01. I already ran the generator locally and it printed ['chrome116', 'edge116', 'firefox118', 'safari17.0', 'ios17.0'], so use exactly those. Update everything that states the default, but don't write the migration guide for the new major. That will be done separately.",
+    "key": "Code: (a) ESBUILD_BASELINE_WIDELY_AVAILABLE_TARGET in packages/vite/src/node/constants.ts becomes ['chrome116', 'edge116', 'firefox118', 'safari17.0', 'ios17.0'], and its JSDoc date is corrected to 2026-07-01. That comment currently says 2025-05-01, which was already stale, so leaving any old date there is a miss. (b) targetDate in packages/vite/scripts/generateTarget.ts becomes '2026-07-01'. (c) The JSDoc of BuildEnvironmentOptions.target in packages/vite/src/node/build.ts says 'Baseline Widely Available on 2026-01-01. (Chrome 111+, Edge 111+, Firefox 114+, Safari 16.4+)' and must show the new date and versions. Docs: (d) docs/config/build-options.md#build-target: the '2026-01-01 for this major' text, the widelyAvailableOnDate=2026-01-01 URL parameter and the explicit array all change. (e) docs/guide/build.md#browser-compatibility: the list becomes Chrome >=116, Edge >=116, Firefox >=118, Safari >=17.0. (f) docs/guide/index.md#browser-support: the production paragraph's link (widelyAvailableOnDate=2026-01-01) changes, and the phrase 'browser versions released around mid-2023' must be reworded or removed so it is no longer wrong. Must NOT change: docs/guide/migration.md 'Default Browser Target Change', which records the v7 to v8 change; the separate dev-runtime 'Newly Available (2026-01-01 for this major)' sentence in guide/index.md, which is not the production target (the run should leave it or point it out, not silently retarget it); plugin-legacy's modern targets (edge105/firefox106/chrome105/safari16.4), which are deliberately independent of Vite's default; and the CLI '--target' help and cli.md, which only name 'baseline-widely-available'. Lightning CSS default targets and the dep optimizer use the constant, so they follow automatically. A run that only edits constants.ts, or only the files that contain the literal 'chrome111', misses the build.ts JSDoc, generateTarget.ts, the date links and index.md.",
+    "key_sections": [
+      "packages/vite/src/node/constants.ts#ESBUILD_BASELINE_WIDELY_AVAILABLE_TARGET",
+      "packages/vite/scripts/generateTarget.ts#targetDate",
+      "packages/vite/src/node/build.ts#BuildEnvironmentOptions",
+      "docs/config/build-options.md#build-target",
+      "docs/guide/build.md#browser-compatibility",
+      "docs/guide/index.md#browser-support",
+      "docs/guide/migration.md#default-browser-target-change",
+      "packages/plugin-legacy/src/index.ts#modernTargetsEsbuild"
+    ],
+    "must_touch": [
+      "packages/vite/src/node/constants.ts",
+      "packages/vite/scripts/generateTarget.ts",
+      "packages/vite/src/node/build.ts",
+      "docs/config/build-options.md",
+      "docs/guide/build.md",
+      "docs/guide/index.md"
+    ]
+  },
+  {
+    "id": "c2",
+    "type": "change-and-update",
+    "prompt": "Users who opt into the future deprecation warnings for server.ssrLoadModule complain that they also get spammed by warnings from server.ssrFixStacktrace and server.ssrRewriteStacktrace, which they call from their error handlers. Split those two out into their own future flag named removeSsrFixStacktrace, so removeSsrLoadModule only covers ssrLoadModule itself. Make sure everything that lists or documents the future flags stays consistent.",
+    "key": "packages/vite/src/node/config.ts: (1) add removeSsrFixStacktrace?: 'warn' to the FutureOptions interface. (2) Add removeSsrFixStacktrace: 'warn' to the object that `future: 'warn'` expands into in resolveConfig. That object is checked with `satisfies Required<FutureOptions>`, so leaving it out is a type error. (3) Adding removeSsrFixStacktrace: undefined to the config defaults' future block is expected for consistency, but not essential. packages/vite/src/node/deprecations.ts: (4) add removeSsrFixStacktrace to deprecationCode. Both deprecationCode and deprecationMessages are checked with `satisfies Record<keyof FutureOptions, string>`. The code value builds the docs link vite.dev/changes/<code>, so it must be an existing page slug, namely 'ssr-using-modulerunner', not a made-up page. (5) Add a deprecationMessages entry for the new flag, for example saying ssrFixStacktrace/ssrRewriteStacktrace are not needed with Module Runners. packages/vite/src/node/server/index.ts: (6) the ssrFixStacktrace and ssrRewriteStacktrace methods of the ViteDevServer object built in _createServer switch from warnFutureDeprecation(config, 'removeSsrLoadModule', ...) to 'removeSsrFixStacktrace' (keeping or moving their extra messages). ssrLoadModule keeps 'removeSsrLoadModule'. Internal ssrFixStacktrace calls (for example ssrModuleLoader's fixStacktrace path) must not start warning. Docs: (7) docs/changes/ssr-using-modulerunner.md must document the new flag. Its 'Future Deprecation' box currently tells users to set only future.removeSsrLoadModule, and its Migration Guide paragraph about ssrFixStacktrace/ssrRewriteStacktrace should name future.removeSsrFixStacktrace. No new docs/changes page and no change to docs/changes/index.md is needed. A run that only adds the interface key, or forgets the 'warn' expansion or the deprecationCode/Message entries, is incomplete.",
+    "key_sections": [
+      "packages/vite/src/node/config.ts#FutureOptions",
+      "packages/vite/src/node/config.ts#resolveConfig",
+      "packages/vite/src/node/deprecations.ts#deprecationCode",
+      "packages/vite/src/node/deprecations.ts#deprecationMessages",
+      "packages/vite/src/node/deprecations.ts#warnFutureDeprecation",
+      "packages/vite/src/node/server/index.ts#_createServer",
+      "docs/changes/ssr-using-modulerunner.md#migration-guide",
+      "docs/config/shared-options.md#future"
+    ],
+    "must_touch": [
+      "packages/vite/src/node/config.ts",
+      "packages/vite/src/node/deprecations.ts",
+      "packages/vite/src/node/server/index.ts",
+      "docs/changes/ssr-using-modulerunner.md"
+    ]
+  },
+  {
+    "id": "c3",
+    "type": "constrained-change",
+    "prompt": "Some of our users still have an element with id=\"vite-legacy-entry\" left over from an old custom HTML template, and it collides with the script tag @vitejs/plugin-legacy injects. Please rename the two ids the legacy plugin injects into HTML to vite-plugin-legacy-entry and vite-plugin-legacy-polyfill. Keep everything else working and consistent, and give me the commit message you'd use.",
+    "key": "Code: in packages/plugin-legacy/src/snippets.ts set legacyEntryId = 'vite-plugin-legacy-entry' and legacyPolyfillId = 'vite-plugin-legacy-polyfill'. index.ts uses the constants, so it needs no id edits. Hidden consistency rule: the README's Content Security Policy section lists the sha256 hashes of the inline scripts, and src/__tests__/readme.spec.ts asserts they equal the exported cspHashes exactly and in order (safari10NoModuleFix, systemJSInlineCode, detectModernBrowserCode, dynamicFallbackInlineCode). systemJSInlineCode embeds the entry id, and dynamicFallbackInlineCode embeds the polyfill id and the whole systemJSInlineCode, so TWO hashes change: the 2nd becomes `sha256-TCDoeszx55yicdH8kFDHCP1F/r8h9p1dOhPqEez2XRk=` and the 4th becomes `sha256-Se+5W6GOBQfIyqjoooB5cqhXNaCluIxMetR8e8m+NW0=`. The 1st (MS6/3FCg4WjP9gwgaBGwLpRCY6fZBgwmhVCdrPrNf3E=) and 3rd (w36slEqa9euNKxfvkw+LLGsDIr++3rsZXpZxtmRh8Aw=) stay the same. A run that updates only one hash, leaves the README stale, or reorders the list fails. The Safari snippet is marked 'DO NOT ALTER' and must not change. Playground e2e specs that query the old ids must be updated: playground/legacy/__tests__/no-polyfills-no-systemjs/legacy-no-polyfills-no-systemjs.spec.ts ('#vite-legacy-entry' twice, '#vite-legacy-polyfill' once) and playground/legacy/__tests__/no-polyfills/legacy-no-polyfills.spec.ts ('#vite-legacy-polyfill', '#vite-legacy-entry'). Contributor rules: CHANGELOG.md must not be hand-edited, because the release PR generates it (CONTRIBUTING release flow). The commit message must follow .github/commit-convention.md: it matches /^(revert: )?(feat|fix|docs|style|refactor|perf|test|build|ci|chore)(\\(.+\\))?!?: .{1,50}/, the subject is imperative and lowercase-first with no trailing period, for example 'fix(legacy): rename injected script ids to avoid collisions'. Marking it breaking with '!' or noting that the CSP hashes changed is a plus, since users who pinned hashes must update them.",
+    "key_sections": [
+      "packages/plugin-legacy/src/snippets.ts#legacyEntryId",
+      "packages/plugin-legacy/src/snippets.ts#systemJSInlineCode",
+      "packages/plugin-legacy/src/snippets.ts#dynamicFallbackInlineCode",
+      "packages/plugin-legacy/src/index.ts#cspHashes",
+      "packages/plugin-legacy/README.md#content-security-policy",
+      "packages/plugin-legacy/src/__tests__/readme.spec.ts",
+      ".github/commit-convention.md#git-commit-message-convention",
+      "CONTRIBUTING.md#release"
+    ],
+    "must_touch": [
+      "packages/plugin-legacy/src/snippets.ts",
+      "packages/plugin-legacy/README.md",
+      "playground/legacy/__tests__/no-polyfills-no-systemjs/legacy-no-polyfills-no-systemjs.spec.ts",
+      "playground/legacy/__tests__/no-polyfills/legacy-no-polyfills.spec.ts"
+    ]
+  }
+]

@@ -1,0 +1,1017 @@
+You are grading coding-agent runs blind. For each ITEM you get the task, the grading key, the agent's final summary, and for change tasks the actual diff. Judge the work, not the writing.
+Output one JSON object per line and nothing else: {"id": "gNN", "score": 0|0.5|1, "hidden_point": true|false|null, "note": "<=20 words"}.
+score 1 = fully correct per the key, every point in it; 0.5 = mostly right with a real omission or error; 0 = wrong or missing the main point. For questions judge the answer's facts; for changes judge the diff.
+hidden_point: true if the run got the key's hardest or hidden point (the one a hasty agent would miss), false if not.
+
+=== ITEM g01 (vite c2, change-and-update)
+TASK: Users who opt into the future deprecation warnings for server.ssrLoadModule complain that they also get spammed by warnings from server.ssrFixStacktrace and server.ssrRewriteStacktrace, which they call from their error handlers. Split those two out into their own future flag named removeSsrFixStacktrace, so removeSsrLoadModule only covers ssrLoadModule itself. Make sure everything that lists or documents the future flags stays consistent.
+KEY: packages/vite/src/node/config.ts: (1) add removeSsrFixStacktrace?: 'warn' to the FutureOptions interface. (2) Add removeSsrFixStacktrace: 'warn' to the object that `future: 'warn'` expands into in resolveConfig. That object is checked with `satisfies Required<FutureOptions>`, so leaving it out is a type error. (3) Adding removeSsrFixStacktrace: undefined to the config defaults' future block is expected for consistency, but not essential. packages/vite/src/node/deprecations.ts: (4) add removeSsrFixStacktrace to deprecationCode. Both deprecationCode and deprecationMessages are checked with `satisfies Record<keyof FutureOptions, string>`. The code value builds the docs link vite.dev/changes/<code>, so it must be an existing page slug, namely 'ssr-using-modulerunner', not a made-up page. (5) Add a deprecationMessages entry for the new flag, for example saying ssrFixStacktrace/ssrRewriteStacktrace are not needed with Module Runners. packages/vite/src/node/server/index.ts: (6) the ssrFixStacktrace and ssrRewriteStacktrace methods of the ViteDevServer object built in _createServer switch from warnFutureDeprecation(config, 'removeSsrLoadModule', ...) to 'removeSsrFixStacktrace' (keeping or moving their extra messages). ssrLoadModule keeps 'removeSsrLoadModule'. Internal ssrFixStacktrace calls (for example ssrModuleLoader's fixStacktrace path) must not start warning. Docs: (7) docs/changes/ssr-using-modulerunner.md must document the new flag. Its 'Future Deprecation' box currently tells users to set only future.removeSsrLoadModule, and its Migration Guide paragraph about ssrFixStacktrace/ssrRewriteStacktrace should name future.removeSsrFixStacktrace. No new docs/changes page and no change to docs/changes/index.md is needed. A run that only adds the interface key, or forgets the 'warn' expansion or the deprecationCode/Message entries, is incomplete.
+SUMMARY: New flag removeSsrFixStacktrace in FutureOptions, defaults, 'warn' expansion; deprecations.ts code (ssr-using-modulerunner) and message; server/index.ts stacktrace methods; docs/changes/ssr-using-modulerunner.md Future Deprecation box shows both flags. Added two missing defaults. CHANGELOG left. No run.
+DIFF:
+diff --git a/docs/changes/ssr-using-modulerunner.md b/docs/changes/ssr-using-modulerunner.md
+index 47c334f..b0c71be 100644
+--- a/docs/changes/ssr-using-modulerunner.md
++++ b/docs/changes/ssr-using-modulerunner.md
+@@ -9,7 +9,16 @@ Give us feedback at [Environment API feedback discussion](https://github.com/vit
+ Affected scope: `Vite Plugin Authors`
+ 
+ ::: warning Future Deprecation
+-`ModuleRunner` was first introduced in `v6.0`. The deprecation of `server.ssrLoadModule` is planned for a future major. To identify your usage, set `future.removeSsrLoadModule` to `"warn"` in your vite config.
++`ModuleRunner` was first introduced in `v6.0`. The deprecation of `server.ssrLoadModule` is planned for a future major. To identify your usage, set these in your vite config.
++
++```ts
++future: {
++  removeSsrLoadModule: 'warn',
++  removeSsrFixStacktrace: 'warn',
++}
++```
++
++`removeSsrLoadModule` warns on `server.ssrLoadModule` calls, and `removeSsrFixStacktrace` warns on `server.ssrFixStacktrace` and `server.ssrRewriteStacktrace` calls.
+ :::
+ 
+ ## Motivation
+diff --git a/packages/vite/src/node/config.ts b/packages/vite/src/node/config.ts
+index 016a97a..25d0bc9 100644
+--- a/packages/vite/src/node/config.ts
++++ b/packages/vite/src/node/config.ts
+@@ -598,6 +598,7 @@ export interface FutureOptions {
+   removeServerWarmupRequest?: 'warn'
+ 
+   removeSsrLoadModule?: 'warn'
++  removeSsrFixStacktrace?: 'warn'
+ }
+ 
+ export interface ExperimentalOptions {
+@@ -929,10 +930,13 @@ const configDefaults = Object.freeze({
+     removePluginHookHandleHotUpdate: undefined,
+     removePluginHookSsrArgument: undefined,
+     removeServerModuleGraph: undefined,
++    removeServerReloadModule: undefined,
++    removeServerPluginContainer: undefined,
+     removeServerHot: undefined,
+     removeServerTransformRequest: undefined,
+     removeServerWarmupRequest: undefined,
+     removeSsrLoadModule: undefined,
++    removeSsrFixStacktrace: undefined,
+   },
+   legacy: {
+     skipWebSocketTokenCheck: false,
+@@ -2161,6 +2165,7 @@ export async function resolveConfig(
+             removeServerTransformRequest: 'warn',
+             removeServerWarmupRequest: 'warn',
+             removeSsrLoadModule: 'warn',
++            removeSsrFixStacktrace: 'warn',
+           } satisfies Required<FutureOptions>)
+         : config.future,
+ 
+diff --git a/packages/vite/src/node/deprecations.ts b/packages/vite/src/node/deprecations.ts
+index f51b71c..2bdd5c0 100644
+--- a/packages/vite/src/node/deprecations.ts
++++ b/packages/vite/src/node/deprecations.ts
+@@ -15,6 +15,7 @@ const deprecationCode = {
+   removeServerWarmupRequest: 'per-environment-apis',
+ 
+   removeSsrLoadModule: 'ssr-using-modulerunner',
++  removeSsrFixStacktrace: 'ssr-using-modulerunner',
+ } satisfies Record<keyof FutureOptions, string>
+ 
+ const deprecationMessages = {
+@@ -37,6 +38,8 @@ const deprecationMessages = {
+ 
+   removeSsrLoadModule:
+     'The `server.ssrLoadModule` is replaced with Environment Runner.',
++  removeSsrFixStacktrace:
++    'The `server.ssrFixStacktrace` and `server.ssrRewriteStacktrace` are not needed with Environment Runner.',
+ } satisfies Record<keyof FutureOptions, string>
+ 
+ let _ignoreDeprecationWarnings = false
+diff --git a/packages/vite/src/node/server/index.ts b/packages/vite/src/node/server/index.ts
+index 0442117..ef5d8f0 100644
+--- a/packages/vite/src/node/server/index.ts
++++ b/packages/vite/src/node/server/index.ts
+@@ -720,7 +720,7 @@ export async function _createServer(
+     ssrFixStacktrace(e) {
+       warnFutureDeprecation(
+         config,
+-        'removeSsrLoadModule',
++        'removeSsrFixStacktrace',
+         "ssrFixStacktrace doesn't need to be used for Environment Module Runners.",
+       )
+       ssrFixStacktrace(e, server.environments.ssr.moduleGraph)
+@@ -728,7 +728,7 @@ export async function _createServer(
+     ssrRewriteStacktrace(stack: string) {
+       warnFutureDeprecation(
+         config,
+-        'removeSsrLoadModule',
++        'removeSsrFixStacktrace',
+         "ssrRewriteStacktrace doesn't need to be used for Environment Module Runners.",
+       )
+       return ssrRewriteStacktrace(stack, server.environments.ssr.moduleGraph)
+
+=== ITEM g02 (vite c2, change-and-update)
+TASK: Users who opt into the future deprecation warnings for server.ssrLoadModule complain that they also get spammed by warnings from server.ssrFixStacktrace and server.ssrRewriteStacktrace, which they call from their error handlers. Split those two out into their own future flag named removeSsrFixStacktrace, so removeSsrLoadModule only covers ssrLoadModule itself. Make sure everything that lists or documents the future flags stays consistent.
+KEY: packages/vite/src/node/config.ts: (1) add removeSsrFixStacktrace?: 'warn' to the FutureOptions interface. (2) Add removeSsrFixStacktrace: 'warn' to the object that `future: 'warn'` expands into in resolveConfig. That object is checked with `satisfies Required<FutureOptions>`, so leaving it out is a type error. (3) Adding removeSsrFixStacktrace: undefined to the config defaults' future block is expected for consistency, but not essential. packages/vite/src/node/deprecations.ts: (4) add removeSsrFixStacktrace to deprecationCode. Both deprecationCode and deprecationMessages are checked with `satisfies Record<keyof FutureOptions, string>`. The code value builds the docs link vite.dev/changes/<code>, so it must be an existing page slug, namely 'ssr-using-modulerunner', not a made-up page. (5) Add a deprecationMessages entry for the new flag, for example saying ssrFixStacktrace/ssrRewriteStacktrace are not needed with Module Runners. packages/vite/src/node/server/index.ts: (6) the ssrFixStacktrace and ssrRewriteStacktrace methods of the ViteDevServer object built in _createServer switch from warnFutureDeprecation(config, 'removeSsrLoadModule', ...) to 'removeSsrFixStacktrace' (keeping or moving their extra messages). ssrLoadModule keeps 'removeSsrLoadModule'. Internal ssrFixStacktrace calls (for example ssrModuleLoader's fixStacktrace path) must not start warning. Docs: (7) docs/changes/ssr-using-modulerunner.md must document the new flag. Its 'Future Deprecation' box currently tells users to set only future.removeSsrLoadModule, and its Migration Guide paragraph about ssrFixStacktrace/ssrRewriteStacktrace should name future.removeSsrFixStacktrace. No new docs/changes page and no change to docs/changes/index.md is needed. A run that only adds the interface key, or forgets the 'warn' expansion or the deprecationCode/Message entries, is incomplete.
+SUMMARY: New flag removeSsrFixStacktrace: FutureOptions, defaults (+2 missing), 'warn' list; deprecations.ts code and message; server/index.ts; docs/changes/ssr-using-modulerunner.md Future Deprecation box with both flags. CHANGELOG left.
+DIFF:
+diff --git a/docs/changes/ssr-using-modulerunner.md b/docs/changes/ssr-using-modulerunner.md
+index 47c334f..a3ee82d 100644
+--- a/docs/changes/ssr-using-modulerunner.md
++++ b/docs/changes/ssr-using-modulerunner.md
+@@ -9,7 +9,16 @@ Give us feedback at [Environment API feedback discussion](https://github.com/vit
+ Affected scope: `Vite Plugin Authors`
+ 
+ ::: warning Future Deprecation
+-`ModuleRunner` was first introduced in `v6.0`. The deprecation of `server.ssrLoadModule` is planned for a future major. To identify your usage, set `future.removeSsrLoadModule` to `"warn"` in your vite config.
++`ModuleRunner` was first introduced in `v6.0`. The deprecation of `server.ssrLoadModule` is planned for a future major. To identify your usage, set these in your vite config.
++
++```ts
++future: {
++  removeSsrLoadModule: 'warn',
++  removeSsrFixStacktrace: 'warn',
++}
++```
++
++`removeSsrLoadModule` warns on `server.ssrLoadModule`, and `removeSsrFixStacktrace` warns on `server.ssrFixStacktrace` and `server.ssrRewriteStacktrace`.
+ :::
+ 
+ ## Motivation
+diff --git a/packages/vite/src/node/config.ts b/packages/vite/src/node/config.ts
+index 016a97a..25d0bc9 100644
+--- a/packages/vite/src/node/config.ts
++++ b/packages/vite/src/node/config.ts
+@@ -598,6 +598,7 @@ export interface FutureOptions {
+   removeServerWarmupRequest?: 'warn'
+ 
+   removeSsrLoadModule?: 'warn'
++  removeSsrFixStacktrace?: 'warn'
+ }
+ 
+ export interface ExperimentalOptions {
+@@ -929,10 +930,13 @@ const configDefaults = Object.freeze({
+     removePluginHookHandleHotUpdate: undefined,
+     removePluginHookSsrArgument: undefined,
+     removeServerModuleGraph: undefined,
++    removeServerReloadModule: undefined,
++    removeServerPluginContainer: undefined,
+     removeServerHot: undefined,
+     removeServerTransformRequest: undefined,
+     removeServerWarmupRequest: undefined,
+     removeSsrLoadModule: undefined,
++    removeSsrFixStacktrace: undefined,
+   },
+   legacy: {
+     skipWebSocketTokenCheck: false,
+@@ -2161,6 +2165,7 @@ export async function resolveConfig(
+             removeServerTransformRequest: 'warn',
+             removeServerWarmupRequest: 'warn',
+             removeSsrLoadModule: 'warn',
++            removeSsrFixStacktrace: 'warn',
+           } satisfies Required<FutureOptions>)
+         : config.future,
+ 
+diff --git a/packages/vite/src/node/deprecations.ts b/packages/vite/src/node/deprecations.ts
+index f51b71c..2bdd5c0 100644
+--- a/packages/vite/src/node/deprecations.ts
++++ b/packages/vite/src/node/deprecations.ts
+@@ -15,6 +15,7 @@ const deprecationCode = {
+   removeServerWarmupRequest: 'per-environment-apis',
+ 
+   removeSsrLoadModule: 'ssr-using-modulerunner',
++  removeSsrFixStacktrace: 'ssr-using-modulerunner',
+ } satisfies Record<keyof FutureOptions, string>
+ 
+ const deprecationMessages = {
+@@ -37,6 +38,8 @@ const deprecationMessages = {
+ 
+   removeSsrLoadModule:
+     'The `server.ssrLoadModule` is replaced with Environment Runner.',
++  removeSsrFixStacktrace:
++    'The `server.ssrFixStacktrace` and `server.ssrRewriteStacktrace` are not needed with Environment Runner.',
+ } satisfies Record<keyof FutureOptions, string>
+ 
+ let _ignoreDeprecationWarnings = false
+diff --git a/packages/vite/src/node/server/index.ts b/packages/vite/src/node/server/index.ts
+index 0442117..ef5d8f0 100644
+--- a/packages/vite/src/node/server/index.ts
++++ b/packages/vite/src/node/server/index.ts
+@@ -720,7 +720,7 @@ export async function _createServer(
+     ssrFixStacktrace(e) {
+       warnFutureDeprecation(
+         config,
+-        'removeSsrLoadModule',
++        'removeSsrFixStacktrace',
+         "ssrFixStacktrace doesn't need to be used for Environment Module Runners.",
+       )
+       ssrFixStacktrace(e, server.environments.ssr.moduleGraph)
+@@ -728,7 +728,7 @@ export async function _createServer(
+     ssrRewriteStacktrace(stack: string) {
+       warnFutureDeprecation(
+         config,
+-        'removeSsrLoadModule',
++        'removeSsrFixStacktrace',
+         "ssrRewriteStacktrace doesn't need to be used for Environment Module Runners.",
+       )
+       return ssrRewriteStacktrace(stack, server.environments.ssr.moduleGraph)
+
+=== ITEM g03 (vite c2, change-and-update)
+TASK: Users who opt into the future deprecation warnings for server.ssrLoadModule complain that they also get spammed by warnings from server.ssrFixStacktrace and server.ssrRewriteStacktrace, which they call from their error handlers. Split those two out into their own future flag named removeSsrFixStacktrace, so removeSsrLoadModule only covers ssrLoadModule itself. Make sure everything that lists or documents the future flags stays consistent.
+KEY: packages/vite/src/node/config.ts: (1) add removeSsrFixStacktrace?: 'warn' to the FutureOptions interface. (2) Add removeSsrFixStacktrace: 'warn' to the object that `future: 'warn'` expands into in resolveConfig. That object is checked with `satisfies Required<FutureOptions>`, so leaving it out is a type error. (3) Adding removeSsrFixStacktrace: undefined to the config defaults' future block is expected for consistency, but not essential. packages/vite/src/node/deprecations.ts: (4) add removeSsrFixStacktrace to deprecationCode. Both deprecationCode and deprecationMessages are checked with `satisfies Record<keyof FutureOptions, string>`. The code value builds the docs link vite.dev/changes/<code>, so it must be an existing page slug, namely 'ssr-using-modulerunner', not a made-up page. (5) Add a deprecationMessages entry for the new flag, for example saying ssrFixStacktrace/ssrRewriteStacktrace are not needed with Module Runners. packages/vite/src/node/server/index.ts: (6) the ssrFixStacktrace and ssrRewriteStacktrace methods of the ViteDevServer object built in _createServer switch from warnFutureDeprecation(config, 'removeSsrLoadModule', ...) to 'removeSsrFixStacktrace' (keeping or moving their extra messages). ssrLoadModule keeps 'removeSsrLoadModule'. Internal ssrFixStacktrace calls (for example ssrModuleLoader's fixStacktrace path) must not start warning. Docs: (7) docs/changes/ssr-using-modulerunner.md must document the new flag. Its 'Future Deprecation' box currently tells users to set only future.removeSsrLoadModule, and its Migration Guide paragraph about ssrFixStacktrace/ssrRewriteStacktrace should name future.removeSsrFixStacktrace. No new docs/changes page and no change to docs/changes/index.md is needed. A run that only adds the interface key, or forgets the 'warn' expansion or the deprecationCode/Message entries, is incomplete.
+SUMMARY: New flag removeSsrFixStacktrace: FutureOptions, defaults, 'warn' list; deprecations.ts code and message; server/index.ts; docs/changes/ssr-using-modulerunner.md Future Deprecation box with both flags. Added two missing defaults. CHANGELOG left.
+DIFF:
+diff --git a/docs/changes/ssr-using-modulerunner.md b/docs/changes/ssr-using-modulerunner.md
+index 47c334f..114df6d 100644
+--- a/docs/changes/ssr-using-modulerunner.md
++++ b/docs/changes/ssr-using-modulerunner.md
+@@ -9,7 +9,16 @@ Give us feedback at [Environment API feedback discussion](https://github.com/vit
+ Affected scope: `Vite Plugin Authors`
+ 
+ ::: warning Future Deprecation
+-`ModuleRunner` was first introduced in `v6.0`. The deprecation of `server.ssrLoadModule` is planned for a future major. To identify your usage, set `future.removeSsrLoadModule` to `"warn"` in your vite config.
++`ModuleRunner` was first introduced in `v6.0`. The deprecation of `server.ssrLoadModule` is planned for a future major. To identify your usage, set these in your vite config.
++
++```ts
++future: {
++  removeSsrLoadModule: 'warn',
++  removeSsrFixStacktrace: 'warn',
++}
++```
++
++`removeSsrLoadModule` warns about `server.ssrLoadModule`, and `removeSsrFixStacktrace` warns about `server.ssrFixStacktrace` and `server.ssrRewriteStacktrace`.
+ :::
+ 
+ ## Motivation
+diff --git a/packages/vite/src/node/config.ts b/packages/vite/src/node/config.ts
+index 016a97a..25d0bc9 100644
+--- a/packages/vite/src/node/config.ts
++++ b/packages/vite/src/node/config.ts
+@@ -598,6 +598,7 @@ export interface FutureOptions {
+   removeServerWarmupRequest?: 'warn'
+ 
+   removeSsrLoadModule?: 'warn'
++  removeSsrFixStacktrace?: 'warn'
+ }
+ 
+ export interface ExperimentalOptions {
+@@ -929,10 +930,13 @@ const configDefaults = Object.freeze({
+     removePluginHookHandleHotUpdate: undefined,
+     removePluginHookSsrArgument: undefined,
+     removeServerModuleGraph: undefined,
++    removeServerReloadModule: undefined,
++    removeServerPluginContainer: undefined,
+     removeServerHot: undefined,
+     removeServerTransformRequest: undefined,
+     removeServerWarmupRequest: undefined,
+     removeSsrLoadModule: undefined,
++    removeSsrFixStacktrace: undefined,
+   },
+   legacy: {
+     skipWebSocketTokenCheck: false,
+@@ -2161,6 +2165,7 @@ export async function resolveConfig(
+             removeServerTransformRequest: 'warn',
+             removeServerWarmupRequest: 'warn',
+             removeSsrLoadModule: 'warn',
++            removeSsrFixStacktrace: 'warn',
+           } satisfies Required<FutureOptions>)
+         : config.future,
+ 
+diff --git a/packages/vite/src/node/deprecations.ts b/packages/vite/src/node/deprecations.ts
+index f51b71c..2bdd5c0 100644
+--- a/packages/vite/src/node/deprecations.ts
++++ b/packages/vite/src/node/deprecations.ts
+@@ -15,6 +15,7 @@ const deprecationCode = {
+   removeServerWarmupRequest: 'per-environment-apis',
+ 
+   removeSsrLoadModule: 'ssr-using-modulerunner',
++  removeSsrFixStacktrace: 'ssr-using-modulerunner',
+ } satisfies Record<keyof FutureOptions, string>
+ 
+ const deprecationMessages = {
+@@ -37,6 +38,8 @@ const deprecationMessages = {
+ 
+   removeSsrLoadModule:
+     'The `server.ssrLoadModule` is replaced with Environment Runner.',
++  removeSsrFixStacktrace:
++    'The `server.ssrFixStacktrace` and `server.ssrRewriteStacktrace` are not needed with Environment Runner.',
+ } satisfies Record<keyof FutureOptions, string>
+ 
+ let _ignoreDeprecationWarnings = false
+diff --git a/packages/vite/src/node/server/index.ts b/packages/vite/src/node/server/index.ts
+index 0442117..ef5d8f0 100644
+--- a/packages/vite/src/node/server/index.ts
++++ b/packages/vite/src/node/server/index.ts
+@@ -720,7 +720,7 @@ export async function _createServer(
+     ssrFixStacktrace(e) {
+       warnFutureDeprecation(
+         config,
+-        'removeSsrLoadModule',
++        'removeSsrFixStacktrace',
+         "ssrFixStacktrace doesn't need to be used for Environment Module Runners.",
+       )
+       ssrFixStacktrace(e, server.environments.ssr.moduleGraph)
+@@ -728,7 +728,7 @@ export async function _createServer(
+     ssrRewriteStacktrace(stack: string) {
+       warnFutureDeprecation(
+         config,
+-        'removeSsrLoadModule',
++        'removeSsrFixStacktrace',
+         "ssrRewriteStacktrace doesn't need to be used for Environment Module Runners.",
+       )
+       return ssrRewriteStacktrace(stack, server.environments.ssr.moduleGraph)
+
+=== ITEM g04 (vite c2, change-and-update)
+TASK: Users who opt into the future deprecation warnings for server.ssrLoadModule complain that they also get spammed by warnings from server.ssrFixStacktrace and server.ssrRewriteStacktrace, which they call from their error handlers. Split those two out into their own future flag named removeSsrFixStacktrace, so removeSsrLoadModule only covers ssrLoadModule itself. Make sure everything that lists or documents the future flags stays consistent.
+KEY: packages/vite/src/node/config.ts: (1) add removeSsrFixStacktrace?: 'warn' to the FutureOptions interface. (2) Add removeSsrFixStacktrace: 'warn' to the object that `future: 'warn'` expands into in resolveConfig. That object is checked with `satisfies Required<FutureOptions>`, so leaving it out is a type error. (3) Adding removeSsrFixStacktrace: undefined to the config defaults' future block is expected for consistency, but not essential. packages/vite/src/node/deprecations.ts: (4) add removeSsrFixStacktrace to deprecationCode. Both deprecationCode and deprecationMessages are checked with `satisfies Record<keyof FutureOptions, string>`. The code value builds the docs link vite.dev/changes/<code>, so it must be an existing page slug, namely 'ssr-using-modulerunner', not a made-up page. (5) Add a deprecationMessages entry for the new flag, for example saying ssrFixStacktrace/ssrRewriteStacktrace are not needed with Module Runners. packages/vite/src/node/server/index.ts: (6) the ssrFixStacktrace and ssrRewriteStacktrace methods of the ViteDevServer object built in _createServer switch from warnFutureDeprecation(config, 'removeSsrLoadModule', ...) to 'removeSsrFixStacktrace' (keeping or moving their extra messages). ssrLoadModule keeps 'removeSsrLoadModule'. Internal ssrFixStacktrace calls (for example ssrModuleLoader's fixStacktrace path) must not start warning. Docs: (7) docs/changes/ssr-using-modulerunner.md must document the new flag. Its 'Future Deprecation' box currently tells users to set only future.removeSsrLoadModule, and its Migration Guide paragraph about ssrFixStacktrace/ssrRewriteStacktrace should name future.removeSsrFixStacktrace. No new docs/changes page and no change to docs/changes/index.md is needed. A run that only adds the interface key, or forgets the 'warn' expansion or the deprecationCode/Message entries, is incomplete.
+SUMMARY: New flag removeSsrFixStacktrace: FutureOptions, defaults (+2 missing), 'warn' list; deprecations.ts both tables; server/index.ts; docs/changes/ssr-using-modulerunner.md Future Deprecation note. Checked graphdown check's changed-code lines (API signatures, SSR examples, a migration note) and judged them still correct. CHANGELOG left.
+DIFF:
+diff --git a/docs/changes/ssr-using-modulerunner.md b/docs/changes/ssr-using-modulerunner.md
+index 47c334f..99ae3fb 100644
+--- a/docs/changes/ssr-using-modulerunner.md
++++ b/docs/changes/ssr-using-modulerunner.md
+@@ -9,7 +9,7 @@ Give us feedback at [Environment API feedback discussion](https://github.com/vit
+ Affected scope: `Vite Plugin Authors`
+ 
+ ::: warning Future Deprecation
+-`ModuleRunner` was first introduced in `v6.0`. The deprecation of `server.ssrLoadModule` is planned for a future major. To identify your usage, set `future.removeSsrLoadModule` to `"warn"` in your vite config.
++`ModuleRunner` was first introduced in `v6.0`. The deprecation of `server.ssrLoadModule` is planned for a future major. To identify your usage, set `future.removeSsrLoadModule` to `"warn"` in your vite config. Calls to `server.ssrFixStacktrace` and `server.ssrRewriteStacktrace` are reported separately by `future.removeSsrFixStacktrace`, so you can enable one without the other.
+ :::
+ 
+ ## Motivation
+diff --git a/packages/vite/src/node/config.ts b/packages/vite/src/node/config.ts
+index 016a97a..25d0bc9 100644
+--- a/packages/vite/src/node/config.ts
++++ b/packages/vite/src/node/config.ts
+@@ -598,6 +598,7 @@ export interface FutureOptions {
+   removeServerWarmupRequest?: 'warn'
+ 
+   removeSsrLoadModule?: 'warn'
++  removeSsrFixStacktrace?: 'warn'
+ }
+ 
+ export interface ExperimentalOptions {
+@@ -929,10 +930,13 @@ const configDefaults = Object.freeze({
+     removePluginHookHandleHotUpdate: undefined,
+     removePluginHookSsrArgument: undefined,
+     removeServerModuleGraph: undefined,
++    removeServerReloadModule: undefined,
++    removeServerPluginContainer: undefined,
+     removeServerHot: undefined,
+     removeServerTransformRequest: undefined,
+     removeServerWarmupRequest: undefined,
+     removeSsrLoadModule: undefined,
++    removeSsrFixStacktrace: undefined,
+   },
+   legacy: {
+     skipWebSocketTokenCheck: false,
+@@ -2161,6 +2165,7 @@ export async function resolveConfig(
+             removeServerTransformRequest: 'warn',
+             removeServerWarmupRequest: 'warn',
+             removeSsrLoadModule: 'warn',
++            removeSsrFixStacktrace: 'warn',
+           } satisfies Required<FutureOptions>)
+         : config.future,
+ 
+diff --git a/packages/vite/src/node/deprecations.ts b/packages/vite/src/node/deprecations.ts
+index f51b71c..2bdd5c0 100644
+--- a/packages/vite/src/node/deprecations.ts
++++ b/packages/vite/src/node/deprecations.ts
+@@ -15,6 +15,7 @@ const deprecationCode = {
+   removeServerWarmupRequest: 'per-environment-apis',
+ 
+   removeSsrLoadModule: 'ssr-using-modulerunner',
++  removeSsrFixStacktrace: 'ssr-using-modulerunner',
+ } satisfies Record<keyof FutureOptions, string>
+ 
+ const deprecationMessages = {
+@@ -37,6 +38,8 @@ const deprecationMessages = {
+ 
+   removeSsrLoadModule:
+     'The `server.ssrLoadModule` is replaced with Environment Runner.',
++  removeSsrFixStacktrace:
++    'The `server.ssrFixStacktrace` and `server.ssrRewriteStacktrace` are not needed with Environment Runner.',
+ } satisfies Record<keyof FutureOptions, string>
+ 
+ let _ignoreDeprecationWarnings = false
+diff --git a/packages/vite/src/node/server/index.ts b/packages/vite/src/node/server/index.ts
+index 0442117..ef5d8f0 100644
+--- a/packages/vite/src/node/server/index.ts
++++ b/packages/vite/src/node/server/index.ts
+@@ -720,7 +720,7 @@ export async function _createServer(
+     ssrFixStacktrace(e) {
+       warnFutureDeprecation(
+         config,
+-        'removeSsrLoadModule',
++        'removeSsrFixStacktrace',
+         "ssrFixStacktrace doesn't need to be used for Environment Module Runners.",
+       )
+       ssrFixStacktrace(e, server.environments.ssr.moduleGraph)
+@@ -728,7 +728,7 @@ export async function _createServer(
+     ssrRewriteStacktrace(stack: string) {
+       warnFutureDeprecation(
+         config,
+-        'removeSsrLoadModule',
++        'removeSsrFixStacktrace',
+         "ssrRewriteStacktrace doesn't need to be used for Environment Module Runners.",
+       )
+       return ssrRewriteStacktrace(stack, server.environments.ssr.moduleGraph)
+
+=== ITEM g05 (vite c2, change-and-update)
+TASK: Users who opt into the future deprecation warnings for server.ssrLoadModule complain that they also get spammed by warnings from server.ssrFixStacktrace and server.ssrRewriteStacktrace, which they call from their error handlers. Split those two out into their own future flag named removeSsrFixStacktrace, so removeSsrLoadModule only covers ssrLoadModule itself. Make sure everything that lists or documents the future flags stays consistent.
+KEY: packages/vite/src/node/config.ts: (1) add removeSsrFixStacktrace?: 'warn' to the FutureOptions interface. (2) Add removeSsrFixStacktrace: 'warn' to the object that `future: 'warn'` expands into in resolveConfig. That object is checked with `satisfies Required<FutureOptions>`, so leaving it out is a type error. (3) Adding removeSsrFixStacktrace: undefined to the config defaults' future block is expected for consistency, but not essential. packages/vite/src/node/deprecations.ts: (4) add removeSsrFixStacktrace to deprecationCode. Both deprecationCode and deprecationMessages are checked with `satisfies Record<keyof FutureOptions, string>`. The code value builds the docs link vite.dev/changes/<code>, so it must be an existing page slug, namely 'ssr-using-modulerunner', not a made-up page. (5) Add a deprecationMessages entry for the new flag, for example saying ssrFixStacktrace/ssrRewriteStacktrace are not needed with Module Runners. packages/vite/src/node/server/index.ts: (6) the ssrFixStacktrace and ssrRewriteStacktrace methods of the ViteDevServer object built in _createServer switch from warnFutureDeprecation(config, 'removeSsrLoadModule', ...) to 'removeSsrFixStacktrace' (keeping or moving their extra messages). ssrLoadModule keeps 'removeSsrLoadModule'. Internal ssrFixStacktrace calls (for example ssrModuleLoader's fixStacktrace path) must not start warning. Docs: (7) docs/changes/ssr-using-modulerunner.md must document the new flag. Its 'Future Deprecation' box currently tells users to set only future.removeSsrLoadModule, and its Migration Guide paragraph about ssrFixStacktrace/ssrRewriteStacktrace should name future.removeSsrFixStacktrace. No new docs/changes page and no change to docs/changes/index.md is needed. A run that only adds the interface key, or forgets the 'warn' expansion or the deprecationCode/Message entries, is incomplete.
+SUMMARY: New flag removeSsrFixStacktrace: server/index.ts, FutureOptions, 'warn' list, defaults (+2 missing defaults), deprecations.ts tables; docs/changes/ssr-using-modulerunner.md Future Deprecation note with both-flags example. Checked api-javascript.md, ssr.md (still correct), CHANGELOG left. graphdown check 18 pre-existing.
+DIFF:
+diff --git a/docs/changes/ssr-using-modulerunner.md b/docs/changes/ssr-using-modulerunner.md
+index 47c334f..e24a000 100644
+--- a/docs/changes/ssr-using-modulerunner.md
++++ b/docs/changes/ssr-using-modulerunner.md
+@@ -9,7 +9,15 @@ Give us feedback at [Environment API feedback discussion](https://github.com/vit
+ Affected scope: `Vite Plugin Authors`
+ 
+ ::: warning Future Deprecation
+-`ModuleRunner` was first introduced in `v6.0`. The deprecation of `server.ssrLoadModule` is planned for a future major. To identify your usage, set `future.removeSsrLoadModule` to `"warn"` in your vite config.
++`ModuleRunner` was first introduced in `v6.0`. The deprecation of `server.ssrLoadModule` is planned for a future major. To identify your usage, set `future.removeSsrLoadModule` to `"warn"` in your vite config. Calls to `server.ssrFixStacktrace` and `server.ssrRewriteStacktrace` are covered by a separate flag, `future.removeSsrFixStacktrace`, so you can enable each warning independently:
++
++```ts
++future: {
++  removeSsrLoadModule: 'warn',
++  removeSsrFixStacktrace: 'warn',
++}
++```
++
+ :::
+ 
+ ## Motivation
+diff --git a/packages/vite/src/node/config.ts b/packages/vite/src/node/config.ts
+index 016a97a..25d0bc9 100644
+--- a/packages/vite/src/node/config.ts
++++ b/packages/vite/src/node/config.ts
+@@ -598,6 +598,7 @@ export interface FutureOptions {
+   removeServerWarmupRequest?: 'warn'
+ 
+   removeSsrLoadModule?: 'warn'
++  removeSsrFixStacktrace?: 'warn'
+ }
+ 
+ export interface ExperimentalOptions {
+@@ -929,10 +930,13 @@ const configDefaults = Object.freeze({
+     removePluginHookHandleHotUpdate: undefined,
+     removePluginHookSsrArgument: undefined,
+     removeServerModuleGraph: undefined,
++    removeServerReloadModule: undefined,
++    removeServerPluginContainer: undefined,
+     removeServerHot: undefined,
+     removeServerTransformRequest: undefined,
+     removeServerWarmupRequest: undefined,
+     removeSsrLoadModule: undefined,
++    removeSsrFixStacktrace: undefined,
+   },
+   legacy: {
+     skipWebSocketTokenCheck: false,
+@@ -2161,6 +2165,7 @@ export async function resolveConfig(
+             removeServerTransformRequest: 'warn',
+             removeServerWarmupRequest: 'warn',
+             removeSsrLoadModule: 'warn',
++            removeSsrFixStacktrace: 'warn',
+           } satisfies Required<FutureOptions>)
+         : config.future,
+ 
+diff --git a/packages/vite/src/node/deprecations.ts b/packages/vite/src/node/deprecations.ts
+index f51b71c..2bdd5c0 100644
+--- a/packages/vite/src/node/deprecations.ts
++++ b/packages/vite/src/node/deprecations.ts
+@@ -15,6 +15,7 @@ const deprecationCode = {
+   removeServerWarmupRequest: 'per-environment-apis',
+ 
+   removeSsrLoadModule: 'ssr-using-modulerunner',
++  removeSsrFixStacktrace: 'ssr-using-modulerunner',
+ } satisfies Record<keyof FutureOptions, string>
+ 
+ const deprecationMessages = {
+@@ -37,6 +38,8 @@ const deprecationMessages = {
+ 
+   removeSsrLoadModule:
+     'The `server.ssrLoadModule` is replaced with Environment Runner.',
++  removeSsrFixStacktrace:
++    'The `server.ssrFixStacktrace` and `server.ssrRewriteStacktrace` are not needed with Environment Runner.',
+ } satisfies Record<keyof FutureOptions, string>
+ 
+ let _ignoreDeprecationWarnings = false
+diff --git a/packages/vite/src/node/server/index.ts b/packages/vite/src/node/server/index.ts
+index 0442117..ef5d8f0 100644
+--- a/packages/vite/src/node/server/index.ts
++++ b/packages/vite/src/node/server/index.ts
+@@ -720,7 +720,7 @@ export async function _createServer(
+     ssrFixStacktrace(e) {
+       warnFutureDeprecation(
+         config,
+-        'removeSsrLoadModule',
++        'removeSsrFixStacktrace',
+         "ssrFixStacktrace doesn't need to be used for Environment Module Runners.",
+       )
+       ssrFixStacktrace(e, server.environments.ssr.moduleGraph)
+@@ -728,7 +728,7 @@ export async function _createServer(
+     ssrRewriteStacktrace(stack: string) {
+       warnFutureDeprecation(
+         config,
+-        'removeSsrLoadModule',
++        'removeSsrFixStacktrace',
+         "ssrRewriteStacktrace doesn't need to be used for Environment Module Runners.",
+       )
+       return ssrRewriteStacktrace(stack, server.environments.ssr.moduleGraph)
+
+=== ITEM g06 (vite c2, change-and-update)
+TASK: Users who opt into the future deprecation warnings for server.ssrLoadModule complain that they also get spammed by warnings from server.ssrFixStacktrace and server.ssrRewriteStacktrace, which they call from their error handlers. Split those two out into their own future flag named removeSsrFixStacktrace, so removeSsrLoadModule only covers ssrLoadModule itself. Make sure everything that lists or documents the future flags stays consistent.
+KEY: packages/vite/src/node/config.ts: (1) add removeSsrFixStacktrace?: 'warn' to the FutureOptions interface. (2) Add removeSsrFixStacktrace: 'warn' to the object that `future: 'warn'` expands into in resolveConfig. That object is checked with `satisfies Required<FutureOptions>`, so leaving it out is a type error. (3) Adding removeSsrFixStacktrace: undefined to the config defaults' future block is expected for consistency, but not essential. packages/vite/src/node/deprecations.ts: (4) add removeSsrFixStacktrace to deprecationCode. Both deprecationCode and deprecationMessages are checked with `satisfies Record<keyof FutureOptions, string>`. The code value builds the docs link vite.dev/changes/<code>, so it must be an existing page slug, namely 'ssr-using-modulerunner', not a made-up page. (5) Add a deprecationMessages entry for the new flag, for example saying ssrFixStacktrace/ssrRewriteStacktrace are not needed with Module Runners. packages/vite/src/node/server/index.ts: (6) the ssrFixStacktrace and ssrRewriteStacktrace methods of the ViteDevServer object built in _createServer switch from warnFutureDeprecation(config, 'removeSsrLoadModule', ...) to 'removeSsrFixStacktrace' (keeping or moving their extra messages). ssrLoadModule keeps 'removeSsrLoadModule'. Internal ssrFixStacktrace calls (for example ssrModuleLoader's fixStacktrace path) must not start warning. Docs: (7) docs/changes/ssr-using-modulerunner.md must document the new flag. Its 'Future Deprecation' box currently tells users to set only future.removeSsrLoadModule, and its Migration Guide paragraph about ssrFixStacktrace/ssrRewriteStacktrace should name future.removeSsrFixStacktrace. No new docs/changes page and no change to docs/changes/index.md is needed. A run that only adds the interface key, or forgets the 'warn' expansion or the deprecationCode/Message entries, is incomplete.
+SUMMARY: New flag removeSsrFixStacktrace: server/index.ts; deprecations.ts code and message; config.ts interface, defaults (+2 missing), 'warn' list; docs/changes/ssr-using-modulerunner.md Future Deprecation note. Judged check's flagged mention lines (API signature, usage example, changelog) still correct.
+DIFF:
+diff --git a/docs/changes/ssr-using-modulerunner.md b/docs/changes/ssr-using-modulerunner.md
+index 47c334f..ce5f85a 100644
+--- a/docs/changes/ssr-using-modulerunner.md
++++ b/docs/changes/ssr-using-modulerunner.md
+@@ -9,7 +9,7 @@ Give us feedback at [Environment API feedback discussion](https://github.com/vit
+ Affected scope: `Vite Plugin Authors`
+ 
+ ::: warning Future Deprecation
+-`ModuleRunner` was first introduced in `v6.0`. The deprecation of `server.ssrLoadModule` is planned for a future major. To identify your usage, set `future.removeSsrLoadModule` to `"warn"` in your vite config.
++`ModuleRunner` was first introduced in `v6.0`. The deprecation of `server.ssrLoadModule` is planned for a future major. To identify your usage, set `future.removeSsrLoadModule` to `"warn"` in your vite config. Usage of `server.ssrFixStacktrace` and `server.ssrRewriteStacktrace` is reported separately by `future.removeSsrFixStacktrace`.
+ :::
+ 
+ ## Motivation
+diff --git a/packages/vite/src/node/config.ts b/packages/vite/src/node/config.ts
+index 016a97a..25d0bc9 100644
+--- a/packages/vite/src/node/config.ts
++++ b/packages/vite/src/node/config.ts
+@@ -598,6 +598,7 @@ export interface FutureOptions {
+   removeServerWarmupRequest?: 'warn'
+ 
+   removeSsrLoadModule?: 'warn'
++  removeSsrFixStacktrace?: 'warn'
+ }
+ 
+ export interface ExperimentalOptions {
+@@ -929,10 +930,13 @@ const configDefaults = Object.freeze({
+     removePluginHookHandleHotUpdate: undefined,
+     removePluginHookSsrArgument: undefined,
+     removeServerModuleGraph: undefined,
++    removeServerReloadModule: undefined,
++    removeServerPluginContainer: undefined,
+     removeServerHot: undefined,
+     removeServerTransformRequest: undefined,
+     removeServerWarmupRequest: undefined,
+     removeSsrLoadModule: undefined,
++    removeSsrFixStacktrace: undefined,
+   },
+   legacy: {
+     skipWebSocketTokenCheck: false,
+@@ -2161,6 +2165,7 @@ export async function resolveConfig(
+             removeServerTransformRequest: 'warn',
+             removeServerWarmupRequest: 'warn',
+             removeSsrLoadModule: 'warn',
++            removeSsrFixStacktrace: 'warn',
+           } satisfies Required<FutureOptions>)
+         : config.future,
+ 
+diff --git a/packages/vite/src/node/deprecations.ts b/packages/vite/src/node/deprecations.ts
+index f51b71c..554b1e9 100644
+--- a/packages/vite/src/node/deprecations.ts
++++ b/packages/vite/src/node/deprecations.ts
+@@ -15,6 +15,7 @@ const deprecationCode = {
+   removeServerWarmupRequest: 'per-environment-apis',
+ 
+   removeSsrLoadModule: 'ssr-using-modulerunner',
++  removeSsrFixStacktrace: 'ssr-using-modulerunner',
+ } satisfies Record<keyof FutureOptions, string>
+ 
+ const deprecationMessages = {
+@@ -37,6 +38,8 @@ const deprecationMessages = {
+ 
+   removeSsrLoadModule:
+     'The `server.ssrLoadModule` is replaced with Environment Runner.',
++  removeSsrFixStacktrace:
++    'Stack traces are fixed automatically by Environment Runner.',
+ } satisfies Record<keyof FutureOptions, string>
+ 
+ let _ignoreDeprecationWarnings = false
+diff --git a/packages/vite/src/node/server/index.ts b/packages/vite/src/node/server/index.ts
+index 0442117..ef5d8f0 100644
+--- a/packages/vite/src/node/server/index.ts
++++ b/packages/vite/src/node/server/index.ts
+@@ -720,7 +720,7 @@ export async function _createServer(
+     ssrFixStacktrace(e) {
+       warnFutureDeprecation(
+         config,
+-        'removeSsrLoadModule',
++        'removeSsrFixStacktrace',
+         "ssrFixStacktrace doesn't need to be used for Environment Module Runners.",
+       )
+       ssrFixStacktrace(e, server.environments.ssr.moduleGraph)
+@@ -728,7 +728,7 @@ export async function _createServer(
+     ssrRewriteStacktrace(stack: string) {
+       warnFutureDeprecation(
+         config,
+-        'removeSsrLoadModule',
++        'removeSsrFixStacktrace',
+         "ssrRewriteStacktrace doesn't need to be used for Environment Module Runners.",
+       )
+       return ssrRewriteStacktrace(stack, server.environments.ssr.moduleGraph)
+
+=== ITEM g07 (vite c2, change-and-update)
+TASK: Users who opt into the future deprecation warnings for server.ssrLoadModule complain that they also get spammed by warnings from server.ssrFixStacktrace and server.ssrRewriteStacktrace, which they call from their error handlers. Split those two out into their own future flag named removeSsrFixStacktrace, so removeSsrLoadModule only covers ssrLoadModule itself. Make sure everything that lists or documents the future flags stays consistent.
+KEY: packages/vite/src/node/config.ts: (1) add removeSsrFixStacktrace?: 'warn' to the FutureOptions interface. (2) Add removeSsrFixStacktrace: 'warn' to the object that `future: 'warn'` expands into in resolveConfig. That object is checked with `satisfies Required<FutureOptions>`, so leaving it out is a type error. (3) Adding removeSsrFixStacktrace: undefined to the config defaults' future block is expected for consistency, but not essential. packages/vite/src/node/deprecations.ts: (4) add removeSsrFixStacktrace to deprecationCode. Both deprecationCode and deprecationMessages are checked with `satisfies Record<keyof FutureOptions, string>`. The code value builds the docs link vite.dev/changes/<code>, so it must be an existing page slug, namely 'ssr-using-modulerunner', not a made-up page. (5) Add a deprecationMessages entry for the new flag, for example saying ssrFixStacktrace/ssrRewriteStacktrace are not needed with Module Runners. packages/vite/src/node/server/index.ts: (6) the ssrFixStacktrace and ssrRewriteStacktrace methods of the ViteDevServer object built in _createServer switch from warnFutureDeprecation(config, 'removeSsrLoadModule', ...) to 'removeSsrFixStacktrace' (keeping or moving their extra messages). ssrLoadModule keeps 'removeSsrLoadModule'. Internal ssrFixStacktrace calls (for example ssrModuleLoader's fixStacktrace path) must not start warning. Docs: (7) docs/changes/ssr-using-modulerunner.md must document the new flag. Its 'Future Deprecation' box currently tells users to set only future.removeSsrLoadModule, and its Migration Guide paragraph about ssrFixStacktrace/ssrRewriteStacktrace should name future.removeSsrFixStacktrace. No new docs/changes page and no change to docs/changes/index.md is needed. A run that only adds the interface key, or forgets the 'warn' expansion or the deprecationCode/Message entries, is incomplete.
+SUMMARY: New flag removeSsrFixStacktrace: FutureOptions, defaults, 'warn' list; server/index.ts both methods; deprecations.ts link and message; docs/changes/ssr-using-modulerunner.md Future Deprecation box explains new flag. Added two missing defaults. Behaviour change noted. No run.
+DIFF:
+diff --git a/docs/changes/ssr-using-modulerunner.md b/docs/changes/ssr-using-modulerunner.md
+index 47c334f..0c4d576 100644
+--- a/docs/changes/ssr-using-modulerunner.md
++++ b/docs/changes/ssr-using-modulerunner.md
+@@ -9,7 +9,7 @@ Give us feedback at [Environment API feedback discussion](https://github.com/vit
+ Affected scope: `Vite Plugin Authors`
+ 
+ ::: warning Future Deprecation
+-`ModuleRunner` was first introduced in `v6.0`. The deprecation of `server.ssrLoadModule` is planned for a future major. To identify your usage, set `future.removeSsrLoadModule` to `"warn"` in your vite config.
++`ModuleRunner` was first introduced in `v6.0`. The deprecation of `server.ssrLoadModule` is planned for a future major. To identify your usage, set `future.removeSsrLoadModule` to `"warn"` in your vite config. Usage of `server.ssrFixStacktrace` and `server.ssrRewriteStacktrace` is reported separately: set `future.removeSsrFixStacktrace` to `"warn"` to identify it.
+ :::
+ 
+ ## Motivation
+diff --git a/packages/vite/src/node/config.ts b/packages/vite/src/node/config.ts
+index 016a97a..25d0bc9 100644
+--- a/packages/vite/src/node/config.ts
++++ b/packages/vite/src/node/config.ts
+@@ -598,6 +598,7 @@ export interface FutureOptions {
+   removeServerWarmupRequest?: 'warn'
+ 
+   removeSsrLoadModule?: 'warn'
++  removeSsrFixStacktrace?: 'warn'
+ }
+ 
+ export interface ExperimentalOptions {
+@@ -929,10 +930,13 @@ const configDefaults = Object.freeze({
+     removePluginHookHandleHotUpdate: undefined,
+     removePluginHookSsrArgument: undefined,
+     removeServerModuleGraph: undefined,
++    removeServerReloadModule: undefined,
++    removeServerPluginContainer: undefined,
+     removeServerHot: undefined,
+     removeServerTransformRequest: undefined,
+     removeServerWarmupRequest: undefined,
+     removeSsrLoadModule: undefined,
++    removeSsrFixStacktrace: undefined,
+   },
+   legacy: {
+     skipWebSocketTokenCheck: false,
+@@ -2161,6 +2165,7 @@ export async function resolveConfig(
+             removeServerTransformRequest: 'warn',
+             removeServerWarmupRequest: 'warn',
+             removeSsrLoadModule: 'warn',
++            removeSsrFixStacktrace: 'warn',
+           } satisfies Required<FutureOptions>)
+         : config.future,
+ 
+diff --git a/packages/vite/src/node/deprecations.ts b/packages/vite/src/node/deprecations.ts
+index f51b71c..2bdd5c0 100644
+--- a/packages/vite/src/node/deprecations.ts
++++ b/packages/vite/src/node/deprecations.ts
+@@ -15,6 +15,7 @@ const deprecationCode = {
+   removeServerWarmupRequest: 'per-environment-apis',
+ 
+   removeSsrLoadModule: 'ssr-using-modulerunner',
++  removeSsrFixStacktrace: 'ssr-using-modulerunner',
+ } satisfies Record<keyof FutureOptions, string>
+ 
+ const deprecationMessages = {
+@@ -37,6 +38,8 @@ const deprecationMessages = {
+ 
+   removeSsrLoadModule:
+     'The `server.ssrLoadModule` is replaced with Environment Runner.',
++  removeSsrFixStacktrace:
++    'The `server.ssrFixStacktrace` and `server.ssrRewriteStacktrace` are not needed with Environment Runner.',
+ } satisfies Record<keyof FutureOptions, string>
+ 
+ let _ignoreDeprecationWarnings = false
+diff --git a/packages/vite/src/node/server/index.ts b/packages/vite/src/node/server/index.ts
+index 0442117..ef5d8f0 100644
+--- a/packages/vite/src/node/server/index.ts
++++ b/packages/vite/src/node/server/index.ts
+@@ -720,7 +720,7 @@ export async function _createServer(
+     ssrFixStacktrace(e) {
+       warnFutureDeprecation(
+         config,
+-        'removeSsrLoadModule',
++        'removeSsrFixStacktrace',
+         "ssrFixStacktrace doesn't need to be used for Environment Module Runners.",
+       )
+       ssrFixStacktrace(e, server.environments.ssr.moduleGraph)
+@@ -728,7 +728,7 @@ export async function _createServer(
+     ssrRewriteStacktrace(stack: string) {
+       warnFutureDeprecation(
+         config,
+-        'removeSsrLoadModule',
++        'removeSsrFixStacktrace',
+         "ssrRewriteStacktrace doesn't need to be used for Environment Module Runners.",
+       )
+       return ssrRewriteStacktrace(stack, server.environments.ssr.moduleGraph)
+
+=== ITEM g08 (vite c2, change-and-update)
+TASK: Users who opt into the future deprecation warnings for server.ssrLoadModule complain that they also get spammed by warnings from server.ssrFixStacktrace and server.ssrRewriteStacktrace, which they call from their error handlers. Split those two out into their own future flag named removeSsrFixStacktrace, so removeSsrLoadModule only covers ssrLoadModule itself. Make sure everything that lists or documents the future flags stays consistent.
+KEY: packages/vite/src/node/config.ts: (1) add removeSsrFixStacktrace?: 'warn' to the FutureOptions interface. (2) Add removeSsrFixStacktrace: 'warn' to the object that `future: 'warn'` expands into in resolveConfig. That object is checked with `satisfies Required<FutureOptions>`, so leaving it out is a type error. (3) Adding removeSsrFixStacktrace: undefined to the config defaults' future block is expected for consistency, but not essential. packages/vite/src/node/deprecations.ts: (4) add removeSsrFixStacktrace to deprecationCode. Both deprecationCode and deprecationMessages are checked with `satisfies Record<keyof FutureOptions, string>`. The code value builds the docs link vite.dev/changes/<code>, so it must be an existing page slug, namely 'ssr-using-modulerunner', not a made-up page. (5) Add a deprecationMessages entry for the new flag, for example saying ssrFixStacktrace/ssrRewriteStacktrace are not needed with Module Runners. packages/vite/src/node/server/index.ts: (6) the ssrFixStacktrace and ssrRewriteStacktrace methods of the ViteDevServer object built in _createServer switch from warnFutureDeprecation(config, 'removeSsrLoadModule', ...) to 'removeSsrFixStacktrace' (keeping or moving their extra messages). ssrLoadModule keeps 'removeSsrLoadModule'. Internal ssrFixStacktrace calls (for example ssrModuleLoader's fixStacktrace path) must not start warning. Docs: (7) docs/changes/ssr-using-modulerunner.md must document the new flag. Its 'Future Deprecation' box currently tells users to set only future.removeSsrLoadModule, and its Migration Guide paragraph about ssrFixStacktrace/ssrRewriteStacktrace should name future.removeSsrFixStacktrace. No new docs/changes page and no change to docs/changes/index.md is needed. A run that only adds the interface key, or forgets the 'warn' expansion or the deprecationCode/Message entries, is incomplete.
+SUMMARY: New flag removeSsrFixStacktrace: config.ts interface, defaults (+2 missing), 'warn' list; deprecations.ts both tables; server/index.ts; docs/changes/ssr-using-modulerunner.md Future Deprecation note. CHANGELOG left. api-javascript.md, ssr.md still correct.
+DIFF:
+diff --git a/docs/changes/ssr-using-modulerunner.md b/docs/changes/ssr-using-modulerunner.md
+index 47c334f..ec8b78e 100644
+--- a/docs/changes/ssr-using-modulerunner.md
++++ b/docs/changes/ssr-using-modulerunner.md
+@@ -9,7 +9,7 @@ Give us feedback at [Environment API feedback discussion](https://github.com/vit
+ Affected scope: `Vite Plugin Authors`
+ 
+ ::: warning Future Deprecation
+-`ModuleRunner` was first introduced in `v6.0`. The deprecation of `server.ssrLoadModule` is planned for a future major. To identify your usage, set `future.removeSsrLoadModule` to `"warn"` in your vite config.
++`ModuleRunner` was first introduced in `v6.0`. The deprecation of `server.ssrLoadModule` is planned for a future major. To identify your usage, set `future.removeSsrLoadModule` to `"warn"` in your vite config. Calls to `server.ssrFixStacktrace` and `server.ssrRewriteStacktrace` are reported separately: set `future.removeSsrFixStacktrace` to `"warn"` to identify those too.
+ :::
+ 
+ ## Motivation
+diff --git a/packages/vite/src/node/config.ts b/packages/vite/src/node/config.ts
+index 016a97a..25d0bc9 100644
+--- a/packages/vite/src/node/config.ts
++++ b/packages/vite/src/node/config.ts
+@@ -598,6 +598,7 @@ export interface FutureOptions {
+   removeServerWarmupRequest?: 'warn'
+ 
+   removeSsrLoadModule?: 'warn'
++  removeSsrFixStacktrace?: 'warn'
+ }
+ 
+ export interface ExperimentalOptions {
+@@ -929,10 +930,13 @@ const configDefaults = Object.freeze({
+     removePluginHookHandleHotUpdate: undefined,
+     removePluginHookSsrArgument: undefined,
+     removeServerModuleGraph: undefined,
++    removeServerReloadModule: undefined,
++    removeServerPluginContainer: undefined,
+     removeServerHot: undefined,
+     removeServerTransformRequest: undefined,
+     removeServerWarmupRequest: undefined,
+     removeSsrLoadModule: undefined,
++    removeSsrFixStacktrace: undefined,
+   },
+   legacy: {
+     skipWebSocketTokenCheck: false,
+@@ -2161,6 +2165,7 @@ export async function resolveConfig(
+             removeServerTransformRequest: 'warn',
+             removeServerWarmupRequest: 'warn',
+             removeSsrLoadModule: 'warn',
++            removeSsrFixStacktrace: 'warn',
+           } satisfies Required<FutureOptions>)
+         : config.future,
+ 
+diff --git a/packages/vite/src/node/deprecations.ts b/packages/vite/src/node/deprecations.ts
+index f51b71c..e7c071a 100644
+--- a/packages/vite/src/node/deprecations.ts
++++ b/packages/vite/src/node/deprecations.ts
+@@ -15,6 +15,7 @@ const deprecationCode = {
+   removeServerWarmupRequest: 'per-environment-apis',
+ 
+   removeSsrLoadModule: 'ssr-using-modulerunner',
++  removeSsrFixStacktrace: 'ssr-using-modulerunner',
+ } satisfies Record<keyof FutureOptions, string>
+ 
+ const deprecationMessages = {
+@@ -37,6 +38,8 @@ const deprecationMessages = {
+ 
+   removeSsrLoadModule:
+     'The `server.ssrLoadModule` is replaced with Environment Runner.',
++  removeSsrFixStacktrace:
++    'The `server.ssrFixStacktrace` and `server.ssrRewriteStacktrace` are replaced with Environment Runner.',
+ } satisfies Record<keyof FutureOptions, string>
+ 
+ let _ignoreDeprecationWarnings = false
+diff --git a/packages/vite/src/node/server/index.ts b/packages/vite/src/node/server/index.ts
+index 0442117..ef5d8f0 100644
+--- a/packages/vite/src/node/server/index.ts
++++ b/packages/vite/src/node/server/index.ts
+@@ -720,7 +720,7 @@ export async function _createServer(
+     ssrFixStacktrace(e) {
+       warnFutureDeprecation(
+         config,
+-        'removeSsrLoadModule',
++        'removeSsrFixStacktrace',
+         "ssrFixStacktrace doesn't need to be used for Environment Module Runners.",
+       )
+       ssrFixStacktrace(e, server.environments.ssr.moduleGraph)
+@@ -728,7 +728,7 @@ export async function _createServer(
+     ssrRewriteStacktrace(stack: string) {
+       warnFutureDeprecation(
+         config,
+-        'removeSsrLoadModule',
++        'removeSsrFixStacktrace',
+         "ssrRewriteStacktrace doesn't need to be used for Environment Module Runners.",
+       )
+       return ssrRewriteStacktrace(stack, server.environments.ssr.moduleGraph)
+
+=== ITEM g09 (vite c2, change-and-update)
+TASK: Users who opt into the future deprecation warnings for server.ssrLoadModule complain that they also get spammed by warnings from server.ssrFixStacktrace and server.ssrRewriteStacktrace, which they call from their error handlers. Split those two out into their own future flag named removeSsrFixStacktrace, so removeSsrLoadModule only covers ssrLoadModule itself. Make sure everything that lists or documents the future flags stays consistent.
+KEY: packages/vite/src/node/config.ts: (1) add removeSsrFixStacktrace?: 'warn' to the FutureOptions interface. (2) Add removeSsrFixStacktrace: 'warn' to the object that `future: 'warn'` expands into in resolveConfig. That object is checked with `satisfies Required<FutureOptions>`, so leaving it out is a type error. (3) Adding removeSsrFixStacktrace: undefined to the config defaults' future block is expected for consistency, but not essential. packages/vite/src/node/deprecations.ts: (4) add removeSsrFixStacktrace to deprecationCode. Both deprecationCode and deprecationMessages are checked with `satisfies Record<keyof FutureOptions, string>`. The code value builds the docs link vite.dev/changes/<code>, so it must be an existing page slug, namely 'ssr-using-modulerunner', not a made-up page. (5) Add a deprecationMessages entry for the new flag, for example saying ssrFixStacktrace/ssrRewriteStacktrace are not needed with Module Runners. packages/vite/src/node/server/index.ts: (6) the ssrFixStacktrace and ssrRewriteStacktrace methods of the ViteDevServer object built in _createServer switch from warnFutureDeprecation(config, 'removeSsrLoadModule', ...) to 'removeSsrFixStacktrace' (keeping or moving their extra messages). ssrLoadModule keeps 'removeSsrLoadModule'. Internal ssrFixStacktrace calls (for example ssrModuleLoader's fixStacktrace path) must not start warning. Docs: (7) docs/changes/ssr-using-modulerunner.md must document the new flag. Its 'Future Deprecation' box currently tells users to set only future.removeSsrLoadModule, and its Migration Guide paragraph about ssrFixStacktrace/ssrRewriteStacktrace should name future.removeSsrFixStacktrace. No new docs/changes page and no change to docs/changes/index.md is needed. A run that only adds the interface key, or forgets the 'warn' expansion or the deprecationCode/Message entries, is incomplete.
+SUMMARY: New flag removeSsrFixStacktrace: FutureOptions, defaults (+2 missing), 'warn' expansion; deprecations.ts both maps; server/index.ts; docs/changes/ssr-using-modulerunner.md Future Deprecation box with both flags. Judged migration-guide note, api-javascript.md, ssr.md still correct (no flags named). CHANGELOG left.
+DIFF:
+diff --git a/docs/changes/ssr-using-modulerunner.md b/docs/changes/ssr-using-modulerunner.md
+index 47c334f..7c3ead7 100644
+--- a/docs/changes/ssr-using-modulerunner.md
++++ b/docs/changes/ssr-using-modulerunner.md
+@@ -9,7 +9,16 @@ Give us feedback at [Environment API feedback discussion](https://github.com/vit
+ Affected scope: `Vite Plugin Authors`
+ 
+ ::: warning Future Deprecation
+-`ModuleRunner` was first introduced in `v6.0`. The deprecation of `server.ssrLoadModule` is planned for a future major. To identify your usage, set `future.removeSsrLoadModule` to `"warn"` in your vite config.
++`ModuleRunner` was first introduced in `v6.0`. The deprecation of `server.ssrLoadModule` is planned for a future major. To identify your usage, set these in your vite config.
++
++```ts
++future: {
++  removeSsrLoadModule: 'warn',
++  removeSsrFixStacktrace: 'warn',
++}
++```
++
++`removeSsrLoadModule` warns on `server.ssrLoadModule`. `removeSsrFixStacktrace` warns on `server.ssrFixStacktrace` and `server.ssrRewriteStacktrace`, so you can enable it separately from `removeSsrLoadModule` if you still call them from your error handlers.
+ :::
+ 
+ ## Motivation
+diff --git a/packages/vite/src/node/config.ts b/packages/vite/src/node/config.ts
+index 016a97a..25d0bc9 100644
+--- a/packages/vite/src/node/config.ts
++++ b/packages/vite/src/node/config.ts
+@@ -598,6 +598,7 @@ export interface FutureOptions {
+   removeServerWarmupRequest?: 'warn'
+ 
+   removeSsrLoadModule?: 'warn'
++  removeSsrFixStacktrace?: 'warn'
+ }
+ 
+ export interface ExperimentalOptions {
+@@ -929,10 +930,13 @@ const configDefaults = Object.freeze({
+     removePluginHookHandleHotUpdate: undefined,
+     removePluginHookSsrArgument: undefined,
+     removeServerModuleGraph: undefined,
++    removeServerReloadModule: undefined,
++    removeServerPluginContainer: undefined,
+     removeServerHot: undefined,
+     removeServerTransformRequest: undefined,
+     removeServerWarmupRequest: undefined,
+     removeSsrLoadModule: undefined,
++    removeSsrFixStacktrace: undefined,
+   },
+   legacy: {
+     skipWebSocketTokenCheck: false,
+@@ -2161,6 +2165,7 @@ export async function resolveConfig(
+             removeServerTransformRequest: 'warn',
+             removeServerWarmupRequest: 'warn',
+             removeSsrLoadModule: 'warn',
++            removeSsrFixStacktrace: 'warn',
+           } satisfies Required<FutureOptions>)
+         : config.future,
+ 
+diff --git a/packages/vite/src/node/deprecations.ts b/packages/vite/src/node/deprecations.ts
+index f51b71c..0476ec6 100644
+--- a/packages/vite/src/node/deprecations.ts
++++ b/packages/vite/src/node/deprecations.ts
+@@ -15,6 +15,7 @@ const deprecationCode = {
+   removeServerWarmupRequest: 'per-environment-apis',
+ 
+   removeSsrLoadModule: 'ssr-using-modulerunner',
++  removeSsrFixStacktrace: 'ssr-using-modulerunner',
+ } satisfies Record<keyof FutureOptions, string>
+ 
+ const deprecationMessages = {
+@@ -37,6 +38,8 @@ const deprecationMessages = {
+ 
+   removeSsrLoadModule:
+     'The `server.ssrLoadModule` is replaced with Environment Runner.',
++  removeSsrFixStacktrace:
++    'The `server.ssrFixStacktrace` and `server.ssrRewriteStacktrace` are handled automatically by Environment Runner.',
+ } satisfies Record<keyof FutureOptions, string>
+ 
+ let _ignoreDeprecationWarnings = false
+diff --git a/packages/vite/src/node/server/index.ts b/packages/vite/src/node/server/index.ts
+index 0442117..ef5d8f0 100644
+--- a/packages/vite/src/node/server/index.ts
++++ b/packages/vite/src/node/server/index.ts
+@@ -720,7 +720,7 @@ export async function _createServer(
+     ssrFixStacktrace(e) {
+       warnFutureDeprecation(
+         config,
+-        'removeSsrLoadModule',
++        'removeSsrFixStacktrace',
+         "ssrFixStacktrace doesn't need to be used for Environment Module Runners.",
+       )
+       ssrFixStacktrace(e, server.environments.ssr.moduleGraph)
+@@ -728,7 +728,7 @@ export async function _createServer(
+     ssrRewriteStacktrace(stack: string) {
+       warnFutureDeprecation(
+         config,
+-        'removeSsrLoadModule',
++        'removeSsrFixStacktrace',
+         "ssrRewriteStacktrace doesn't need to be used for Environment Module Runners.",
+       )
+       return ssrRewriteStacktrace(stack, server.environments.ssr.moduleGraph)
+
+=== ITEM g10 (vite c2, change-and-update)
+TASK: Users who opt into the future deprecation warnings for server.ssrLoadModule complain that they also get spammed by warnings from server.ssrFixStacktrace and server.ssrRewriteStacktrace, which they call from their error handlers. Split those two out into their own future flag named removeSsrFixStacktrace, so removeSsrLoadModule only covers ssrLoadModule itself. Make sure everything that lists or documents the future flags stays consistent.
+KEY: packages/vite/src/node/config.ts: (1) add removeSsrFixStacktrace?: 'warn' to the FutureOptions interface. (2) Add removeSsrFixStacktrace: 'warn' to the object that `future: 'warn'` expands into in resolveConfig. That object is checked with `satisfies Required<FutureOptions>`, so leaving it out is a type error. (3) Adding removeSsrFixStacktrace: undefined to the config defaults' future block is expected for consistency, but not essential. packages/vite/src/node/deprecations.ts: (4) add removeSsrFixStacktrace to deprecationCode. Both deprecationCode and deprecationMessages are checked with `satisfies Record<keyof FutureOptions, string>`. The code value builds the docs link vite.dev/changes/<code>, so it must be an existing page slug, namely 'ssr-using-modulerunner', not a made-up page. (5) Add a deprecationMessages entry for the new flag, for example saying ssrFixStacktrace/ssrRewriteStacktrace are not needed with Module Runners. packages/vite/src/node/server/index.ts: (6) the ssrFixStacktrace and ssrRewriteStacktrace methods of the ViteDevServer object built in _createServer switch from warnFutureDeprecation(config, 'removeSsrLoadModule', ...) to 'removeSsrFixStacktrace' (keeping or moving their extra messages). ssrLoadModule keeps 'removeSsrLoadModule'. Internal ssrFixStacktrace calls (for example ssrModuleLoader's fixStacktrace path) must not start warning. Docs: (7) docs/changes/ssr-using-modulerunner.md must document the new flag. Its 'Future Deprecation' box currently tells users to set only future.removeSsrLoadModule, and its Migration Guide paragraph about ssrFixStacktrace/ssrRewriteStacktrace should name future.removeSsrFixStacktrace. No new docs/changes page and no change to docs/changes/index.md is needed. A run that only adds the interface key, or forgets the 'warn' expansion or the deprecationCode/Message entries, is incomplete.
+SUMMARY: New flag removeSsrFixStacktrace: FutureOptions, configDefaults (+2 missing), 'warn' list; server/index.ts; deprecations.ts code and message; docs/changes/ssr-using-modulerunner.md warning box with both flags. CHANGELOG left.
+DIFF:
+diff --git a/docs/changes/ssr-using-modulerunner.md b/docs/changes/ssr-using-modulerunner.md
+index 47c334f..b0c71be 100644
+--- a/docs/changes/ssr-using-modulerunner.md
++++ b/docs/changes/ssr-using-modulerunner.md
+@@ -9,7 +9,16 @@ Give us feedback at [Environment API feedback discussion](https://github.com/vit
+ Affected scope: `Vite Plugin Authors`
+ 
+ ::: warning Future Deprecation
+-`ModuleRunner` was first introduced in `v6.0`. The deprecation of `server.ssrLoadModule` is planned for a future major. To identify your usage, set `future.removeSsrLoadModule` to `"warn"` in your vite config.
++`ModuleRunner` was first introduced in `v6.0`. The deprecation of `server.ssrLoadModule` is planned for a future major. To identify your usage, set these in your vite config.
++
++```ts
++future: {
++  removeSsrLoadModule: 'warn',
++  removeSsrFixStacktrace: 'warn',
++}
++```
++
++`removeSsrLoadModule` warns on `server.ssrLoadModule` calls, and `removeSsrFixStacktrace` warns on `server.ssrFixStacktrace` and `server.ssrRewriteStacktrace` calls.
+ :::
+ 
+ ## Motivation
+diff --git a/packages/vite/src/node/config.ts b/packages/vite/src/node/config.ts
+index 016a97a..25d0bc9 100644
+--- a/packages/vite/src/node/config.ts
++++ b/packages/vite/src/node/config.ts
+@@ -598,6 +598,7 @@ export interface FutureOptions {
+   removeServerWarmupRequest?: 'warn'
+ 
+   removeSsrLoadModule?: 'warn'
++  removeSsrFixStacktrace?: 'warn'
+ }
+ 
+ export interface ExperimentalOptions {
+@@ -929,10 +930,13 @@ const configDefaults = Object.freeze({
+     removePluginHookHandleHotUpdate: undefined,
+     removePluginHookSsrArgument: undefined,
+     removeServerModuleGraph: undefined,
++    removeServerReloadModule: undefined,
++    removeServerPluginContainer: undefined,
+     removeServerHot: undefined,
+     removeServerTransformRequest: undefined,
+     removeServerWarmupRequest: undefined,
+     removeSsrLoadModule: undefined,
++    removeSsrFixStacktrace: undefined,
+   },
+   legacy: {
+     skipWebSocketTokenCheck: false,
+@@ -2161,6 +2165,7 @@ export async function resolveConfig(
+             removeServerTransformRequest: 'warn',
+             removeServerWarmupRequest: 'warn',
+             removeSsrLoadModule: 'warn',
++            removeSsrFixStacktrace: 'warn',
+           } satisfies Required<FutureOptions>)
+         : config.future,
+ 
+diff --git a/packages/vite/src/node/deprecations.ts b/packages/vite/src/node/deprecations.ts
+index f51b71c..df16577 100644
+--- a/packages/vite/src/node/deprecations.ts
++++ b/packages/vite/src/node/deprecations.ts
+@@ -15,6 +15,7 @@ const deprecationCode = {
+   removeServerWarmupRequest: 'per-environment-apis',
+ 
+   removeSsrLoadModule: 'ssr-using-modulerunner',
++  removeSsrFixStacktrace: 'ssr-using-modulerunner',
+ } satisfies Record<keyof FutureOptions, string>
+ 
+ const deprecationMessages = {
+@@ -37,6 +38,8 @@ const deprecationMessages = {
+ 
+   removeSsrLoadModule:
+     'The `server.ssrLoadModule` is replaced with Environment Runner.',
++  removeSsrFixStacktrace:
++    'The `server.ssrFixStacktrace` and `server.ssrRewriteStacktrace` are not needed with Environment Runner, which rewrites stack traces automatically.',
+ } satisfies Record<keyof FutureOptions, string>
+ 
+ let _ignoreDeprecationWarnings = false
+diff --git a/packages/vite/src/node/server/index.ts b/packages/vite/src/node/server/index.ts
+index 0442117..ef5d8f0 100644
+--- a/packages/vite/src/node/server/index.ts
++++ b/packages/vite/src/node/server/index.ts
+@@ -720,7 +720,7 @@ export async function _createServer(
+     ssrFixStacktrace(e) {
+       warnFutureDeprecation(
+         config,
+-        'removeSsrLoadModule',
++        'removeSsrFixStacktrace',
+         "ssrFixStacktrace doesn't need to be used for Environment Module Runners.",
+       )
+       ssrFixStacktrace(e, server.environments.ssr.moduleGraph)
+@@ -728,7 +728,7 @@ export async function _createServer(
+     ssrRewriteStacktrace(stack: string) {
+       warnFutureDeprecation(
+         config,
+-        'removeSsrLoadModule',
++        'removeSsrFixStacktrace',
+         "ssrRewriteStacktrace doesn't need to be used for Environment Module Runners.",
+       )
+       return ssrRewriteStacktrace(stack, server.environments.ssr.moduleGraph)

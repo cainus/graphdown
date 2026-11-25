@@ -1,0 +1,10 @@
+{"id": "g01", "score": 0.5, "hidden_point": false, "note": "Code complete and correct; docs box updated but Migration Guide stacktrace paragraph not updated."}
+{"id": "g02", "score": 0.5, "hidden_point": false, "note": "Code complete and correct; docs box updated but Migration Guide stacktrace paragraph not updated."}
+{"id": "g03", "score": 0.5, "hidden_point": false, "note": "Code complete and correct; docs box updated but Migration Guide stacktrace paragraph not updated."}
+{"id": "g04", "score": 0.5, "hidden_point": false, "note": "Code complete; box mentions new flag but Migration Guide paragraph left unchanged."}
+{"id": "g05", "score": 0.5, "hidden_point": false, "note": "Code complete; box documents both flags but Migration Guide paragraph unchanged."}
+{"id": "g06", "score": 0.5, "hidden_point": false, "note": "Code complete; box mentions flag without warn value; Migration Guide paragraph unchanged."}
+{"id": "g07", "score": 0.5, "hidden_point": false, "note": "Code complete and correct; box updated but Migration Guide paragraph not updated."}
+{"id": "g08", "score": 0.5, "hidden_point": false, "note": "Code complete; box updated; Migration Guide paragraph unchanged; message says 'replaced', slightly off."}
+{"id": "g09", "score": 0.5, "hidden_point": false, "note": "Code complete; box updated; explicitly judged Migration Guide note fine, leaving it without flag."}
+{"id": "g10", "score": 0.5, "hidden_point": false, "note": "Code complete and correct; box updated but Migration Guide stacktrace paragraph not updated."}
