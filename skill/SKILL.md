@@ -17,7 +17,9 @@ Do this instead of listing folders and opening files:
 4. `graphdown slice docs/auth#token-refresh`: that section plus everything it references, transitively, each piece once. Use it to gather context for a task in one read. Add `--depth 1` to stay close, or `--no-code` for prose only.
 5. `graphdown outline src/auth.rs` and `graphdown show src/auth.rs#Session::refresh` work on code the same way.
 
-Before changing a function or a doc section, run `graphdown refs <target>` to see every doc and code comment that points at it. Those are what your change may make wrong.
+Before changing a function or a doc section, run `graphdown refs <target>` to see every doc and code comment that points at it, plus the doc lines that mention its name without a reference. Those are what your change may make wrong. When you change a value, also pass the old value: `graphdown refs src/config.py#DEFAULT_TIMEOUT --mention timeout=5.0`.
+
+Before finishing a change, run `graphdown outline` on the doc folders it touches and open any doc whose title or summary relates to it. Docs that restate behaviour in examples or sample output rarely link to the code.
 
 ## Writing references
 

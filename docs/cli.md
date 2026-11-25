@@ -45,7 +45,16 @@ graphdown refs src/project.rs         # every doc that mentions the file
 graphdown refs src/project.rs#Project::resolve
 ```
 
-Lists every reference that lands on the target, as `file:line (#within)  reference`, where `within` is the section slug for a doc or the enclosing definition for code. References from code comments are included, so `graphdown refs docs/auth#token-refresh` lists the functions that claim to implement it. A whole doc or file matches references to any part of it, and a section matches references to its subsections. Run it before changing code or a section, to find the docs that describe it. Implemented by @src/ops.rs#incoming.
+Lists every reference that lands on the target, as `file:line (#within)  reference`, where `within` is the section slug for a doc or the enclosing definition for code. References from code comments are included, so `graphdown refs docs/auth#token-refresh` lists the functions that claim to implement it. A whole doc or file matches references to any part of it, and a section matches references to its subsections. Run it before changing code or a section, to find the docs that describe it.
+
+References are only half the story: docs often name a function or setting in passing without linking it, and those lines go stale silently. So `refs` also lists, separately, every doc line that contains the target's name as a whole word but has no reference to it. For a code symbol the name is its last part (`ssrFixStacktrace` for `ViteDevServer.ssrFixStacktrace`, at least four characters long). Add more words with `--mention`, for example `--mention timeout=5.0` before changing a default, and turn the list off with `--no-mentions`. Mentions are leads to check by hand, not proof: graphdown can't tell whether the word means the target. In `--json` output every entry has a `kind` of `reference` or `mention`.
+
+```sh
+graphdown refs src/server.ts#ViteDevServer.ssrFixStacktrace
+graphdown refs docs/advanced/timeouts --mention timeout=5.0
+```
+
+In @docs/benchmark-pilot-3#results every agent missed a migration paragraph that named `server.ssrFixStacktrace` without linking it; this list puts that paragraph first. Implemented by @src/ops.rs#incoming.
 
 ## slice
 

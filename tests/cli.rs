@@ -444,3 +444,49 @@ fn outline_narrows_to_a_folder_and_a_depth() {
     let (code, out) = p.run(&["outline", "nowhere/"]);
     assert_ne!(code, 0, "{out}");
 }
+
+#[test]
+fn refs_lists_unlinked_mentions_separately() {
+    let p = Project::new(&[
+        ("src/server.ts", "export interface DevServer {\n  ssrFixStacktrace(e: Error): void\n}\n"),
+        (
+            "docs/api.md",
+            "# API\n\n## Stack traces\n\nSee @src/server.ts#DevServer.ssrFixStacktrace for details.\n\n## Migration\n\nYou no longer need `server.ssrFixStacktrace` here.\nNor ssrFixStacktraceExtra, a different word.\n",
+        ),
+    ]);
+    let (code, out) = p.run(&["refs", "src/server.ts#DevServer.ssrFixStacktrace"]);
+    assert_eq!(code, 0, "{out}");
+    let (refs, mentions) = out.split_once("mentioned without a reference").expect(&out);
+    assert!(refs.contains("docs/api.md:5 (#stack-traces)"), "{out}");
+    assert!(
+        mentions.contains(
+            "docs/api.md:9 (#migration)  You no longer need `server.ssrFixStacktrace` here."
+        ),
+        "{out}"
+    );
+    assert!(!mentions.contains(":10"), "{out}");
+    assert!(!mentions.contains(":5 "), "{out}");
+
+    let (_, out) = p.run(&[
+        "refs",
+        "src/server.ts#DevServer.ssrFixStacktrace",
+        "--no-mentions",
+    ]);
+    assert!(!out.contains("mentioned without"), "{out}");
+
+    let (_, out) = p.run(&[
+        "refs",
+        "docs/api#migration",
+        "--mention",
+        "no longer",
+        "--json",
+    ]);
+    let v: serde_json::Value = serde_json::from_str(&out).unwrap();
+    assert!(
+        v.as_array()
+            .unwrap()
+            .iter()
+            .all(|h| h["kind"] == "mention" || h["kind"] == "reference"),
+        "{out}"
+    );
+}

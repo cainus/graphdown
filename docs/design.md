@@ -54,6 +54,10 @@ The same reasoning drops an `@` reference whose first path part doesn't exist: i
 
 Graphdown is one static binary, and every channel delivers that same binary rather than a port or a wrapper library. Agent users mostly live in JavaScript and Python repos, so npm and PyPI matter more than crates.io: `npx` and `uvx` let a repo run graphdown without anyone installing Rust. The npm name `graphdown` belongs to an unrelated 2022 package that turns ASCII diagrams into SVG, so the npm package is scoped as `@cainus/graphdown`. The PyPI and crates.io names were free. Releases are cut by tag only, so no channel can drift from the others. See @docs/releasing.
 
+## Mentions are leads, not edges
+
+The pilots kept finding the same failure: prose that names a function or restates a rule without linking it, which no reference check can see (@docs/benchmark-pilot-3#results). `refs` now lists those lines too, but separately and labelled as mentions, and `check` never fails on them. Text matching can't know that `refresh` in a sentence means `Session::refresh`, so treating a mention as an edge would make `check` noisy and `slice` pull in unrelated prose. Short names are skipped for the same reason.
+
 ## Open questions
 
 - **`context:` frontmatter.** The one dependency that cannot be derived: a doc that should always come along in a slice even though the prose never mentions it. Add only when a real doc needs it.

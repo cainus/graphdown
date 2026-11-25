@@ -278,7 +278,26 @@ impl<'a> Walker<'a> {
         };
         if let Some(kind) = simple {
             if let Some(name) = self.name_of(decl) {
-                self.push(range, prefix, name, kind);
+                let full = self.push(range, prefix, name, kind);
+                // Interface members (`ViteDevServer.ssrLoadModule`) are what
+                // docs usually describe, so they are symbols too.
+                if kind == "interface" {
+                    if let Some(body) = decl.child_by_field_name("body") {
+                        let p = format!("{full}.");
+                        let mut c = body.walk();
+                        let members: Vec<Node> = body.named_children(&mut c).collect();
+                        for m in members {
+                            let kind = match m.kind() {
+                                "method_signature" => "method",
+                                "property_signature" => "field",
+                                _ => continue,
+                            };
+                            if let Some(name) = self.name_of(m) {
+                                self.push(m, &p, name, kind);
+                            }
+                        }
+                    }
+                }
             }
             return;
         }
@@ -410,6 +429,7 @@ mod tests {
                 "SessionManager 3-5",
                 "SessionManager.lock 4-4",
                 "Token 6-6",
+                "Token.a 6-6",
                 "TTL 7-7",
                 "Id 8-8"
             ]

@@ -66,7 +66,7 @@ Names are qualified by their container: `Type::method` for Rust, `Class.method` 
 | Language                  | Extensions                     | Definitions found                                                     |
 | ------------------------- | ------------------------------ | --------------------------------------------------------------------- |
 | Rust                      | `.rs`                          | fn, struct, enum, union, trait, type, const, static, macro, mod, impl methods |
-| TypeScript                | `.ts` `.tsx` `.mts` `.cts`     | function, class and its methods and fields, interface, type, enum, const, namespace |
+| TypeScript                | `.ts` `.tsx` `.mts` `.cts`     | function, class and its methods and fields, interface and its members, type, enum, const, namespace |
 | JavaScript                | `.js` `.jsx` `.mjs` `.cjs`     | function, class and its methods and fields, const                     |
 | Python                    | `.py` `.pyi`                   | def, class and its methods, module-level assignments                  |
 

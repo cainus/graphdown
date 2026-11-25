@@ -52,6 +52,13 @@ enum Command {
     /// List every reference that points at a doc, section, file or symbol.
     Refs {
         target: String,
+        /// Also list doc lines that contain this word without a reference.
+        /// A code symbol's own name is always searched for. Repeatable.
+        #[arg(long = "mention", value_name = "WORD")]
+        mention: Vec<String>,
+        /// Leave out unlinked mentions.
+        #[arg(long)]
+        no_mentions: bool,
         #[arg(long)]
         json: bool,
     },
@@ -242,22 +249,45 @@ fn run(cli: Cli) -> Result<ExitCode> {
             writeln!(out, "<!-- {t}  {} L{}-{} -->", c.path, c.start, c.end)?;
             writeln!(out, "{}", c.text)?;
         }
-        Command::Refs { target: t, json } => {
+        Command::Refs {
+            target: t,
+            mention,
+            no_mentions,
+            json,
+        } => {
             let t = target(&t)?;
-            let hits = ops::incoming(&project, &t);
+            let mut hits = ops::incoming(&project, &t);
+            let mentions = if no_mentions {
+                Vec::new()
+            } else {
+                ops::mentions(&project, &t, &ops::mention_terms(&t, &mention))
+            };
             if json {
+                hits.extend(mentions);
                 writeln!(out, "{}", serde_json::to_string_pretty(&hits)?)?;
             } else {
-                for h in &hits {
+                let line = |h: &ops::Incoming| {
                     let section = h
                         .within
                         .as_ref()
                         .map(|s| format!(" (#{s})"))
                         .unwrap_or_default();
-                    writeln!(out, "{}:{}{section}  {}", h.file, h.line, h.reference)?;
+                    format!("{}:{}{section}  {}", h.file, h.line, h.reference)
+                };
+                for h in &hits {
+                    writeln!(out, "{}", line(h))?;
                 }
                 if hits.is_empty() {
                     writeln!(out, "no references to {t}")?;
+                }
+                if !mentions.is_empty() {
+                    writeln!(
+                        out,
+                        "\nmentioned without a reference (check these by hand):"
+                    )?;
+                    for h in &mentions {
+                        writeln!(out, "{}", line(h))?;
+                    }
                 }
             }
         }

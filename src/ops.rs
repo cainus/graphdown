@@ -94,8 +94,18 @@ pub fn resolve_ref(project: &Project, r: &Ref) -> Result<Resolved, String> {
 
 // ---------------------------------------------------------------- refs
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "lowercase")]
+pub enum IncomingKind {
+    /// A checked `@` reference or markdown link.
+    Reference,
+    /// The target's name in a doc's text with no reference beside it.
+    Mention,
+}
+
 #[derive(Debug, Serialize)]
 pub struct Incoming {
+    pub kind: IncomingKind,
     pub file: String,
     pub line: usize,
     /// The section slug (in a doc) or symbol name (in code) that the
@@ -117,6 +127,7 @@ pub fn incoming(project: &Project, target: &Resolved) -> Vec<Incoming> {
         };
         if lands_on(project, &res, target) {
             out.push(Incoming {
+                kind: IncomingKind::Reference,
                 file: file.to_string(),
                 line: r.line,
                 within: project.within(file, r.line),
@@ -126,6 +137,91 @@ pub fn incoming(project: &Project, target: &Resolved) -> Vec<Incoming> {
         }
     }
     out
+}
+
+/// Words that name `target` in prose: the last part of a symbol's name
+/// (`ssrFixStacktrace` for `ViteDevServer.ssrFixStacktrace`), plus any the
+/// caller adds. Short names are skipped because they match too much.
+pub fn mention_terms(target: &Resolved, extra: &[String]) -> Vec<String> {
+    let mut terms: Vec<String> = Vec::new();
+    if let Resolved::Symbol { name, .. } = target {
+        let last = name.rsplit(['.', ':']).next().unwrap_or(name);
+        if last.chars().count() >= 4 {
+            terms.push(last.to_string());
+        }
+    }
+    for t in extra {
+        if !t.is_empty() && !terms.contains(t) {
+            terms.push(t.clone());
+        }
+    }
+    terms
+}
+
+/// Lines in docs that contain one of `terms` as a whole word but carry no
+/// reference to `target`: the prose that restates something without linking
+/// it, which `check` and plain references can't see.
+///
+/// Spec: @docs/cli#refs
+pub fn mentions(project: &Project, target: &Resolved, terms: &[String]) -> Vec<Incoming> {
+    let mut out = Vec::new();
+    if terms.is_empty() {
+        return out;
+    }
+    for doc in project.docs.values() {
+        if target.is_doc() && doc.path == target.path() {
+            continue;
+        }
+        let linked: BTreeSet<usize> = doc
+            .refs
+            .iter()
+            .filter(|r| resolve_ref(project, r).is_ok_and(|res| lands_on(project, &res, target)))
+            .map(|r| r.line)
+            .collect();
+        for (i, line) in doc.source.lines().enumerate() {
+            let n = i + 1;
+            if linked.contains(&n) {
+                continue;
+            }
+            if let Some(term) = terms.iter().find(|t| contains_word(line, t)) {
+                out.push(Incoming {
+                    kind: IncomingKind::Mention,
+                    file: doc.path.clone(),
+                    line: n,
+                    within: doc.section_at(n).map(|h| h.slug.clone()),
+                    reference: snippet(line, term),
+                    target: target.to_string(),
+                });
+            }
+        }
+    }
+    out
+}
+
+fn contains_word(line: &str, word: &str) -> bool {
+    let is_word = |c: char| c.is_alphanumeric() || c == '_';
+    line.match_indices(word).any(|(i, _)| {
+        let before = line[..i].chars().next_back();
+        let after = line[i + word.len()..].chars().next();
+        !before.is_some_and(is_word) && !after.is_some_and(is_word)
+    })
+}
+
+/// The line, trimmed to about 100 characters around `term`.
+fn snippet(line: &str, term: &str) -> String {
+    let line = line.trim();
+    if line.chars().count() <= 100 {
+        return line.to_string();
+    }
+    let at = line.find(term).unwrap_or(0);
+    let start = line[..at]
+        .char_indices()
+        .rev()
+        .nth(40)
+        .map(|(i, _)| i)
+        .unwrap_or(0);
+    let tail: String = line[start..].chars().take(100).collect();
+    format!("{}{tail}...", if start > 0 { "..." } else { "" })
 }
 
 fn lands_on(project: &Project, hit: &Resolved, target: &Resolved) -> bool {
