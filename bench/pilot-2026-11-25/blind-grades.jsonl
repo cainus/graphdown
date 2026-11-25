@@ -1,0 +1,18 @@
+{"id": "g01", "correct": true, "flagged_conflict": null}
+{"id": "g02", "correct": true, "flagged_conflict": null}
+{"id": "g03", "correct": false, "flagged_conflict": null, "audit": "grader error: its own note matches the key; counted as correct"}
+{"id": "g04", "correct": true, "flagged_conflict": null}
+{"id": "g05", "correct": true, "flagged_conflict": null}
+{"id": "g06", "correct": true, "flagged_conflict": null}
+{"id": "g07", "correct": true, "flagged_conflict": true}
+{"id": "g08", "correct": true, "flagged_conflict": null}
+{"id": "g09", "correct": true, "flagged_conflict": true}
+{"id": "g10", "correct": true, "flagged_conflict": null}
+{"id": "g11", "correct": true, "flagged_conflict": null}
+{"id": "g12", "correct": true, "flagged_conflict": null}
+{"id": "g13", "correct": true, "flagged_conflict": true}
+{"id": "g14", "correct": true, "flagged_conflict": null}
+{"id": "g15", "correct": true, "flagged_conflict": null}
+{"id": "g16", "correct": true, "flagged_conflict": true}
+{"id": "g17", "correct": true, "flagged_conflict": true}
+{"id": "g18", "correct": true, "flagged_conflict": true}

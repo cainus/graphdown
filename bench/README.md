@@ -8,3 +8,5 @@ Scripts for the study planned in @docs/benchmark. Nothing in this folder is copi
 - `grade.sh TASK DEST`: builds a finished run and probes it for the change tasks, printing one JSON line. Questions and judgement calls are graded blind instead.
 
 Run directories get neutral names (`r01`, `r02`, ...) so nothing in a path tells an agent which arm it is in; the mapping lives in the run plan outside the repo.
+
+`pilot-2026-11-25/` holds the raw data from the pilot: the run plan, each run's reported answer and usage, the scripted grades and the blind grading sheet. The write-up is @docs/benchmark-pilot.

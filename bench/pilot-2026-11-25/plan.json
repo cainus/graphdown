@@ -1,0 +1,254 @@
+[
+ {
+  "run": "r01",
+  "task": "t6",
+  "arm": "A",
+  "rep": 2,
+  "dir": "/tmp/bench/runs/r01"
+ },
+ {
+  "run": "r02",
+  "task": "t5",
+  "arm": "A",
+  "rep": 1,
+  "dir": "/tmp/bench/runs/r02"
+ },
+ {
+  "run": "r03",
+  "task": "t2",
+  "arm": "C",
+  "rep": 1,
+  "dir": "/tmp/bench/runs/r03"
+ },
+ {
+  "run": "r04",
+  "task": "t1",
+  "arm": "C",
+  "rep": 2,
+  "dir": "/tmp/bench/runs/r04"
+ },
+ {
+  "run": "r05",
+  "task": "t5",
+  "arm": "C",
+  "rep": 2,
+  "dir": "/tmp/bench/runs/r05"
+ },
+ {
+  "run": "r06",
+  "task": "t5",
+  "arm": "B",
+  "rep": 2,
+  "dir": "/tmp/bench/runs/r06"
+ },
+ {
+  "run": "r07",
+  "task": "t2",
+  "arm": "B",
+  "rep": 1,
+  "dir": "/tmp/bench/runs/r07"
+ },
+ {
+  "run": "r08",
+  "task": "t4",
+  "arm": "C",
+  "rep": 2,
+  "dir": "/tmp/bench/runs/r08"
+ },
+ {
+  "run": "r09",
+  "task": "t3",
+  "arm": "B",
+  "rep": 1,
+  "dir": "/tmp/bench/runs/r09"
+ },
+ {
+  "run": "r10",
+  "task": "t3",
+  "arm": "A",
+  "rep": 1,
+  "dir": "/tmp/bench/runs/r10"
+ },
+ {
+  "run": "r11",
+  "task": "t5",
+  "arm": "C",
+  "rep": 1,
+  "dir": "/tmp/bench/runs/r11"
+ },
+ {
+  "run": "r12",
+  "task": "t4",
+  "arm": "C",
+  "rep": 1,
+  "dir": "/tmp/bench/runs/r12"
+ },
+ {
+  "run": "r13",
+  "task": "t6",
+  "arm": "C",
+  "rep": 1,
+  "dir": "/tmp/bench/runs/r13"
+ },
+ {
+  "run": "r14",
+  "task": "t3",
+  "arm": "B",
+  "rep": 2,
+  "dir": "/tmp/bench/runs/r14"
+ },
+ {
+  "run": "r15",
+  "task": "t1",
+  "arm": "A",
+  "rep": 1,
+  "dir": "/tmp/bench/runs/r15"
+ },
+ {
+  "run": "r16",
+  "task": "t4",
+  "arm": "A",
+  "rep": 2,
+  "dir": "/tmp/bench/runs/r16"
+ },
+ {
+  "run": "r17",
+  "task": "t6",
+  "arm": "A",
+  "rep": 1,
+  "dir": "/tmp/bench/runs/r17"
+ },
+ {
+  "run": "r18",
+  "task": "t2",
+  "arm": "A",
+  "rep": 2,
+  "dir": "/tmp/bench/runs/r18"
+ },
+ {
+  "run": "r19",
+  "task": "t4",
+  "arm": "B",
+  "rep": 2,
+  "dir": "/tmp/bench/runs/r19"
+ },
+ {
+  "run": "r20",
+  "task": "t6",
+  "arm": "C",
+  "rep": 2,
+  "dir": "/tmp/bench/runs/r20"
+ },
+ {
+  "run": "r21",
+  "task": "t3",
+  "arm": "A",
+  "rep": 2,
+  "dir": "/tmp/bench/runs/r21"
+ },
+ {
+  "run": "r22",
+  "task": "t1",
+  "arm": "B",
+  "rep": 1,
+  "dir": "/tmp/bench/runs/r22"
+ },
+ {
+  "run": "r23",
+  "task": "t6",
+  "arm": "B",
+  "rep": 2,
+  "dir": "/tmp/bench/runs/r23"
+ },
+ {
+  "run": "r24",
+  "task": "t2",
+  "arm": "A",
+  "rep": 1,
+  "dir": "/tmp/bench/runs/r24"
+ },
+ {
+  "run": "r25",
+  "task": "t3",
+  "arm": "C",
+  "rep": 1,
+  "dir": "/tmp/bench/runs/r25"
+ },
+ {
+  "run": "r26",
+  "task": "t1",
+  "arm": "A",
+  "rep": 2,
+  "dir": "/tmp/bench/runs/r26"
+ },
+ {
+  "run": "r27",
+  "task": "t4",
+  "arm": "A",
+  "rep": 1,
+  "dir": "/tmp/bench/runs/r27"
+ },
+ {
+  "run": "r28",
+  "task": "t2",
+  "arm": "C",
+  "rep": 2,
+  "dir": "/tmp/bench/runs/r28"
+ },
+ {
+  "run": "r29",
+  "task": "t6",
+  "arm": "B",
+  "rep": 1,
+  "dir": "/tmp/bench/runs/r29"
+ },
+ {
+  "run": "r30",
+  "task": "t3",
+  "arm": "C",
+  "rep": 2,
+  "dir": "/tmp/bench/runs/r30"
+ },
+ {
+  "run": "r31",
+  "task": "t5",
+  "arm": "B",
+  "rep": 1,
+  "dir": "/tmp/bench/runs/r31"
+ },
+ {
+  "run": "r32",
+  "task": "t1",
+  "arm": "C",
+  "rep": 1,
+  "dir": "/tmp/bench/runs/r32"
+ },
+ {
+  "run": "r33",
+  "task": "t1",
+  "arm": "B",
+  "rep": 2,
+  "dir": "/tmp/bench/runs/r33"
+ },
+ {
+  "run": "r34",
+  "task": "t5",
+  "arm": "A",
+  "rep": 2,
+  "dir": "/tmp/bench/runs/r34"
+ },
+ {
+  "run": "r35",
+  "task": "t2",
+  "arm": "B",
+  "rep": 2,
+  "dir": "/tmp/bench/runs/r35"
+ },
+ {
+  "run": "r36",
+  "task": "t4",
+  "arm": "B",
+  "rep": 1,
+  "dir": "/tmp/bench/runs/r36"
+ }
+]
