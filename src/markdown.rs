@@ -52,6 +52,66 @@ pub struct TargetSpec {
     /// Normalised, root-relative path. Doc paths may lack the `.md` extension.
     pub path: String,
     pub fragment: Option<String>,
+    /// Set for markdown links: try the spellings docs sites use when the path
+    /// itself is not a file (`guide/api` for `guide/api.md`, a folder for its
+    /// `index.md`, `page.html` for `page.md`).
+    pub infer: bool,
+    /// For links starting with `/`: folders that may be the docs site's root,
+    /// nearest first. The repo root is always tried before these.
+    pub site_roots: Vec<String>,
+}
+
+impl TargetSpec {
+    pub fn new(path: String, fragment: Option<String>) -> TargetSpec {
+        TargetSpec {
+            path,
+            fragment,
+            infer: false,
+            site_roots: Vec::new(),
+        }
+    }
+
+    /// Every path this target may mean, most likely first.
+    ///
+    /// Spec: @docs/syntax#markdown-links
+    pub fn candidates(&self) -> Vec<String> {
+        let mut bases = vec![String::new()];
+        bases.extend(self.site_roots.iter().cloned());
+        let mut out = Vec::new();
+        for base in bases {
+            let p = match (base.is_empty(), self.path.is_empty()) {
+                (true, _) => self.path.clone(),
+                (false, true) => base.clone(),
+                (false, false) => format!("{base}/{}", self.path),
+            };
+            if !p.is_empty() {
+                out.push(p.clone());
+            }
+            // Docs sites serve static files from a folder at their root:
+            // `public/` for VitePress and Vite, `static/` for Docusaurus.
+            if !base.is_empty() && !self.path.is_empty() {
+                out.push(format!("{base}/public/{}", self.path));
+                out.push(format!("{base}/static/{}", self.path));
+            }
+            if self.infer {
+                let dir = if p.is_empty() {
+                    String::new()
+                } else {
+                    format!("{p}/")
+                };
+                if !p.is_empty() {
+                    out.push(format!("{p}.md"));
+                }
+                out.push(format!("{dir}index.md"));
+                out.push(format!("{dir}README.md"));
+                if let Some(stem) = p.strip_suffix(".html") {
+                    out.push(format!("{stem}.md"));
+                }
+            }
+        }
+        out.dedup();
+        out
+    }
 }
 
 /// A reference found in a document.
@@ -152,8 +212,13 @@ pub fn parse(path: &str, source: String) -> Doc {
             Event::End(TagEnd::CodeBlock) => in_code_block = false,
             Event::Start(Tag::MetadataBlock(_)) => in_metadata = true,
             Event::End(TagEnd::MetadataBlock(_)) => in_metadata = false,
-            Event::Start(Tag::Link { dest_url, .. }) => {
-                if link_depth == 0 {
+            Event::Start(Tag::Link {
+                dest_url,
+                link_type,
+                ..
+            }) => {
+                // `<me@example.com>` autolinks are mail addresses, not paths.
+                if link_depth == 0 && link_type != pulldown_cmark::LinkType::Email {
                     links.push((RefForm::Link, dest_url.to_string(), range.clone()));
                 }
                 link_depth += 1;
@@ -320,7 +385,7 @@ pub fn scan_at_refs(
             None => (body, None),
         };
         let path = path.trim_end_matches(['.', '/']);
-        let target = normalize(path).map(|path| TargetSpec { path, fragment });
+        let target = normalize(path).map(|path| TargetSpec::new(path, fragment));
         let (line, col) = lines.line_col(i);
         out.push(Ref {
             form: RefForm::At,
@@ -350,17 +415,41 @@ fn link_target(doc_path: &str, dest: &str) -> Option<Result<TargetSpec, String>>
         None => (dest, None),
     };
     let path = percent_decode(path.split('?').next().unwrap_or(""));
+    let dir = doc_path.rsplit_once('/').map(|(d, _)| d).unwrap_or("");
+    if let Some(abs) = path.strip_prefix('/') {
+        // `/guide/api` means the repo root on GitHub, but the docs folder on
+        // most docs sites, so every folder above the linking doc is a candidate.
+        let mut site_roots = Vec::new();
+        let mut d = dir;
+        while !d.is_empty() {
+            site_roots.push(d.to_string());
+            d = d.rsplit_once('/').map(|(p, _)| p).unwrap_or("");
+        }
+        let path = if abs.trim_matches('/').is_empty() {
+            Ok(String::new())
+        } else {
+            normalize(abs)
+        };
+        return Some(path.map(|path| TargetSpec {
+            path,
+            fragment,
+            infer: true,
+            site_roots,
+        }));
+    }
     let joined = if path.is_empty() {
         doc_path.to_string()
-    } else if let Some(abs) = path.strip_prefix('/') {
-        abs.to_string()
+    } else if dir.is_empty() {
+        path
     } else {
-        match doc_path.rsplit_once('/') {
-            Some((dir, _)) => format!("{dir}/{path}"),
-            None => path,
-        }
+        format!("{dir}/{path}")
     };
-    Some(normalize(&joined).map(|path| TargetSpec { path, fragment }))
+    Some(normalize(&joined).map(|path| TargetSpec {
+        path,
+        fragment,
+        infer: true,
+        site_roots: Vec::new(),
+    }))
 }
 
 /// Collapses `.` and `..` segments; refuses paths that leave the project root.
@@ -447,28 +536,41 @@ mod tests {
     fn links_resolve_relative_to_doc() {
         let d = doc("[x](../src/a.rs#run) [y](#local) [z](https://example.com) [w](b.md)\n");
         let targets: Vec<_> = d.refs.iter().map(|r| r.target.clone().unwrap()).collect();
-        assert_eq!(
-            targets[0],
-            TargetSpec {
-                path: "src/a.rs".into(),
-                fragment: Some("run".into())
-            }
-        );
-        assert_eq!(
-            targets[1],
-            TargetSpec {
-                path: "docs/a.md".into(),
-                fragment: Some("local".into())
-            }
-        );
-        assert_eq!(
-            targets[2],
-            TargetSpec {
-                path: "docs/b.md".into(),
-                fragment: None
-            }
-        );
+        let pf = |t: &TargetSpec| (t.path.clone(), t.fragment.clone());
+        assert_eq!(pf(&targets[0]), ("src/a.rs".into(), Some("run".into())));
+        assert_eq!(pf(&targets[1]), ("docs/a.md".into(), Some("local".into())));
+        assert_eq!(pf(&targets[2]), ("docs/b.md".into(), None));
         assert_eq!(targets.len(), 3);
+    }
+
+    #[test]
+    fn site_style_links_have_candidates() {
+        let d = parse(
+            "docs/guide/a.md",
+            "[x](/guide/api#hooks) [y](/) [z](setup) [w](page.html)\n".into(),
+        );
+        let c: Vec<Vec<String>> = d
+            .refs
+            .iter()
+            .map(|r| r.target.clone().unwrap().candidates())
+            .collect();
+        assert!(
+            c[0].contains(&"docs/guide/api.md".to_string()),
+            "{:?}",
+            c[0]
+        );
+        assert_eq!(c[0][0], "guide/api");
+        assert!(c[1].contains(&"docs/index.md".to_string()), "{:?}", c[1]);
+        assert!(
+            c[2].contains(&"docs/guide/setup/index.md".to_string()),
+            "{:?}",
+            c[2]
+        );
+        assert!(
+            c[3].contains(&"docs/guide/page.md".to_string()),
+            "{:?}",
+            c[3]
+        );
     }
 
     #[test]

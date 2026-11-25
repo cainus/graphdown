@@ -40,11 +40,20 @@ Not references:
 - an `@` straight after a letter, digit, `.`, `/`, `-` or backslash, so `me@example.com` and `\@` are left alone
 - anything in YAML frontmatter
 
-Write `` `@scope/package` `` in backticks when you mean an npm package or a person's handle.
+An `@` reference only counts when the first part of its path exists in the project, so `@vitejs/plugin-react` or `@alice` in someone's prose or comments is left alone. The price is that a typo in that first part (`@doc/syntax` for `@docs/syntax`) goes unreported, so backticks are still the clearer way to write a package name or a handle: `` `@scope/package` ``.
 
 ### Markdown links
 
 Ordinary links are references too: `[Sections](syntax.md#sections)`, `[the resolver](../src/project.rs#Project::resolve)`. Their paths are relative to the linking file, as everywhere else in markdown, and a leading `/` means the project root. Links to URLs are not checked.
+
+Docs sites spell links in ways GitHub doesn't, so when a link's path is not itself a file, graphdown also tries the spellings they use. No configuration is needed.
+
+- `guide/api` for `guide/api.md`, and a folder for its `index.md` or `README.md`
+- `page.html` for `page.md`, as mdBook writes it
+- `/guide/api`: the repo root first, then each folder above the linking file, which finds `docs/guide/api.md` for VitePress, Docusaurus or MkDocs sites. Static files are also looked for in a `public/` or `static/` folder there.
+- a fragment that differs from the GitHub slug only in punctuation, such as `#build-assetsinlinelimit` for `## build.assetsInlineLimit`
+
+Links to mail addresses, written `<me@example.com>`, are not checked. The candidates are listed by @src/markdown.rs#TargetSpec::candidates.
 
 Links are clickable on GitHub and in editors; `@` references are shorter to write and read. @docs/cli#fmt converts between them without losing anything, so a repo can author in one form and publish in the other.
 

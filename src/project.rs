@@ -148,12 +148,41 @@ impl Project {
             for range in &file.comments {
                 markdown::scan_at_refs(&file.source, range.clone(), &file.lines, true, &mut refs);
             }
+            refs.retain(|r| project.could_be_ours(r));
             project.code.borrow_mut().insert(rel.clone(), Ok(file));
             if !refs.is_empty() {
                 project.code_refs.insert(rel, refs);
             }
         }
+        // The same rule for `@` references written in prose.
+        let paths: Vec<String> = project.docs.keys().cloned().collect();
+        for path in paths {
+            let refs = std::mem::take(&mut project.docs.get_mut(&path).unwrap().refs);
+            let kept = refs
+                .into_iter()
+                .filter(|r| project.could_be_ours(r))
+                .collect();
+            project.docs.get_mut(&path).unwrap().refs = kept;
+        }
         Ok(project)
+    }
+
+    /// `@typescript-eslint/rule`, `@vitejs/plugin-react` or `@alice` is not a
+    /// reference into this repo. An `@` reference counts only if its first
+    /// path part exists here; links always count.
+    ///
+    /// Spec: @docs/syntax#at-references
+    fn could_be_ours(&self, r: &Ref) -> bool {
+        if r.form != markdown::RefForm::At {
+            return true;
+        }
+        match &r.target {
+            Ok(spec) => {
+                let first = spec.path.split('/').next().unwrap_or("");
+                self.root.join(first).exists() || self.root.join(format!("{first}.md")).exists()
+            }
+            Err(_) => true,
+        }
     }
 
     /// References made from inside `path`, whether it is a doc or source.
@@ -214,13 +243,46 @@ impl Project {
         result
     }
 
-    /// Checks a target against the project.
+    /// Checks a target against the project. A link may be spelled the way a
+    /// docs site expects (see @src/markdown.rs#TargetSpec::candidates); the
+    /// first candidate that names a real doc or file wins.
     pub fn resolve(&self, spec: &TargetSpec) -> Result<Resolved, String> {
+        if !spec.infer && spec.site_roots.is_empty() {
+            return self.resolve_path(spec);
+        }
+        let candidates = spec.candidates();
+        for path in &candidates {
+            if self.doc(path).is_some() || self.root.join(path).is_file() {
+                let mut exact = spec.clone();
+                exact.path = path.clone();
+                return self.resolve_path(&exact);
+            }
+        }
+        let shown = if spec.path.is_empty() {
+            "/"
+        } else {
+            spec.path.as_str()
+        };
+        Err(format!("no such doc or file `{shown}`"))
+    }
+
+    fn resolve_path(&self, spec: &TargetSpec) -> Result<Resolved, String> {
         if let Some(doc) = self.doc(&spec.path) {
             let path = doc.path.clone();
             return match &spec.fragment {
                 None => Ok(Resolved::Doc { path }),
-                Some(frag) => match doc.heading(frag) {
+                Some(frag) => match doc.heading(frag).or_else(|| {
+                    // Docs sites slug some punctuation as `-` where GitHub drops
+                    // it (`build.assetsInlineLimit`), so links get a looser match.
+                    let loose = |s: &str| {
+                        s.chars()
+                            .filter(|c| c.is_alphanumeric())
+                            .collect::<String>()
+                    };
+                    spec.infer
+                        .then(|| doc.headings.iter().find(|h| loose(&h.slug) == loose(frag)))
+                        .flatten()
+                }) {
                     Some(h) => Ok(Resolved::Section {
                         path,
                         slug: h.slug.clone(),
@@ -290,7 +352,7 @@ impl Project {
             None => (input, None),
         };
         let path = markdown::normalize(path.trim_start_matches("./"))?;
-        self.resolve(&TargetSpec { path, fragment })
+        self.resolve(&TargetSpec::new(path, fragment))
     }
 
     /// The lines a target covers.

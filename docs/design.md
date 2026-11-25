@@ -44,6 +44,12 @@ A comment like `// Spec: @docs/auth#token-refresh` records an edge that `graphdo
 
 Three choices keep the cost down. No marker is required, so there is nothing new to learn. A reference in code must contain `/` or `#`, so documentation tags like `@param` are never misread. And nothing forces the two directions to pair up: each reference is checked on its own, so a missing back-link is never an error. See @docs/syntax#references-from-code.
 
+## Docs-site links without configuration
+
+Most real repos write links for their docs site, not for GitHub: `/guide/api` with no extension, `.html` targets, anchors slugged by the site's own rules. Checking those as GitHub paths made 461 of vite's 592 references look broken, which would make graphdown useless on exactly the repos with the most docs. A `graphdown.toml` naming the site root and link style was the obvious fix, but it is another file to keep right. Instead a link that is not a file is tried under the few spellings sites use, in a fixed order, and the first real file wins (@docs/syntax#markdown-links). The cost is that a link which only works by one of those spellings is accepted even on GitHub, where it would 404.
+
+The same reasoning drops an `@` reference whose first path part doesn't exist: in other people's repos those are npm packages, lint rule names and handles far more often than typos.
+
 ## Distribution
 
 Graphdown is one static binary, and every channel delivers that same binary rather than a port or a wrapper library. Agent users mostly live in JavaScript and Python repos, so npm and PyPI matter more than crates.io: `npx` and `uvx` let a repo run graphdown without anyone installing Rust. The npm name `graphdown` belongs to an unrelated 2022 package that turns ASCII diagrams into SVG, so the npm package is scoped as `@cainus/graphdown`. The PyPI and crates.io names were free. Releases are cut by tag only, so no channel can drift from the others. See @docs/releasing.

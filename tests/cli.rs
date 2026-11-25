@@ -385,3 +385,28 @@ fn check_can_print_github_annotations() {
     );
     assert!(out.contains("1 broken"), "{out}");
 }
+
+#[test]
+fn docs_site_links_resolve() {
+    let p = Project::new(&[
+        ("docs/index.md", "# Home\n\n[API](/guide/api#hooks) and [setup](guide/setup) and [old](guide/api.html)\n"),
+        ("docs/guide/api.md", "# API\n\n## Hooks\n\nBack [home](/).\n"),
+        ("docs/guide/setup/index.md", "# Setup\n"),
+    ]);
+    let (code, out) = p.run(&["check"]);
+    assert_eq!(code, 0, "{out}");
+    let (_, out) = p.run(&["refs", "docs/guide/api#hooks"]);
+    assert!(out.contains("docs/index.md:3"), "{out}");
+}
+
+#[test]
+fn comment_tags_that_look_like_paths_are_ignored() {
+    let p = Project::new(&[
+        ("docs/a.md", "# A\n"),
+        ("src/x.ts", "// eslint-disable-next-line @typescript-eslint/ban-ts-comment\n// see @docs/a#nope\nexport const x = 1;\n"),
+    ]);
+    let (code, out) = p.run(&["check"]);
+    assert_eq!(code, 1, "{out}");
+    assert!(!out.contains("typescript-eslint"), "{out}");
+    assert!(out.contains("src/x.ts:2"), "{out}");
+}
