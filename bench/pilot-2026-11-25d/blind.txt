@@ -1,0 +1,1670 @@
+You are grading coding-agent runs blind. For each ITEM you get the task, the grading key, the agent's final summary, and for change tasks the actual diff. Judge the work, not the writing.
+Output one JSON object per line and nothing else: {"id": "gNN", "score": 0|0.5|1, "hidden_point": true|false|null, "note": "<=20 words"}.
+score 1 = fully correct per the key, every point in it; 0.5 = mostly right with a real omission or error; 0 = wrong or missing the main point. For questions judge the answer's facts; for changes judge the diff.
+hidden_point: true if the run got the key's hardest or hidden point (the one a hasty agent would miss), false if not.
+
+=== ITEM g01 (httpx c1, change-and-update)
+TASK: Five seconds is too aggressive for our users. Change httpx's default timeout to 10 seconds, and make sure everything that describes the default is consistent with that.
+KEY: Code: DEFAULT_TIMEOUT_CONFIG in httpx/_config.py becomes Timeout(timeout=10.0) (client and top-level API defaults all use it). Docs that state the default must change: docs/advanced/timeouts.md intro ('after 5 seconds of network inactivity') and the 'Setting a default timeout on a client' comment ('Use a default 5s timeout everywhere'); docs/quickstart.md Timeouts section ('The default timeout for network inactivity is five seconds'); docs/logging.md sample debug output shows timeout=5.0 on connect_tcp.started and start_tls.started for a default httpx.get -- both should become timeout=10.0. CHANGELOG.md: an entry under the existing '## 1.0.0 (Unreleased)' heading (e.g. a '### Changed' bullet), not a new version heading (scripts/sync-version requires the changelog's version to match __version__.py; the release process says changed features must be listed). Must NOT change: Limits keepalive_expiry default 5.0 and its 'Default 5' in docs/advanced/resource-limits.md; the explicit 5.0 examples in the Timeout docstring, the extensions.md timeout example, or tests that construct Timeout(5.0) explicitly. A test asserting the new default (e.g. httpx.Client().timeout == httpx.Timeout(10.0)) is expected per the contributor checklist.
+SUMMARY: DEFAULT_TIMEOUT_CONFIG Timeout(timeout=10.0); httpx/_main.py --timeout default 10.0 and both help texts; docs/advanced/timeouts.md intro, default comment 10s, explicit example 20.0; docs/quickstart.md ten seconds; docs/logging.md sample output timeout=10.0 in two lines; CHANGELOG Changed entry. Left docstring, extensions.md, keepalive_expiry, old changelog. No test added. Used refs --mention timeout=5.0.
+DIFF:
+diff --git a/CHANGELOG.md b/CHANGELOG.md
+index a3fa798..3d8640f 100644
+--- a/CHANGELOG.md
++++ b/CHANGELOG.md
+@@ -8,6 +8,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
+ 
+ * Minimum supported Python version is now 3.10
+ 
++### Changed
++
++* The default timeout is now 10 seconds, rather than 5 seconds. (Applies to the client, top-level API, and the `--timeout` default of the command line client.)
++
+ ### Added
+ 
+ * Expose `FunctionAuth` from the public API. (#3699)
+diff --git a/docs/advanced/timeouts.md b/docs/advanced/timeouts.md
+index aedcfb6..32f9693 100644
+--- a/docs/advanced/timeouts.md
++++ b/docs/advanced/timeouts.md
+@@ -1,6 +1,6 @@
+ HTTPX is careful to enforce timeouts everywhere by default.
+ 
+-The default behavior is to raise a `TimeoutException` after 5 seconds of
++The default behavior is to raise a `TimeoutException` after 10 seconds of
+ network inactivity.
+ 
+ ## Setting and disabling timeouts
+@@ -33,8 +33,8 @@ You can set a timeout on a client instance, which results in the given
+ `timeout` being used as the default for requests made with this client:
+ 
+ ```python
+-client = httpx.Client()              # Use a default 5s timeout everywhere.
+-client = httpx.Client(timeout=10.0)  # Use a default 10s timeout everywhere.
++client = httpx.Client()              # Use a default 10s timeout everywhere.
++client = httpx.Client(timeout=20.0)  # Use a default 20s timeout everywhere.
+ client = httpx.Client(timeout=None)  # Disable all timeouts by default.
+ ```
+ 
+diff --git a/docs/logging.md b/docs/logging.md
+index b3c5781..4ba1af2 100644
+--- a/docs/logging.md
++++ b/docs/logging.md
+@@ -20,9 +20,9 @@ httpx.get("https://www.example.com")
+ Will send debug level output to the console, or wherever `stdout` is directed too...
+ 
+ ```
+-DEBUG [2024-09-28 17:27:40] httpcore.connection - connect_tcp.started host='www.example.com' port=443 local_address=None timeout=5.0 socket_options=None
++DEBUG [2024-09-28 17:27:40] httpcore.connection - connect_tcp.started host='www.example.com' port=443 local_address=None timeout=10.0 socket_options=None
+ DEBUG [2024-09-28 17:27:41] httpcore.connection - connect_tcp.complete return_value=<httpcore._backends.sync.SyncStream object at 0x101f1e8e0>
+-DEBUG [2024-09-28 17:27:41] httpcore.connection - start_tls.started ssl_context=SSLContext(verify=True) server_hostname='www.example.com' timeout=5.0
++DEBUG [2024-09-28 17:27:41] httpcore.connection - start_tls.started ssl_context=SSLContext(verify=True) server_hostname='www.example.com' timeout=10.0
+ DEBUG [2024-09-28 17:27:41] httpcore.connection - start_tls.complete return_value=<httpcore._backends.sync.SyncStream object at 0x1020f49a0>
+ DEBUG [2024-09-28 17:27:41] httpcore.http11 - send_request_headers.started request=<Request [b'GET']>
+ DEBUG [2024-09-28 17:27:41] httpcore.http11 - send_request_headers.complete
+diff --git a/docs/quickstart.md b/docs/quickstart.md
+index e140b53..cd7011c 100644
+--- a/docs/quickstart.md
++++ b/docs/quickstart.md
+@@ -454,7 +454,7 @@ HTTPX defaults to including reasonable timeouts for all network operations,
+ meaning that if a connection is not properly established then it should always
+ raise an error rather than hanging indefinitely.
+ 
+-The default timeout for network inactivity is five seconds. You can modify the
++The default timeout for network inactivity is ten seconds. You can modify the
+ value to be more or less strict:
+ 
+ ```pycon
+diff --git a/httpx/_config.py b/httpx/_config.py
+index 467a6c9..d10b32a 100644
+--- a/httpx/_config.py
++++ b/httpx/_config.py
+@@ -243,6 +243,6 @@ class Proxy:
+         return f"Proxy({url_str}{auth_str}{headers_str})"
+ 
+ 
+-DEFAULT_TIMEOUT_CONFIG = Timeout(timeout=5.0)
++DEFAULT_TIMEOUT_CONFIG = Timeout(timeout=10.0)
+ DEFAULT_LIMITS = Limits(max_connections=100, max_keepalive_connections=20)
+ DEFAULT_MAX_REDIRECTS = 20
+diff --git a/httpx/_main.py b/httpx/_main.py
+index cffa4bb..480bc52 100644
+--- a/httpx/_main.py
++++ b/httpx/_main.py
+@@ -81,7 +81,7 @@ def print_help() -> None:
+     table.add_row(
+         "--timeout [cyan]FLOAT",
+         "Timeout value to use for network operations, such as establishing the"
+-        " connection, reading some data, etc... [Default: 5.0]",
++        " connection, reading some data, etc... [Default: 10.0]",
+     )
+ 
+     table.add_row("--follow-redirects", "Automatically follow redirects.")
+@@ -400,10 +400,10 @@ def handle_help(
+     "--timeout",
+     "timeout",
+     type=float,
+-    default=5.0,
++    default=10.0,
+     help=(
+         "Timeout value to use for network operations, such as establishing the "
+-        "connection, reading some data, etc... [Default: 5.0]"
++        "connection, reading some data, etc... [Default: 10.0]"
+     ),
+ )
+ @click.option(
+
+=== ITEM g02 (vite q2, question)
+TASK: Before the next Vite major we want to see every deprecation warning Vite can give us. We maintain an SSR framework with a few plugins. What is the least config that turns all of these warnings on? Which exact flags exist, and what triggers each one? Separately, our server code only holds the ViteDevServer instance (we're not inside a plugin hook). What should we replace our server.hot.send(...) calls with?
+KEY: 1) The shortest config is future: 'warn'. UserConfig types future as FutureOptions | 'warn', and resolveConfig expands the string into all flags set to 'warn' (checked with `satisfies Required<FutureOptions>`). The docs for the future option (shared-options.md) only describe a record of flag names and never mention the string shorthand, so an answer that only lists the individual flags is not the least config. 2) There are exactly nine flags in FutureOptions: removePluginHookSsrArgument (a plugin reads options.ssr in resolveId/load/transform, in dev and in build), removePluginHookHandleHotUpdate (a plugin that has handleHotUpdate and no hotUpdate runs on a file 'update'), removeServerModuleGraph, removeServerReloadModule, removeServerPluginContainer, removeServerHot, removeServerTransformRequest, removeServerWarmupRequest (each fires when the matching ViteDevServer getter or method is used), and removeSsrLoadModule. removeSsrLoadModule fires for server.ssrLoadModule and also for server.ssrFixStacktrace and server.ssrRewriteStacktrace. Each warning is printed once (warnOnce), prefixed '[vite future]', with a link to vite.dev/changes/<page> (this-environment-in-hooks, hotupdate-hook, per-environment-apis or ssr-using-modulerunner) and usually a stack trace. 3) 'Shared plugins during build' (builder.sharedConfigBuild) is listed on the breaking-changes page but has no future flag and gives no warning. 4) server.hot replacement: docs/changes/per-environment-apis.md says `server.hot -> server.client.environment.hot`. That path does not exist, because ViteDevServer has no `client` property. The correct replacement from a server instance is server.environments.client.hot, which the SSR guide (docs/guide/ssr.md) uses and which matches ViteDevServer.environments. Inside plugin hooks it is this.environment.hot, which is what the deprecation message says. An answer that repeats server.client.environment.hot is wrong.
+SUMMARY: future: 'warn' (code type FutureOptions | 'warn', expanded from Required; docs don't mention). Nine flags with triggers; removePluginHookHandleHotUpdate only on update events, plugins without hotUpdate; removeSsrLoadModule also stacktrace methods. warnOnce, [vite future], link, stack except handleHotUpdate. builder.sharedConfigBuild is not a warning flag. Replace with server.environments.client.hot.send; this.environment.hot only in hooks; per-environment-apis.md server.client.environment.hot doc error.
+
+=== ITEM g03 (httpx q2, question)
+TASK: Our pods have HTTPS_PROXY=corp-proxy:3128 (no scheme) and NO_PROXY=localhost,.svc.cluster.local,10.0.0.0/8 set, and no HTTP_PROXY. With a plain httpx.Client(), which of these go direct and which go through the proxy: https://api.svc.cluster.local, https://svc.cluster.local, https://10.2.3.4, http://localhost:8080/health, http://example.com, https://example.com? Then two teammates changed the code: one switched to httpx.Client(transport=httpx.HTTPTransport(retries=3)) to get retries, the other to httpx.Client(proxy=os.environ['HTTPS_PROXY']) to 'be explicit'. What does each of those do?
+KEY: Plain Client() (trust_env defaults True; env proxies come from urllib getproxies via httpx._utils.get_environment_proxies): HTTPS_PROXY without a scheme is accepted and turned into 'http://corp-proxy:3128' mounted on 'https://' only (docs say 'a URL' but scheme-less is accepted). NO_PROXY entries: 'localhost' -> 'all://localhost'; '.svc.cluster.local' -> 'all://*.svc.cluster.local' which matches strict subdomains only (same semantics as '*.example.com' in the transports routing docs); '10.0.0.0/8' is recognised as IPv4 but becomes 'all://10.0.0.0/8', whose host is just 10.0.0.0 -- CIDR ranges are NOT supported (only the exact address matches), despite the code comment suggesting 192.168.0.0/16 works. Results: https://api.svc.cluster.local -> direct; https://svc.cluster.local -> via proxy (leading dot excludes the bare domain); https://10.2.3.4 -> via proxy; http://localhost:8080/health -> direct; http://example.com -> direct (no HTTP_PROXY, HTTPS_PROXY applies only to https:// URLs); https://example.com -> via http://corp-proxy:3128 (tunnelled over an HTTP proxy). Teammate A: passing transport= disables environment proxies entirely (allow_env_proxies = trust_env and transport is None in the client), so everything goes direct; to keep retries and the proxy use HTTPTransport(proxy='http://corp-proxy:3128', retries=3) in mounts (e.g. 'https://' plus None entries for exclusions) or similar. Teammate B: httpx.Proxy requires a URL with scheme http/https/socks5/socks5h, so 'corp-proxy:3128' raises ValueError('Unknown scheme for proxy URL ...') at client construction; even with 'http://' added, an explicit proxy= maps 'all://' to the proxy and ignores the environment completely (including NO_PROXY), so all traffic -- http and https, localhost and cluster hosts -- would go through the proxy.
+SUMMARY: Routing rules {'https://': 'http://corp-proxy:3128', 'all://localhost': None, 'all://*.svc.cluster.local': None, 'all://10.0.0.0/8': None}; no http rule. api.svc direct; svc.cluster.local proxy; 10.2.3.4 proxy (no CIDR); localhost direct; http://example.com direct; https://example.com proxy. Teammate 1 transport=: env off, all direct, retries connect only; mounts fix. Teammate 2: ValueError Unknown scheme for proxy URL; fixed all:// ignoring NO_PROXY.
+
+=== ITEM g04 (vite q2, question)
+TASK: Before the next Vite major we want to see every deprecation warning Vite can give us. We maintain an SSR framework with a few plugins. What is the least config that turns all of these warnings on? Which exact flags exist, and what triggers each one? Separately, our server code only holds the ViteDevServer instance (we're not inside a plugin hook). What should we replace our server.hot.send(...) calls with?
+KEY: 1) The shortest config is future: 'warn'. UserConfig types future as FutureOptions | 'warn', and resolveConfig expands the string into all flags set to 'warn' (checked with `satisfies Required<FutureOptions>`). The docs for the future option (shared-options.md) only describe a record of flag names and never mention the string shorthand, so an answer that only lists the individual flags is not the least config. 2) There are exactly nine flags in FutureOptions: removePluginHookSsrArgument (a plugin reads options.ssr in resolveId/load/transform, in dev and in build), removePluginHookHandleHotUpdate (a plugin that has handleHotUpdate and no hotUpdate runs on a file 'update'), removeServerModuleGraph, removeServerReloadModule, removeServerPluginContainer, removeServerHot, removeServerTransformRequest, removeServerWarmupRequest (each fires when the matching ViteDevServer getter or method is used), and removeSsrLoadModule. removeSsrLoadModule fires for server.ssrLoadModule and also for server.ssrFixStacktrace and server.ssrRewriteStacktrace. Each warning is printed once (warnOnce), prefixed '[vite future]', with a link to vite.dev/changes/<page> (this-environment-in-hooks, hotupdate-hook, per-environment-apis or ssr-using-modulerunner) and usually a stack trace. 3) 'Shared plugins during build' (builder.sharedConfigBuild) is listed on the breaking-changes page but has no future flag and gives no warning. 4) server.hot replacement: docs/changes/per-environment-apis.md says `server.hot -> server.client.environment.hot`. That path does not exist, because ViteDevServer has no `client` property. The correct replacement from a server instance is server.environments.client.hot, which the SSR guide (docs/guide/ssr.md) uses and which matches ViteDevServer.environments. Inside plugin hooks it is this.environment.hot, which is what the deprecation message says. An answer that repeats server.client.environment.hot is wrong.
+SUMMARY: future: 'warn' (satisfies Required; docs don't mention). Nine flags with triggers; removeServerHot on any access, not assignment; removeSsrLoadModule also stacktrace methods. Never warn: server.ws, server.environments; esbuild deprecations separate from future. Replace with server.environments.client.hot.send; this.environment.hot only in hooks; per-environment-apis.md server.client.environment.hot wrong.
+
+=== ITEM g05 (vite c2, change-and-update)
+TASK: Users who opt into the future deprecation warnings for server.ssrLoadModule complain that they also get spammed by warnings from server.ssrFixStacktrace and server.ssrRewriteStacktrace, which they call from their error handlers. Split those two out into their own future flag named removeSsrFixStacktrace, so removeSsrLoadModule only covers ssrLoadModule itself. Make sure everything that lists or documents the future flags stays consistent.
+KEY: packages/vite/src/node/config.ts: (1) add removeSsrFixStacktrace?: 'warn' to the FutureOptions interface. (2) Add removeSsrFixStacktrace: 'warn' to the object that `future: 'warn'` expands into in resolveConfig. That object is checked with `satisfies Required<FutureOptions>`, so leaving it out is a type error. (3) Adding removeSsrFixStacktrace: undefined to the config defaults' future block is expected for consistency, but not essential. packages/vite/src/node/deprecations.ts: (4) add removeSsrFixStacktrace to deprecationCode. Both deprecationCode and deprecationMessages are checked with `satisfies Record<keyof FutureOptions, string>`. The code value builds the docs link vite.dev/changes/<code>, so it must be an existing page slug, namely 'ssr-using-modulerunner', not a made-up page. (5) Add a deprecationMessages entry for the new flag, for example saying ssrFixStacktrace/ssrRewriteStacktrace are not needed with Module Runners. packages/vite/src/node/server/index.ts: (6) the ssrFixStacktrace and ssrRewriteStacktrace methods of the ViteDevServer object built in _createServer switch from warnFutureDeprecation(config, 'removeSsrLoadModule', ...) to 'removeSsrFixStacktrace' (keeping or moving their extra messages). ssrLoadModule keeps 'removeSsrLoadModule'. Internal ssrFixStacktrace calls (for example ssrModuleLoader's fixStacktrace path) must not start warning. Docs: (7) docs/changes/ssr-using-modulerunner.md must document the new flag. Its 'Future Deprecation' box currently tells users to set only future.removeSsrLoadModule, and its Migration Guide paragraph about ssrFixStacktrace/ssrRewriteStacktrace should name future.removeSsrFixStacktrace. No new docs/changes page and no change to docs/changes/index.md is needed. A run that only adds the interface key, or forgets the 'warn' expansion or the deprecationCode/Message entries, is incomplete.
+SUMMARY: New flag removeSsrFixStacktrace: FutureOptions, defaults, 'warn' expansion; deprecations.ts code and message (ssr-using-modulerunner); server/index.ts stacktrace methods; docs/changes/ssr-using-modulerunner.md warning box explains new flag. Behaviour change for removeSsrLoadModule-only users noted. Did not edit CHANGELOG. Did not fix missing defaults.
+DIFF:
+diff --git a/docs/changes/ssr-using-modulerunner.md b/docs/changes/ssr-using-modulerunner.md
+index 47c334f..ec8b78e 100644
+--- a/docs/changes/ssr-using-modulerunner.md
++++ b/docs/changes/ssr-using-modulerunner.md
+@@ -9,7 +9,7 @@ Give us feedback at [Environment API feedback discussion](https://github.com/vit
+ Affected scope: `Vite Plugin Authors`
+ 
+ ::: warning Future Deprecation
+-`ModuleRunner` was first introduced in `v6.0`. The deprecation of `server.ssrLoadModule` is planned for a future major. To identify your usage, set `future.removeSsrLoadModule` to `"warn"` in your vite config.
++`ModuleRunner` was first introduced in `v6.0`. The deprecation of `server.ssrLoadModule` is planned for a future major. To identify your usage, set `future.removeSsrLoadModule` to `"warn"` in your vite config. Calls to `server.ssrFixStacktrace` and `server.ssrRewriteStacktrace` are reported separately: set `future.removeSsrFixStacktrace` to `"warn"` to identify those too.
+ :::
+ 
+ ## Motivation
+diff --git a/packages/vite/src/node/config.ts b/packages/vite/src/node/config.ts
+index 016a97a..c85a46b 100644
+--- a/packages/vite/src/node/config.ts
++++ b/packages/vite/src/node/config.ts
+@@ -598,6 +598,7 @@ export interface FutureOptions {
+   removeServerWarmupRequest?: 'warn'
+ 
+   removeSsrLoadModule?: 'warn'
++  removeSsrFixStacktrace?: 'warn'
+ }
+ 
+ export interface ExperimentalOptions {
+@@ -933,6 +934,7 @@ const configDefaults = Object.freeze({
+     removeServerTransformRequest: undefined,
+     removeServerWarmupRequest: undefined,
+     removeSsrLoadModule: undefined,
++    removeSsrFixStacktrace: undefined,
+   },
+   legacy: {
+     skipWebSocketTokenCheck: false,
+@@ -2161,6 +2163,7 @@ export async function resolveConfig(
+             removeServerTransformRequest: 'warn',
+             removeServerWarmupRequest: 'warn',
+             removeSsrLoadModule: 'warn',
++            removeSsrFixStacktrace: 'warn',
+           } satisfies Required<FutureOptions>)
+         : config.future,
+ 
+diff --git a/packages/vite/src/node/deprecations.ts b/packages/vite/src/node/deprecations.ts
+index f51b71c..2bdd5c0 100644
+--- a/packages/vite/src/node/deprecations.ts
++++ b/packages/vite/src/node/deprecations.ts
+@@ -15,6 +15,7 @@ const deprecationCode = {
+   removeServerWarmupRequest: 'per-environment-apis',
+ 
+   removeSsrLoadModule: 'ssr-using-modulerunner',
++  removeSsrFixStacktrace: 'ssr-using-modulerunner',
+ } satisfies Record<keyof FutureOptions, string>
+ 
+ const deprecationMessages = {
+@@ -37,6 +38,8 @@ const deprecationMessages = {
+ 
+   removeSsrLoadModule:
+     'The `server.ssrLoadModule` is replaced with Environment Runner.',
++  removeSsrFixStacktrace:
++    'The `server.ssrFixStacktrace` and `server.ssrRewriteStacktrace` are not needed with Environment Runner.',
+ } satisfies Record<keyof FutureOptions, string>
+ 
+ let _ignoreDeprecationWarnings = false
+diff --git a/packages/vite/src/node/server/index.ts b/packages/vite/src/node/server/index.ts
+index 0442117..ef5d8f0 100644
+--- a/packages/vite/src/node/server/index.ts
++++ b/packages/vite/src/node/server/index.ts
+@@ -720,7 +720,7 @@ export async function _createServer(
+     ssrFixStacktrace(e) {
+       warnFutureDeprecation(
+         config,
+-        'removeSsrLoadModule',
++        'removeSsrFixStacktrace',
+         "ssrFixStacktrace doesn't need to be used for Environment Module Runners.",
+       )
+       ssrFixStacktrace(e, server.environments.ssr.moduleGraph)
+@@ -728,7 +728,7 @@ export async function _createServer(
+     ssrRewriteStacktrace(stack: string) {
+       warnFutureDeprecation(
+         config,
+-        'removeSsrLoadModule',
++        'removeSsrFixStacktrace',
+         "ssrRewriteStacktrace doesn't need to be used for Environment Module Runners.",
+       )
+       return ssrRewriteStacktrace(stack, server.environments.ssr.moduleGraph)
+
+=== ITEM g06 (vite q2, question)
+TASK: Before the next Vite major we want to see every deprecation warning Vite can give us. We maintain an SSR framework with a few plugins. What is the least config that turns all of these warnings on? Which exact flags exist, and what triggers each one? Separately, our server code only holds the ViteDevServer instance (we're not inside a plugin hook). What should we replace our server.hot.send(...) calls with?
+KEY: 1) The shortest config is future: 'warn'. UserConfig types future as FutureOptions | 'warn', and resolveConfig expands the string into all flags set to 'warn' (checked with `satisfies Required<FutureOptions>`). The docs for the future option (shared-options.md) only describe a record of flag names and never mention the string shorthand, so an answer that only lists the individual flags is not the least config. 2) There are exactly nine flags in FutureOptions: removePluginHookSsrArgument (a plugin reads options.ssr in resolveId/load/transform, in dev and in build), removePluginHookHandleHotUpdate (a plugin that has handleHotUpdate and no hotUpdate runs on a file 'update'), removeServerModuleGraph, removeServerReloadModule, removeServerPluginContainer, removeServerHot, removeServerTransformRequest, removeServerWarmupRequest (each fires when the matching ViteDevServer getter or method is used), and removeSsrLoadModule. removeSsrLoadModule fires for server.ssrLoadModule and also for server.ssrFixStacktrace and server.ssrRewriteStacktrace. Each warning is printed once (warnOnce), prefixed '[vite future]', with a link to vite.dev/changes/<page> (this-environment-in-hooks, hotupdate-hook, per-environment-apis or ssr-using-modulerunner) and usually a stack trace. 3) 'Shared plugins during build' (builder.sharedConfigBuild) is listed on the breaking-changes page but has no future flag and gives no warning. 4) server.hot replacement: docs/changes/per-environment-apis.md says `server.hot -> server.client.environment.hot`. That path does not exist, because ViteDevServer has no `client` property. The correct replacement from a server instance is server.environments.client.hot, which the SSR guide (docs/guide/ssr.md) uses and which matches ViteDevServer.environments. Inside plugin hooks it is this.environment.hot, which is what the deprecation message says. An answer that repeats server.client.environment.hot is wrong.
+SUMMARY: future: 'warn' (undocumented; per-environment-apis lists six). Nine flags table with triggers and files; handleHotUpdate on update events, no stack; warnOnce. Replace with server.environments.client.hot.send; this.environment.hot only in hooks; per-environment-apis.md server.client.environment.hot wrong. shared-options type mismatch; defaults missing two flags.
+
+=== ITEM g07 (httpx c1, change-and-update)
+TASK: Five seconds is too aggressive for our users. Change httpx's default timeout to 10 seconds, and make sure everything that describes the default is consistent with that.
+KEY: Code: DEFAULT_TIMEOUT_CONFIG in httpx/_config.py becomes Timeout(timeout=10.0) (client and top-level API defaults all use it). Docs that state the default must change: docs/advanced/timeouts.md intro ('after 5 seconds of network inactivity') and the 'Setting a default timeout on a client' comment ('Use a default 5s timeout everywhere'); docs/quickstart.md Timeouts section ('The default timeout for network inactivity is five seconds'); docs/logging.md sample debug output shows timeout=5.0 on connect_tcp.started and start_tls.started for a default httpx.get -- both should become timeout=10.0. CHANGELOG.md: an entry under the existing '## 1.0.0 (Unreleased)' heading (e.g. a '### Changed' bullet), not a new version heading (scripts/sync-version requires the changelog's version to match __version__.py; the release process says changed features must be listed). Must NOT change: Limits keepalive_expiry default 5.0 and its 'Default 5' in docs/advanced/resource-limits.md; the explicit 5.0 examples in the Timeout docstring, the extensions.md timeout example, or tests that construct Timeout(5.0) explicitly. A test asserting the new default (e.g. httpx.Client().timeout == httpx.Timeout(10.0)) is expected per the contributor checklist.
+SUMMARY: DEFAULT_TIMEOUT_CONFIG Timeout(timeout=10.0); httpx/_main.py --timeout 10.0 and both help texts; docs/quickstart.md ten seconds; docs/advanced/timeouts.md intro and client comment, example to 20.0; CHANGELOG entry. Left docs/logging.md sample output and extensions.md, docstring, tests, keepalive. No test added.
+DIFF:
+diff --git a/CHANGELOG.md b/CHANGELOG.md
+index a3fa798..5a7371b 100644
+--- a/CHANGELOG.md
++++ b/CHANGELOG.md
+@@ -7,6 +7,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
+ ## 1.0.0 (Unreleased)
+ 
+ * Minimum supported Python version is now 3.10
++* The default timeout is now 10 seconds, increased from 5 seconds. This applies to the top-level API, `Client`, `AsyncClient` and the `httpx` command line `--timeout` option.
+ 
+ ### Added
+ 
+diff --git a/docs/advanced/timeouts.md b/docs/advanced/timeouts.md
+index aedcfb6..32f9693 100644
+--- a/docs/advanced/timeouts.md
++++ b/docs/advanced/timeouts.md
+@@ -1,6 +1,6 @@
+ HTTPX is careful to enforce timeouts everywhere by default.
+ 
+-The default behavior is to raise a `TimeoutException` after 5 seconds of
++The default behavior is to raise a `TimeoutException` after 10 seconds of
+ network inactivity.
+ 
+ ## Setting and disabling timeouts
+@@ -33,8 +33,8 @@ You can set a timeout on a client instance, which results in the given
+ `timeout` being used as the default for requests made with this client:
+ 
+ ```python
+-client = httpx.Client()              # Use a default 5s timeout everywhere.
+-client = httpx.Client(timeout=10.0)  # Use a default 10s timeout everywhere.
++client = httpx.Client()              # Use a default 10s timeout everywhere.
++client = httpx.Client(timeout=20.0)  # Use a default 20s timeout everywhere.
+ client = httpx.Client(timeout=None)  # Disable all timeouts by default.
+ ```
+ 
+diff --git a/docs/quickstart.md b/docs/quickstart.md
+index e140b53..cd7011c 100644
+--- a/docs/quickstart.md
++++ b/docs/quickstart.md
+@@ -454,7 +454,7 @@ HTTPX defaults to including reasonable timeouts for all network operations,
+ meaning that if a connection is not properly established then it should always
+ raise an error rather than hanging indefinitely.
+ 
+-The default timeout for network inactivity is five seconds. You can modify the
++The default timeout for network inactivity is ten seconds. You can modify the
+ value to be more or less strict:
+ 
+ ```pycon
+diff --git a/httpx/_config.py b/httpx/_config.py
+index 467a6c9..d10b32a 100644
+--- a/httpx/_config.py
++++ b/httpx/_config.py
+@@ -243,6 +243,6 @@ class Proxy:
+         return f"Proxy({url_str}{auth_str}{headers_str})"
+ 
+ 
+-DEFAULT_TIMEOUT_CONFIG = Timeout(timeout=5.0)
++DEFAULT_TIMEOUT_CONFIG = Timeout(timeout=10.0)
+ DEFAULT_LIMITS = Limits(max_connections=100, max_keepalive_connections=20)
+ DEFAULT_MAX_REDIRECTS = 20
+diff --git a/httpx/_main.py b/httpx/_main.py
+index cffa4bb..480bc52 100644
+--- a/httpx/_main.py
++++ b/httpx/_main.py
+@@ -81,7 +81,7 @@ def print_help() -> None:
+     table.add_row(
+         "--timeout [cyan]FLOAT",
+         "Timeout value to use for network operations, such as establishing the"
+-        " connection, reading some data, etc... [Default: 5.0]",
++        " connection, reading some data, etc... [Default: 10.0]",
+     )
+ 
+     table.add_row("--follow-redirects", "Automatically follow redirects.")
+@@ -400,10 +400,10 @@ def handle_help(
+     "--timeout",
+     "timeout",
+     type=float,
+-    default=5.0,
++    default=10.0,
+     help=(
+         "Timeout value to use for network operations, such as establishing the "
+-        "connection, reading some data, etc... [Default: 5.0]"
++        "connection, reading some data, etc... [Default: 10.0]"
+     ),
+ )
+ @click.option(
+
+=== ITEM g08 (httpx c1, change-and-update)
+TASK: Five seconds is too aggressive for our users. Change httpx's default timeout to 10 seconds, and make sure everything that describes the default is consistent with that.
+KEY: Code: DEFAULT_TIMEOUT_CONFIG in httpx/_config.py becomes Timeout(timeout=10.0) (client and top-level API defaults all use it). Docs that state the default must change: docs/advanced/timeouts.md intro ('after 5 seconds of network inactivity') and the 'Setting a default timeout on a client' comment ('Use a default 5s timeout everywhere'); docs/quickstart.md Timeouts section ('The default timeout for network inactivity is five seconds'); docs/logging.md sample debug output shows timeout=5.0 on connect_tcp.started and start_tls.started for a default httpx.get -- both should become timeout=10.0. CHANGELOG.md: an entry under the existing '## 1.0.0 (Unreleased)' heading (e.g. a '### Changed' bullet), not a new version heading (scripts/sync-version requires the changelog's version to match __version__.py; the release process says changed features must be listed). Must NOT change: Limits keepalive_expiry default 5.0 and its 'Default 5' in docs/advanced/resource-limits.md; the explicit 5.0 examples in the Timeout docstring, the extensions.md timeout example, or tests that construct Timeout(5.0) explicitly. A test asserting the new default (e.g. httpx.Client().timeout == httpx.Timeout(10.0)) is expected per the contributor checklist.
+SUMMARY: DEFAULT_TIMEOUT_CONFIG Timeout(timeout=10.0); docs/quickstart.md ten seconds; docs/advanced/timeouts.md 'after 10 seconds'; docs/logging.md sample timeout=10.0; CHANGELOG Changed entry. Did not change httpx/_main.py CLI or the timeouts.md client comment; override examples with 10.0 noted, not changed. No test.
+DIFF:
+diff --git a/CHANGELOG.md b/CHANGELOG.md
+index a3fa798..526476f 100644
+--- a/CHANGELOG.md
++++ b/CHANGELOG.md
+@@ -12,6 +12,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
+ 
+ * Expose `FunctionAuth` from the public API. (#3699)
+ 
++### Changed
++
++* The default timeout is now 10 seconds, increased from 5 seconds.
++
+ ## 0.28.1 (6th December, 2024)
+ 
+ * Fix SSL case where `verify=False` together with client side certificates.
+diff --git a/docs/advanced/timeouts.md b/docs/advanced/timeouts.md
+index aedcfb6..06c7e77 100644
+--- a/docs/advanced/timeouts.md
++++ b/docs/advanced/timeouts.md
+@@ -1,6 +1,6 @@
+ HTTPX is careful to enforce timeouts everywhere by default.
+ 
+-The default behavior is to raise a `TimeoutException` after 5 seconds of
++The default behavior is to raise a `TimeoutException` after 10 seconds of
+ network inactivity.
+ 
+ ## Setting and disabling timeouts
+diff --git a/docs/logging.md b/docs/logging.md
+index b3c5781..4ba1af2 100644
+--- a/docs/logging.md
++++ b/docs/logging.md
+@@ -20,9 +20,9 @@ httpx.get("https://www.example.com")
+ Will send debug level output to the console, or wherever `stdout` is directed too...
+ 
+ ```
+-DEBUG [2024-09-28 17:27:40] httpcore.connection - connect_tcp.started host='www.example.com' port=443 local_address=None timeout=5.0 socket_options=None
++DEBUG [2024-09-28 17:27:40] httpcore.connection - connect_tcp.started host='www.example.com' port=443 local_address=None timeout=10.0 socket_options=None
+ DEBUG [2024-09-28 17:27:41] httpcore.connection - connect_tcp.complete return_value=<httpcore._backends.sync.SyncStream object at 0x101f1e8e0>
+-DEBUG [2024-09-28 17:27:41] httpcore.connection - start_tls.started ssl_context=SSLContext(verify=True) server_hostname='www.example.com' timeout=5.0
++DEBUG [2024-09-28 17:27:41] httpcore.connection - start_tls.started ssl_context=SSLContext(verify=True) server_hostname='www.example.com' timeout=10.0
+ DEBUG [2024-09-28 17:27:41] httpcore.connection - start_tls.complete return_value=<httpcore._backends.sync.SyncStream object at 0x1020f49a0>
+ DEBUG [2024-09-28 17:27:41] httpcore.http11 - send_request_headers.started request=<Request [b'GET']>
+ DEBUG [2024-09-28 17:27:41] httpcore.http11 - send_request_headers.complete
+diff --git a/docs/quickstart.md b/docs/quickstart.md
+index e140b53..cd7011c 100644
+--- a/docs/quickstart.md
++++ b/docs/quickstart.md
+@@ -454,7 +454,7 @@ HTTPX defaults to including reasonable timeouts for all network operations,
+ meaning that if a connection is not properly established then it should always
+ raise an error rather than hanging indefinitely.
+ 
+-The default timeout for network inactivity is five seconds. You can modify the
++The default timeout for network inactivity is ten seconds. You can modify the
+ value to be more or less strict:
+ 
+ ```pycon
+diff --git a/httpx/_config.py b/httpx/_config.py
+index 467a6c9..d10b32a 100644
+--- a/httpx/_config.py
++++ b/httpx/_config.py
+@@ -243,6 +243,6 @@ class Proxy:
+         return f"Proxy({url_str}{auth_str}{headers_str})"
+ 
+ 
+-DEFAULT_TIMEOUT_CONFIG = Timeout(timeout=5.0)
++DEFAULT_TIMEOUT_CONFIG = Timeout(timeout=10.0)
+ DEFAULT_LIMITS = Limits(max_connections=100, max_keepalive_connections=20)
+ DEFAULT_MAX_REDIRECTS = 20
+
+=== ITEM g09 (httpx c1, change-and-update)
+TASK: Five seconds is too aggressive for our users. Change httpx's default timeout to 10 seconds, and make sure everything that describes the default is consistent with that.
+KEY: Code: DEFAULT_TIMEOUT_CONFIG in httpx/_config.py becomes Timeout(timeout=10.0) (client and top-level API defaults all use it). Docs that state the default must change: docs/advanced/timeouts.md intro ('after 5 seconds of network inactivity') and the 'Setting a default timeout on a client' comment ('Use a default 5s timeout everywhere'); docs/quickstart.md Timeouts section ('The default timeout for network inactivity is five seconds'); docs/logging.md sample debug output shows timeout=5.0 on connect_tcp.started and start_tls.started for a default httpx.get -- both should become timeout=10.0. CHANGELOG.md: an entry under the existing '## 1.0.0 (Unreleased)' heading (e.g. a '### Changed' bullet), not a new version heading (scripts/sync-version requires the changelog's version to match __version__.py; the release process says changed features must be listed). Must NOT change: Limits keepalive_expiry default 5.0 and its 'Default 5' in docs/advanced/resource-limits.md; the explicit 5.0 examples in the Timeout docstring, the extensions.md timeout example, or tests that construct Timeout(5.0) explicitly. A test asserting the new default (e.g. httpx.Client().timeout == httpx.Timeout(10.0)) is expected per the contributor checklist.
+SUMMARY: DEFAULT_TIMEOUT_CONFIG Timeout(timeout=10.0); httpx/_main.py --timeout 10.0 and help texts; docs/advanced/timeouts.md 'after 10 seconds', client comment 10s, example to 20.0; docs/quickstart.md ten seconds; docs/logging.md sample timeout=10.0 in two lines; CHANGELOG entry. Left tests, extensions.md, keepalive, old changelog. No test added.
+DIFF:
+diff --git a/CHANGELOG.md b/CHANGELOG.md
+index a3fa798..3791ec1 100644
+--- a/CHANGELOG.md
++++ b/CHANGELOG.md
+@@ -7,6 +7,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
+ ## 1.0.0 (Unreleased)
+ 
+ * Minimum supported Python version is now 3.10
++* The default timeout is now 10 seconds, increased from 5 seconds.
+ 
+ ### Added
+ 
+diff --git a/docs/advanced/timeouts.md b/docs/advanced/timeouts.md
+index aedcfb6..32f9693 100644
+--- a/docs/advanced/timeouts.md
++++ b/docs/advanced/timeouts.md
+@@ -1,6 +1,6 @@
+ HTTPX is careful to enforce timeouts everywhere by default.
+ 
+-The default behavior is to raise a `TimeoutException` after 5 seconds of
++The default behavior is to raise a `TimeoutException` after 10 seconds of
+ network inactivity.
+ 
+ ## Setting and disabling timeouts
+@@ -33,8 +33,8 @@ You can set a timeout on a client instance, which results in the given
+ `timeout` being used as the default for requests made with this client:
+ 
+ ```python
+-client = httpx.Client()              # Use a default 5s timeout everywhere.
+-client = httpx.Client(timeout=10.0)  # Use a default 10s timeout everywhere.
++client = httpx.Client()              # Use a default 10s timeout everywhere.
++client = httpx.Client(timeout=20.0)  # Use a default 20s timeout everywhere.
+ client = httpx.Client(timeout=None)  # Disable all timeouts by default.
+ ```
+ 
+diff --git a/docs/logging.md b/docs/logging.md
+index b3c5781..4ba1af2 100644
+--- a/docs/logging.md
++++ b/docs/logging.md
+@@ -20,9 +20,9 @@ httpx.get("https://www.example.com")
+ Will send debug level output to the console, or wherever `stdout` is directed too...
+ 
+ ```
+-DEBUG [2024-09-28 17:27:40] httpcore.connection - connect_tcp.started host='www.example.com' port=443 local_address=None timeout=5.0 socket_options=None
++DEBUG [2024-09-28 17:27:40] httpcore.connection - connect_tcp.started host='www.example.com' port=443 local_address=None timeout=10.0 socket_options=None
+ DEBUG [2024-09-28 17:27:41] httpcore.connection - connect_tcp.complete return_value=<httpcore._backends.sync.SyncStream object at 0x101f1e8e0>
+-DEBUG [2024-09-28 17:27:41] httpcore.connection - start_tls.started ssl_context=SSLContext(verify=True) server_hostname='www.example.com' timeout=5.0
++DEBUG [2024-09-28 17:27:41] httpcore.connection - start_tls.started ssl_context=SSLContext(verify=True) server_hostname='www.example.com' timeout=10.0
+ DEBUG [2024-09-28 17:27:41] httpcore.connection - start_tls.complete return_value=<httpcore._backends.sync.SyncStream object at 0x1020f49a0>
+ DEBUG [2024-09-28 17:27:41] httpcore.http11 - send_request_headers.started request=<Request [b'GET']>
+ DEBUG [2024-09-28 17:27:41] httpcore.http11 - send_request_headers.complete
+diff --git a/docs/quickstart.md b/docs/quickstart.md
+index e140b53..cd7011c 100644
+--- a/docs/quickstart.md
++++ b/docs/quickstart.md
+@@ -454,7 +454,7 @@ HTTPX defaults to including reasonable timeouts for all network operations,
+ meaning that if a connection is not properly established then it should always
+ raise an error rather than hanging indefinitely.
+ 
+-The default timeout for network inactivity is five seconds. You can modify the
++The default timeout for network inactivity is ten seconds. You can modify the
+ value to be more or less strict:
+ 
+ ```pycon
+diff --git a/httpx/_config.py b/httpx/_config.py
+index 467a6c9..d10b32a 100644
+--- a/httpx/_config.py
++++ b/httpx/_config.py
+@@ -243,6 +243,6 @@ class Proxy:
+         return f"Proxy({url_str}{auth_str}{headers_str})"
+ 
+ 
+-DEFAULT_TIMEOUT_CONFIG = Timeout(timeout=5.0)
++DEFAULT_TIMEOUT_CONFIG = Timeout(timeout=10.0)
+ DEFAULT_LIMITS = Limits(max_connections=100, max_keepalive_connections=20)
+ DEFAULT_MAX_REDIRECTS = 20
+diff --git a/httpx/_main.py b/httpx/_main.py
+index cffa4bb..480bc52 100644
+--- a/httpx/_main.py
++++ b/httpx/_main.py
+@@ -81,7 +81,7 @@ def print_help() -> None:
+     table.add_row(
+         "--timeout [cyan]FLOAT",
+         "Timeout value to use for network operations, such as establishing the"
+-        " connection, reading some data, etc... [Default: 5.0]",
++        " connection, reading some data, etc... [Default: 10.0]",
+     )
+ 
+     table.add_row("--follow-redirects", "Automatically follow redirects.")
+@@ -400,10 +400,10 @@ def handle_help(
+     "--timeout",
+     "timeout",
+     type=float,
+-    default=5.0,
++    default=10.0,
+     help=(
+         "Timeout value to use for network operations, such as establishing the "
+-        "connection, reading some data, etc... [Default: 5.0]"
++        "connection, reading some data, etc... [Default: 10.0]"
+     ),
+ )
+ @click.option(
+
+=== ITEM g10 (vite c2, change-and-update)
+TASK: Users who opt into the future deprecation warnings for server.ssrLoadModule complain that they also get spammed by warnings from server.ssrFixStacktrace and server.ssrRewriteStacktrace, which they call from their error handlers. Split those two out into their own future flag named removeSsrFixStacktrace, so removeSsrLoadModule only covers ssrLoadModule itself. Make sure everything that lists or documents the future flags stays consistent.
+KEY: packages/vite/src/node/config.ts: (1) add removeSsrFixStacktrace?: 'warn' to the FutureOptions interface. (2) Add removeSsrFixStacktrace: 'warn' to the object that `future: 'warn'` expands into in resolveConfig. That object is checked with `satisfies Required<FutureOptions>`, so leaving it out is a type error. (3) Adding removeSsrFixStacktrace: undefined to the config defaults' future block is expected for consistency, but not essential. packages/vite/src/node/deprecations.ts: (4) add removeSsrFixStacktrace to deprecationCode. Both deprecationCode and deprecationMessages are checked with `satisfies Record<keyof FutureOptions, string>`. The code value builds the docs link vite.dev/changes/<code>, so it must be an existing page slug, namely 'ssr-using-modulerunner', not a made-up page. (5) Add a deprecationMessages entry for the new flag, for example saying ssrFixStacktrace/ssrRewriteStacktrace are not needed with Module Runners. packages/vite/src/node/server/index.ts: (6) the ssrFixStacktrace and ssrRewriteStacktrace methods of the ViteDevServer object built in _createServer switch from warnFutureDeprecation(config, 'removeSsrLoadModule', ...) to 'removeSsrFixStacktrace' (keeping or moving their extra messages). ssrLoadModule keeps 'removeSsrLoadModule'. Internal ssrFixStacktrace calls (for example ssrModuleLoader's fixStacktrace path) must not start warning. Docs: (7) docs/changes/ssr-using-modulerunner.md must document the new flag. Its 'Future Deprecation' box currently tells users to set only future.removeSsrLoadModule, and its Migration Guide paragraph about ssrFixStacktrace/ssrRewriteStacktrace should name future.removeSsrFixStacktrace. No new docs/changes page and no change to docs/changes/index.md is needed. A run that only adds the interface key, or forgets the 'warn' expansion or the deprecationCode/Message entries, is incomplete.
+SUMMARY: New flag removeSsrFixStacktrace: config.ts FutureOptions, defaults undefined, 'warn' list; deprecations.ts link and message; server/index.ts stack-trace methods; docs/changes/ssr-using-modulerunner.md warning box says these are reported separately via future.removeSsrFixStacktrace. Added two missing defaults. No other docs list flags. CHANGELOG history left.
+DIFF:
+diff --git a/docs/changes/ssr-using-modulerunner.md b/docs/changes/ssr-using-modulerunner.md
+index 47c334f..3b9752c 100644
+--- a/docs/changes/ssr-using-modulerunner.md
++++ b/docs/changes/ssr-using-modulerunner.md
+@@ -9,7 +9,7 @@ Give us feedback at [Environment API feedback discussion](https://github.com/vit
+ Affected scope: `Vite Plugin Authors`
+ 
+ ::: warning Future Deprecation
+-`ModuleRunner` was first introduced in `v6.0`. The deprecation of `server.ssrLoadModule` is planned for a future major. To identify your usage, set `future.removeSsrLoadModule` to `"warn"` in your vite config.
++`ModuleRunner` was first introduced in `v6.0`. The deprecation of `server.ssrLoadModule` is planned for a future major. To identify your usage, set `future.removeSsrLoadModule` to `"warn"` in your vite config. Usages of `server.ssrFixStacktrace` and `server.ssrRewriteStacktrace` are reported separately; set `future.removeSsrFixStacktrace` to `"warn"` to identify them.
+ :::
+ 
+ ## Motivation
+diff --git a/packages/vite/src/node/config.ts b/packages/vite/src/node/config.ts
+index 016a97a..25d0bc9 100644
+--- a/packages/vite/src/node/config.ts
++++ b/packages/vite/src/node/config.ts
+@@ -598,6 +598,7 @@ export interface FutureOptions {
+   removeServerWarmupRequest?: 'warn'
+ 
+   removeSsrLoadModule?: 'warn'
++  removeSsrFixStacktrace?: 'warn'
+ }
+ 
+ export interface ExperimentalOptions {
+@@ -929,10 +930,13 @@ const configDefaults = Object.freeze({
+     removePluginHookHandleHotUpdate: undefined,
+     removePluginHookSsrArgument: undefined,
+     removeServerModuleGraph: undefined,
++    removeServerReloadModule: undefined,
++    removeServerPluginContainer: undefined,
+     removeServerHot: undefined,
+     removeServerTransformRequest: undefined,
+     removeServerWarmupRequest: undefined,
+     removeSsrLoadModule: undefined,
++    removeSsrFixStacktrace: undefined,
+   },
+   legacy: {
+     skipWebSocketTokenCheck: false,
+@@ -2161,6 +2165,7 @@ export async function resolveConfig(
+             removeServerTransformRequest: 'warn',
+             removeServerWarmupRequest: 'warn',
+             removeSsrLoadModule: 'warn',
++            removeSsrFixStacktrace: 'warn',
+           } satisfies Required<FutureOptions>)
+         : config.future,
+ 
+diff --git a/packages/vite/src/node/deprecations.ts b/packages/vite/src/node/deprecations.ts
+index f51b71c..2bdd5c0 100644
+--- a/packages/vite/src/node/deprecations.ts
++++ b/packages/vite/src/node/deprecations.ts
+@@ -15,6 +15,7 @@ const deprecationCode = {
+   removeServerWarmupRequest: 'per-environment-apis',
+ 
+   removeSsrLoadModule: 'ssr-using-modulerunner',
++  removeSsrFixStacktrace: 'ssr-using-modulerunner',
+ } satisfies Record<keyof FutureOptions, string>
+ 
+ const deprecationMessages = {
+@@ -37,6 +38,8 @@ const deprecationMessages = {
+ 
+   removeSsrLoadModule:
+     'The `server.ssrLoadModule` is replaced with Environment Runner.',
++  removeSsrFixStacktrace:
++    'The `server.ssrFixStacktrace` and `server.ssrRewriteStacktrace` are not needed with Environment Runner.',
+ } satisfies Record<keyof FutureOptions, string>
+ 
+ let _ignoreDeprecationWarnings = false
+diff --git a/packages/vite/src/node/server/index.ts b/packages/vite/src/node/server/index.ts
+index 0442117..ef5d8f0 100644
+--- a/packages/vite/src/node/server/index.ts
++++ b/packages/vite/src/node/server/index.ts
+@@ -720,7 +720,7 @@ export async function _createServer(
+     ssrFixStacktrace(e) {
+       warnFutureDeprecation(
+         config,
+-        'removeSsrLoadModule',
++        'removeSsrFixStacktrace',
+         "ssrFixStacktrace doesn't need to be used for Environment Module Runners.",
+       )
+       ssrFixStacktrace(e, server.environments.ssr.moduleGraph)
+@@ -728,7 +728,7 @@ export async function _createServer(
+     ssrRewriteStacktrace(stack: string) {
+       warnFutureDeprecation(
+         config,
+-        'removeSsrLoadModule',
++        'removeSsrFixStacktrace',
+         "ssrRewriteStacktrace doesn't need to be used for Environment Module Runners.",
+       )
+       return ssrRewriteStacktrace(stack, server.environments.ssr.moduleGraph)
+
+=== ITEM g11 (vite q2, question)
+TASK: Before the next Vite major we want to see every deprecation warning Vite can give us. We maintain an SSR framework with a few plugins. What is the least config that turns all of these warnings on? Which exact flags exist, and what triggers each one? Separately, our server code only holds the ViteDevServer instance (we're not inside a plugin hook). What should we replace our server.hot.send(...) calls with?
+KEY: 1) The shortest config is future: 'warn'. UserConfig types future as FutureOptions | 'warn', and resolveConfig expands the string into all flags set to 'warn' (checked with `satisfies Required<FutureOptions>`). The docs for the future option (shared-options.md) only describe a record of flag names and never mention the string shorthand, so an answer that only lists the individual flags is not the least config. 2) There are exactly nine flags in FutureOptions: removePluginHookSsrArgument (a plugin reads options.ssr in resolveId/load/transform, in dev and in build), removePluginHookHandleHotUpdate (a plugin that has handleHotUpdate and no hotUpdate runs on a file 'update'), removeServerModuleGraph, removeServerReloadModule, removeServerPluginContainer, removeServerHot, removeServerTransformRequest, removeServerWarmupRequest (each fires when the matching ViteDevServer getter or method is used), and removeSsrLoadModule. removeSsrLoadModule fires for server.ssrLoadModule and also for server.ssrFixStacktrace and server.ssrRewriteStacktrace. Each warning is printed once (warnOnce), prefixed '[vite future]', with a link to vite.dev/changes/<page> (this-environment-in-hooks, hotupdate-hook, per-environment-apis or ssr-using-modulerunner) and usually a stack trace. 3) 'Shared plugins during build' (builder.sharedConfigBuild) is listed on the breaking-changes page but has no future flag and gives no warning. 4) server.hot replacement: docs/changes/per-environment-apis.md says `server.hot -> server.client.environment.hot`. That path does not exist, because ViteDevServer has no `client` property. The correct replacement from a server instance is server.environments.client.hot, which the SSR guide (docs/guide/ssr.md) uses and which matches ViteDevServer.environments. Inside plugin hooks it is this.environment.hot, which is what the deprecation message says. An answer that repeats server.client.environment.hot is wrong.
+SUMMARY: future: 'warn' (satisfies Required; docs don't mention). Nine flags table with triggers and files; warnOnce, link, stack trace minus dist frames, ignoreDeprecationWarnings. Replace with server.environments.client.hot.send (type comment, docs/guide/ssr.md); this.environment.hot only in hooks; per-environment-apis.md server.client.environment.hot wrong.
+
+=== ITEM g12 (httpx q2, question)
+TASK: Our pods have HTTPS_PROXY=corp-proxy:3128 (no scheme) and NO_PROXY=localhost,.svc.cluster.local,10.0.0.0/8 set, and no HTTP_PROXY. With a plain httpx.Client(), which of these go direct and which go through the proxy: https://api.svc.cluster.local, https://svc.cluster.local, https://10.2.3.4, http://localhost:8080/health, http://example.com, https://example.com? Then two teammates changed the code: one switched to httpx.Client(transport=httpx.HTTPTransport(retries=3)) to get retries, the other to httpx.Client(proxy=os.environ['HTTPS_PROXY']) to 'be explicit'. What does each of those do?
+KEY: Plain Client() (trust_env defaults True; env proxies come from urllib getproxies via httpx._utils.get_environment_proxies): HTTPS_PROXY without a scheme is accepted and turned into 'http://corp-proxy:3128' mounted on 'https://' only (docs say 'a URL' but scheme-less is accepted). NO_PROXY entries: 'localhost' -> 'all://localhost'; '.svc.cluster.local' -> 'all://*.svc.cluster.local' which matches strict subdomains only (same semantics as '*.example.com' in the transports routing docs); '10.0.0.0/8' is recognised as IPv4 but becomes 'all://10.0.0.0/8', whose host is just 10.0.0.0 -- CIDR ranges are NOT supported (only the exact address matches), despite the code comment suggesting 192.168.0.0/16 works. Results: https://api.svc.cluster.local -> direct; https://svc.cluster.local -> via proxy (leading dot excludes the bare domain); https://10.2.3.4 -> via proxy; http://localhost:8080/health -> direct; http://example.com -> direct (no HTTP_PROXY, HTTPS_PROXY applies only to https:// URLs); https://example.com -> via http://corp-proxy:3128 (tunnelled over an HTTP proxy). Teammate A: passing transport= disables environment proxies entirely (allow_env_proxies = trust_env and transport is None in the client), so everything goes direct; to keep retries and the proxy use HTTPTransport(proxy='http://corp-proxy:3128', retries=3) in mounts (e.g. 'https://' plus None entries for exclusions) or similar. Teammate B: httpx.Proxy requires a URL with scheme http/https/socks5/socks5h, so 'corp-proxy:3128' raises ValueError('Unknown scheme for proxy URL ...') at client construction; even with 'http://' added, an explicit proxy= maps 'all://' to the proxy and ignores the environment completely (including NO_PROXY), so all traffic -- http and https, localhost and cluster hosts -- would go through the proxy.
+SUMMARY: Routes https -> http://corp-proxy:3128; localhost, *.svc.cluster.local, 10.0.0.0/8 direct; no http route. api.svc direct; svc.cluster.local proxy; 10.2.3.4 proxy (no CIDR); localhost direct; http://example.com direct; https://example.com proxy (CONNECT). Teammate 1 transport=: env proxies off, all direct; trust_env still SSL; retries connect only. Teammate 2: ValueError Unknown scheme (reproduced); fixed all:// ignoring NO_PROXY, http proxied. Doc gaps.
+
+=== ITEM g13 (vite q2, question)
+TASK: Before the next Vite major we want to see every deprecation warning Vite can give us. We maintain an SSR framework with a few plugins. What is the least config that turns all of these warnings on? Which exact flags exist, and what triggers each one? Separately, our server code only holds the ViteDevServer instance (we're not inside a plugin hook). What should we replace our server.hot.send(...) calls with?
+KEY: 1) The shortest config is future: 'warn'. UserConfig types future as FutureOptions | 'warn', and resolveConfig expands the string into all flags set to 'warn' (checked with `satisfies Required<FutureOptions>`). The docs for the future option (shared-options.md) only describe a record of flag names and never mention the string shorthand, so an answer that only lists the individual flags is not the least config. 2) There are exactly nine flags in FutureOptions: removePluginHookSsrArgument (a plugin reads options.ssr in resolveId/load/transform, in dev and in build), removePluginHookHandleHotUpdate (a plugin that has handleHotUpdate and no hotUpdate runs on a file 'update'), removeServerModuleGraph, removeServerReloadModule, removeServerPluginContainer, removeServerHot, removeServerTransformRequest, removeServerWarmupRequest (each fires when the matching ViteDevServer getter or method is used), and removeSsrLoadModule. removeSsrLoadModule fires for server.ssrLoadModule and also for server.ssrFixStacktrace and server.ssrRewriteStacktrace. Each warning is printed once (warnOnce), prefixed '[vite future]', with a link to vite.dev/changes/<page> (this-environment-in-hooks, hotupdate-hook, per-environment-apis or ssr-using-modulerunner) and usually a stack trace. 3) 'Shared plugins during build' (builder.sharedConfigBuild) is listed on the breaking-changes page but has no future flag and gives no warning. 4) server.hot replacement: docs/changes/per-environment-apis.md says `server.hot -> server.client.environment.hot`. That path does not exist, because ViteDevServer has no `client` property. The correct replacement from a server instance is server.environments.client.hot, which the SSR guide (docs/guide/ssr.md) uses and which matches ViteDevServer.environments. Inside plugin hooks it is this.environment.hot, which is what the deprecation message says. An answer that repeats server.client.environment.hot is wrong.
+SUMMARY: future: 'warn' (satisfies Required<FutureOptions>; docs don't mention). Nine flags table with triggers; [vite future] once per message, docs link, stack trace; ignoreDeprecationWarnings; builder.sharedConfigBuild has no flag and no warning. Replace with server.environments.client.hot.send (type comment, docs/guide/ssr.md); this.environment.hot only in hooks; per-environment-apis.md server.client.environment.hot doesn't exist.
+
+=== ITEM g14 (httpx q2, question)
+TASK: Our pods have HTTPS_PROXY=corp-proxy:3128 (no scheme) and NO_PROXY=localhost,.svc.cluster.local,10.0.0.0/8 set, and no HTTP_PROXY. With a plain httpx.Client(), which of these go direct and which go through the proxy: https://api.svc.cluster.local, https://svc.cluster.local, https://10.2.3.4, http://localhost:8080/health, http://example.com, https://example.com? Then two teammates changed the code: one switched to httpx.Client(transport=httpx.HTTPTransport(retries=3)) to get retries, the other to httpx.Client(proxy=os.environ['HTTPS_PROXY']) to 'be explicit'. What does each of those do?
+KEY: Plain Client() (trust_env defaults True; env proxies come from urllib getproxies via httpx._utils.get_environment_proxies): HTTPS_PROXY without a scheme is accepted and turned into 'http://corp-proxy:3128' mounted on 'https://' only (docs say 'a URL' but scheme-less is accepted). NO_PROXY entries: 'localhost' -> 'all://localhost'; '.svc.cluster.local' -> 'all://*.svc.cluster.local' which matches strict subdomains only (same semantics as '*.example.com' in the transports routing docs); '10.0.0.0/8' is recognised as IPv4 but becomes 'all://10.0.0.0/8', whose host is just 10.0.0.0 -- CIDR ranges are NOT supported (only the exact address matches), despite the code comment suggesting 192.168.0.0/16 works. Results: https://api.svc.cluster.local -> direct; https://svc.cluster.local -> via proxy (leading dot excludes the bare domain); https://10.2.3.4 -> via proxy; http://localhost:8080/health -> direct; http://example.com -> direct (no HTTP_PROXY, HTTPS_PROXY applies only to https:// URLs); https://example.com -> via http://corp-proxy:3128 (tunnelled over an HTTP proxy). Teammate A: passing transport= disables environment proxies entirely (allow_env_proxies = trust_env and transport is None in the client), so everything goes direct; to keep retries and the proxy use HTTPTransport(proxy='http://corp-proxy:3128', retries=3) in mounts (e.g. 'https://' plus None entries for exclusions) or similar. Teammate B: httpx.Proxy requires a URL with scheme http/https/socks5/socks5h, so 'corp-proxy:3128' raises ValueError('Unknown scheme for proxy URL ...') at client construction; even with 'http://' added, an explicit proxy= maps 'all://' to the proxy and ignores the environment completely (including NO_PROXY), so all traffic -- http and https, localhost and cluster hosts -- would go through the proxy.
+SUMMARY: Plain Client: https -> http://corp-proxy:3128, no http rule; NO_PROXY localhost, *.svc.cluster.local (subdomains only), 10.0.0.0/8 (no CIDR, exact host). api.svc direct; svc.cluster.local proxy; 10.2.3.4 proxy; localhost direct; http://example.com direct; https://example.com proxy. Teammate 1 transport=: env proxies off, all direct, retries connect only; mounts fix. Teammate 2: ValueError Unknown scheme for proxy URL (reproduced); fixed all:// ignores NO_PROXY. Env var fixes.
+
+=== ITEM g15 (vite c2, change-and-update)
+TASK: Users who opt into the future deprecation warnings for server.ssrLoadModule complain that they also get spammed by warnings from server.ssrFixStacktrace and server.ssrRewriteStacktrace, which they call from their error handlers. Split those two out into their own future flag named removeSsrFixStacktrace, so removeSsrLoadModule only covers ssrLoadModule itself. Make sure everything that lists or documents the future flags stays consistent.
+KEY: packages/vite/src/node/config.ts: (1) add removeSsrFixStacktrace?: 'warn' to the FutureOptions interface. (2) Add removeSsrFixStacktrace: 'warn' to the object that `future: 'warn'` expands into in resolveConfig. That object is checked with `satisfies Required<FutureOptions>`, so leaving it out is a type error. (3) Adding removeSsrFixStacktrace: undefined to the config defaults' future block is expected for consistency, but not essential. packages/vite/src/node/deprecations.ts: (4) add removeSsrFixStacktrace to deprecationCode. Both deprecationCode and deprecationMessages are checked with `satisfies Record<keyof FutureOptions, string>`. The code value builds the docs link vite.dev/changes/<code>, so it must be an existing page slug, namely 'ssr-using-modulerunner', not a made-up page. (5) Add a deprecationMessages entry for the new flag, for example saying ssrFixStacktrace/ssrRewriteStacktrace are not needed with Module Runners. packages/vite/src/node/server/index.ts: (6) the ssrFixStacktrace and ssrRewriteStacktrace methods of the ViteDevServer object built in _createServer switch from warnFutureDeprecation(config, 'removeSsrLoadModule', ...) to 'removeSsrFixStacktrace' (keeping or moving their extra messages). ssrLoadModule keeps 'removeSsrLoadModule'. Internal ssrFixStacktrace calls (for example ssrModuleLoader's fixStacktrace path) must not start warning. Docs: (7) docs/changes/ssr-using-modulerunner.md must document the new flag. Its 'Future Deprecation' box currently tells users to set only future.removeSsrLoadModule, and its Migration Guide paragraph about ssrFixStacktrace/ssrRewriteStacktrace should name future.removeSsrFixStacktrace. No new docs/changes page and no change to docs/changes/index.md is needed. A run that only adds the interface key, or forgets the 'warn' expansion or the deprecationCode/Message entries, is incomplete.
+SUMMARY: New flag removeSsrFixStacktrace: FutureOptions, defaults, 'warn' expansion (satisfies Required); deprecations.ts both tables, ssr-using-modulerunner; server/index.ts; docs/changes/ssr-using-modulerunner.md note says set future.removeSsrFixStacktrace. Added two missing defaults. Behaviour change noted. No CHANGELOG (release-generated).
+DIFF:
+diff --git a/docs/changes/ssr-using-modulerunner.md b/docs/changes/ssr-using-modulerunner.md
+index 47c334f..59bb5e7 100644
+--- a/docs/changes/ssr-using-modulerunner.md
++++ b/docs/changes/ssr-using-modulerunner.md
+@@ -9,7 +9,7 @@ Give us feedback at [Environment API feedback discussion](https://github.com/vit
+ Affected scope: `Vite Plugin Authors`
+ 
+ ::: warning Future Deprecation
+-`ModuleRunner` was first introduced in `v6.0`. The deprecation of `server.ssrLoadModule` is planned for a future major. To identify your usage, set `future.removeSsrLoadModule` to `"warn"` in your vite config.
++`ModuleRunner` was first introduced in `v6.0`. The deprecation of `server.ssrLoadModule` is planned for a future major. To identify your usage, set `future.removeSsrLoadModule` to `"warn"` in your vite config. To also identify calls to `server.ssrFixStacktrace` and `server.ssrRewriteStacktrace`, set `future.removeSsrFixStacktrace` to `"warn"`.
+ :::
+ 
+ ## Motivation
+diff --git a/packages/vite/src/node/config.ts b/packages/vite/src/node/config.ts
+index 016a97a..25d0bc9 100644
+--- a/packages/vite/src/node/config.ts
++++ b/packages/vite/src/node/config.ts
+@@ -598,6 +598,7 @@ export interface FutureOptions {
+   removeServerWarmupRequest?: 'warn'
+ 
+   removeSsrLoadModule?: 'warn'
++  removeSsrFixStacktrace?: 'warn'
+ }
+ 
+ export interface ExperimentalOptions {
+@@ -929,10 +930,13 @@ const configDefaults = Object.freeze({
+     removePluginHookHandleHotUpdate: undefined,
+     removePluginHookSsrArgument: undefined,
+     removeServerModuleGraph: undefined,
++    removeServerReloadModule: undefined,
++    removeServerPluginContainer: undefined,
+     removeServerHot: undefined,
+     removeServerTransformRequest: undefined,
+     removeServerWarmupRequest: undefined,
+     removeSsrLoadModule: undefined,
++    removeSsrFixStacktrace: undefined,
+   },
+   legacy: {
+     skipWebSocketTokenCheck: false,
+@@ -2161,6 +2165,7 @@ export async function resolveConfig(
+             removeServerTransformRequest: 'warn',
+             removeServerWarmupRequest: 'warn',
+             removeSsrLoadModule: 'warn',
++            removeSsrFixStacktrace: 'warn',
+           } satisfies Required<FutureOptions>)
+         : config.future,
+ 
+diff --git a/packages/vite/src/node/deprecations.ts b/packages/vite/src/node/deprecations.ts
+index f51b71c..975aa9c 100644
+--- a/packages/vite/src/node/deprecations.ts
++++ b/packages/vite/src/node/deprecations.ts
+@@ -15,6 +15,7 @@ const deprecationCode = {
+   removeServerWarmupRequest: 'per-environment-apis',
+ 
+   removeSsrLoadModule: 'ssr-using-modulerunner',
++  removeSsrFixStacktrace: 'ssr-using-modulerunner',
+ } satisfies Record<keyof FutureOptions, string>
+ 
+ const deprecationMessages = {
+@@ -37,6 +38,8 @@ const deprecationMessages = {
+ 
+   removeSsrLoadModule:
+     'The `server.ssrLoadModule` is replaced with Environment Runner.',
++  removeSsrFixStacktrace:
++    'The `server.ssrFixStacktrace` and `server.ssrRewriteStacktrace` are replaced with Environment Runner source map support.',
+ } satisfies Record<keyof FutureOptions, string>
+ 
+ let _ignoreDeprecationWarnings = false
+diff --git a/packages/vite/src/node/server/index.ts b/packages/vite/src/node/server/index.ts
+index 0442117..ef5d8f0 100644
+--- a/packages/vite/src/node/server/index.ts
++++ b/packages/vite/src/node/server/index.ts
+@@ -720,7 +720,7 @@ export async function _createServer(
+     ssrFixStacktrace(e) {
+       warnFutureDeprecation(
+         config,
+-        'removeSsrLoadModule',
++        'removeSsrFixStacktrace',
+         "ssrFixStacktrace doesn't need to be used for Environment Module Runners.",
+       )
+       ssrFixStacktrace(e, server.environments.ssr.moduleGraph)
+@@ -728,7 +728,7 @@ export async function _createServer(
+     ssrRewriteStacktrace(stack: string) {
+       warnFutureDeprecation(
+         config,
+-        'removeSsrLoadModule',
++        'removeSsrFixStacktrace',
+         "ssrRewriteStacktrace doesn't need to be used for Environment Module Runners.",
+       )
+       return ssrRewriteStacktrace(stack, server.environments.ssr.moduleGraph)
+
+=== ITEM g16 (httpx c1, change-and-update)
+TASK: Five seconds is too aggressive for our users. Change httpx's default timeout to 10 seconds, and make sure everything that describes the default is consistent with that.
+KEY: Code: DEFAULT_TIMEOUT_CONFIG in httpx/_config.py becomes Timeout(timeout=10.0) (client and top-level API defaults all use it). Docs that state the default must change: docs/advanced/timeouts.md intro ('after 5 seconds of network inactivity') and the 'Setting a default timeout on a client' comment ('Use a default 5s timeout everywhere'); docs/quickstart.md Timeouts section ('The default timeout for network inactivity is five seconds'); docs/logging.md sample debug output shows timeout=5.0 on connect_tcp.started and start_tls.started for a default httpx.get -- both should become timeout=10.0. CHANGELOG.md: an entry under the existing '## 1.0.0 (Unreleased)' heading (e.g. a '### Changed' bullet), not a new version heading (scripts/sync-version requires the changelog's version to match __version__.py; the release process says changed features must be listed). Must NOT change: Limits keepalive_expiry default 5.0 and its 'Default 5' in docs/advanced/resource-limits.md; the explicit 5.0 examples in the Timeout docstring, the extensions.md timeout example, or tests that construct Timeout(5.0) explicitly. A test asserting the new default (e.g. httpx.Client().timeout == httpx.Timeout(10.0)) is expected per the contributor checklist.
+SUMMARY: DEFAULT_TIMEOUT_CONFIG 10.0; httpx/_main.py --timeout default 10.0 and help texts; docs/quickstart.md ten seconds; docs/advanced/timeouts.md 10 seconds, Client() comment 10s, override examples bumped to 20.0; docs/logging.md timeout=10.0 (found via graphdown mention); CHANGELOG Changed entry. Left explicit 5.0 values. No test.
+DIFF:
+diff --git a/CHANGELOG.md b/CHANGELOG.md
+index a3fa798..12f3f0d 100644
+--- a/CHANGELOG.md
++++ b/CHANGELOG.md
+@@ -12,6 +12,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
+ 
+ * Expose `FunctionAuth` from the public API. (#3699)
+ 
++### Changed
++
++* The default timeout is now 10 seconds, up from 5 seconds. This applies to the top-level API, `Client`, `AsyncClient` and the `httpx` command line `--timeout` option.
++
+ ## 0.28.1 (6th December, 2024)
+ 
+ * Fix SSL case where `verify=False` together with client side certificates.
+diff --git a/docs/advanced/timeouts.md b/docs/advanced/timeouts.md
+index aedcfb6..ebd7d03 100644
+--- a/docs/advanced/timeouts.md
++++ b/docs/advanced/timeouts.md
+@@ -1,6 +1,6 @@
+ HTTPX is careful to enforce timeouts everywhere by default.
+ 
+-The default behavior is to raise a `TimeoutException` after 5 seconds of
++The default behavior is to raise a `TimeoutException` after 10 seconds of
+ network inactivity.
+ 
+ ## Setting and disabling timeouts
+@@ -9,11 +9,11 @@ You can set timeouts for an individual request:
+ 
+ ```python
+ # Using the top-level API:
+-httpx.get('http://example.com/api/v1/example', timeout=10.0)
++httpx.get('http://example.com/api/v1/example', timeout=20.0)
+ 
+ # Using a client instance:
+ with httpx.Client() as client:
+-    client.get("http://example.com/api/v1/example", timeout=10.0)
++    client.get("http://example.com/api/v1/example", timeout=20.0)
+ ```
+ 
+ Or disable timeouts for an individual request:
+@@ -33,8 +33,8 @@ You can set a timeout on a client instance, which results in the given
+ `timeout` being used as the default for requests made with this client:
+ 
+ ```python
+-client = httpx.Client()              # Use a default 5s timeout everywhere.
+-client = httpx.Client(timeout=10.0)  # Use a default 10s timeout everywhere.
++client = httpx.Client()              # Use a default 10s timeout everywhere.
++client = httpx.Client(timeout=20.0)  # Use a default 20s timeout everywhere.
+ client = httpx.Client(timeout=None)  # Disable all timeouts by default.
+ ```
+ 
+diff --git a/docs/logging.md b/docs/logging.md
+index b3c5781..4ba1af2 100644
+--- a/docs/logging.md
++++ b/docs/logging.md
+@@ -20,9 +20,9 @@ httpx.get("https://www.example.com")
+ Will send debug level output to the console, or wherever `stdout` is directed too...
+ 
+ ```
+-DEBUG [2024-09-28 17:27:40] httpcore.connection - connect_tcp.started host='www.example.com' port=443 local_address=None timeout=5.0 socket_options=None
++DEBUG [2024-09-28 17:27:40] httpcore.connection - connect_tcp.started host='www.example.com' port=443 local_address=None timeout=10.0 socket_options=None
+ DEBUG [2024-09-28 17:27:41] httpcore.connection - connect_tcp.complete return_value=<httpcore._backends.sync.SyncStream object at 0x101f1e8e0>
+-DEBUG [2024-09-28 17:27:41] httpcore.connection - start_tls.started ssl_context=SSLContext(verify=True) server_hostname='www.example.com' timeout=5.0
++DEBUG [2024-09-28 17:27:41] httpcore.connection - start_tls.started ssl_context=SSLContext(verify=True) server_hostname='www.example.com' timeout=10.0
+ DEBUG [2024-09-28 17:27:41] httpcore.connection - start_tls.complete return_value=<httpcore._backends.sync.SyncStream object at 0x1020f49a0>
+ DEBUG [2024-09-28 17:27:41] httpcore.http11 - send_request_headers.started request=<Request [b'GET']>
+ DEBUG [2024-09-28 17:27:41] httpcore.http11 - send_request_headers.complete
+diff --git a/docs/quickstart.md b/docs/quickstart.md
+index e140b53..cd7011c 100644
+--- a/docs/quickstart.md
++++ b/docs/quickstart.md
+@@ -454,7 +454,7 @@ HTTPX defaults to including reasonable timeouts for all network operations,
+ meaning that if a connection is not properly established then it should always
+ raise an error rather than hanging indefinitely.
+ 
+-The default timeout for network inactivity is five seconds. You can modify the
++The default timeout for network inactivity is ten seconds. You can modify the
+ value to be more or less strict:
+ 
+ ```pycon
+diff --git a/httpx/_config.py b/httpx/_config.py
+index 467a6c9..d10b32a 100644
+--- a/httpx/_config.py
++++ b/httpx/_config.py
+@@ -243,6 +243,6 @@ class Proxy:
+         return f"Proxy({url_str}{auth_str}{headers_str})"
+ 
+ 
+-DEFAULT_TIMEOUT_CONFIG = Timeout(timeout=5.0)
++DEFAULT_TIMEOUT_CONFIG = Timeout(timeout=10.0)
+ DEFAULT_LIMITS = Limits(max_connections=100, max_keepalive_connections=20)
+ DEFAULT_MAX_REDIRECTS = 20
+diff --git a/httpx/_main.py b/httpx/_main.py
+index cffa4bb..480bc52 100644
+--- a/httpx/_main.py
++++ b/httpx/_main.py
+@@ -81,7 +81,7 @@ def print_help() -> None:
+     table.add_row(
+         "--timeout [cyan]FLOAT",
+         "Timeout value to use for network operations, such as establishing the"
+-        " connection, reading some data, etc... [Default: 5.0]",
++        " connection, reading some data, etc... [Default: 10.0]",
+     )
+ 
+     table.add_row("--follow-redirects", "Automatically follow redirects.")
+@@ -400,10 +400,10 @@ def handle_help(
+     "--timeout",
+     "timeout",
+     type=float,
+-    default=5.0,
++    default=10.0,
+     help=(
+         "Timeout value to use for network operations, such as establishing the "
+-        "connection, reading some data, etc... [Default: 5.0]"
++        "connection, reading some data, etc... [Default: 10.0]"
+     ),
+ )
+ @click.option(
+
+=== ITEM g17 (httpx q2, question)
+TASK: Our pods have HTTPS_PROXY=corp-proxy:3128 (no scheme) and NO_PROXY=localhost,.svc.cluster.local,10.0.0.0/8 set, and no HTTP_PROXY. With a plain httpx.Client(), which of these go direct and which go through the proxy: https://api.svc.cluster.local, https://svc.cluster.local, https://10.2.3.4, http://localhost:8080/health, http://example.com, https://example.com? Then two teammates changed the code: one switched to httpx.Client(transport=httpx.HTTPTransport(retries=3)) to get retries, the other to httpx.Client(proxy=os.environ['HTTPS_PROXY']) to 'be explicit'. What does each of those do?
+KEY: Plain Client() (trust_env defaults True; env proxies come from urllib getproxies via httpx._utils.get_environment_proxies): HTTPS_PROXY without a scheme is accepted and turned into 'http://corp-proxy:3128' mounted on 'https://' only (docs say 'a URL' but scheme-less is accepted). NO_PROXY entries: 'localhost' -> 'all://localhost'; '.svc.cluster.local' -> 'all://*.svc.cluster.local' which matches strict subdomains only (same semantics as '*.example.com' in the transports routing docs); '10.0.0.0/8' is recognised as IPv4 but becomes 'all://10.0.0.0/8', whose host is just 10.0.0.0 -- CIDR ranges are NOT supported (only the exact address matches), despite the code comment suggesting 192.168.0.0/16 works. Results: https://api.svc.cluster.local -> direct; https://svc.cluster.local -> via proxy (leading dot excludes the bare domain); https://10.2.3.4 -> via proxy; http://localhost:8080/health -> direct; http://example.com -> direct (no HTTP_PROXY, HTTPS_PROXY applies only to https:// URLs); https://example.com -> via http://corp-proxy:3128 (tunnelled over an HTTP proxy). Teammate A: passing transport= disables environment proxies entirely (allow_env_proxies = trust_env and transport is None in the client), so everything goes direct; to keep retries and the proxy use HTTPTransport(proxy='http://corp-proxy:3128', retries=3) in mounts (e.g. 'https://' plus None entries for exclusions) or similar. Teammate B: httpx.Proxy requires a URL with scheme http/https/socks5/socks5h, so 'corp-proxy:3128' raises ValueError('Unknown scheme for proxy URL ...') at client construction; even with 'http://' added, an explicit proxy= maps 'all://' to the proxy and ignores the environment completely (including NO_PROXY), so all traffic -- http and https, localhost and cluster hosts -- would go through the proxy.
+SUMMARY: Mounts https -> http://corp-proxy:3128; all://*.svc.cluster.local, localhost, 10.0.0.0/8 direct; no http mount. api.svc direct; svc.cluster.local proxy; 10.2.3.4 proxy (no CIDR, /8 dropped); localhost direct; http://example.com direct; https://example.com proxy. Teammate 1 transport=: env proxies off, all direct, retries connect only. Teammate 2: ValueError Unknown scheme for proxy URL; fixed -> all:// ignoring NO_PROXY, http proxied too. Docs gap noted.
+
+=== ITEM g18 (httpx c1, change-and-update)
+TASK: Five seconds is too aggressive for our users. Change httpx's default timeout to 10 seconds, and make sure everything that describes the default is consistent with that.
+KEY: Code: DEFAULT_TIMEOUT_CONFIG in httpx/_config.py becomes Timeout(timeout=10.0) (client and top-level API defaults all use it). Docs that state the default must change: docs/advanced/timeouts.md intro ('after 5 seconds of network inactivity') and the 'Setting a default timeout on a client' comment ('Use a default 5s timeout everywhere'); docs/quickstart.md Timeouts section ('The default timeout for network inactivity is five seconds'); docs/logging.md sample debug output shows timeout=5.0 on connect_tcp.started and start_tls.started for a default httpx.get -- both should become timeout=10.0. CHANGELOG.md: an entry under the existing '## 1.0.0 (Unreleased)' heading (e.g. a '### Changed' bullet), not a new version heading (scripts/sync-version requires the changelog's version to match __version__.py; the release process says changed features must be listed). Must NOT change: Limits keepalive_expiry default 5.0 and its 'Default 5' in docs/advanced/resource-limits.md; the explicit 5.0 examples in the Timeout docstring, the extensions.md timeout example, or tests that construct Timeout(5.0) explicitly. A test asserting the new default (e.g. httpx.Client().timeout == httpx.Timeout(10.0)) is expected per the contributor checklist.
+SUMMARY: DEFAULT_TIMEOUT_CONFIG Timeout(timeout=10.0); httpx/_main.py --timeout 10.0 and both help texts; docs/advanced/timeouts.md opening 10 seconds, client comment, example to 20.0; docs/quickstart.md ten seconds; docs/logging.md sample timeout=10.0 on connect_tcp and start_tls; CHANGELOG Changed entry. Left docstring, keepalive_expiry, extensions, tests. No test added. Used refs --mention timeout=5.
+DIFF:
+diff --git a/CHANGELOG.md b/CHANGELOG.md
+index a3fa798..6a1aaac 100644
+--- a/CHANGELOG.md
++++ b/CHANGELOG.md
+@@ -8,6 +8,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
+ 
+ * Minimum supported Python version is now 3.10
+ 
++### Changed
++
++* The default timeout is now 10 seconds, instead of 5 seconds.
++
+ ### Added
+ 
+ * Expose `FunctionAuth` from the public API. (#3699)
+diff --git a/docs/advanced/timeouts.md b/docs/advanced/timeouts.md
+index aedcfb6..32f9693 100644
+--- a/docs/advanced/timeouts.md
++++ b/docs/advanced/timeouts.md
+@@ -1,6 +1,6 @@
+ HTTPX is careful to enforce timeouts everywhere by default.
+ 
+-The default behavior is to raise a `TimeoutException` after 5 seconds of
++The default behavior is to raise a `TimeoutException` after 10 seconds of
+ network inactivity.
+ 
+ ## Setting and disabling timeouts
+@@ -33,8 +33,8 @@ You can set a timeout on a client instance, which results in the given
+ `timeout` being used as the default for requests made with this client:
+ 
+ ```python
+-client = httpx.Client()              # Use a default 5s timeout everywhere.
+-client = httpx.Client(timeout=10.0)  # Use a default 10s timeout everywhere.
++client = httpx.Client()              # Use a default 10s timeout everywhere.
++client = httpx.Client(timeout=20.0)  # Use a default 20s timeout everywhere.
+ client = httpx.Client(timeout=None)  # Disable all timeouts by default.
+ ```
+ 
+diff --git a/docs/logging.md b/docs/logging.md
+index b3c5781..4ba1af2 100644
+--- a/docs/logging.md
++++ b/docs/logging.md
+@@ -20,9 +20,9 @@ httpx.get("https://www.example.com")
+ Will send debug level output to the console, or wherever `stdout` is directed too...
+ 
+ ```
+-DEBUG [2024-09-28 17:27:40] httpcore.connection - connect_tcp.started host='www.example.com' port=443 local_address=None timeout=5.0 socket_options=None
++DEBUG [2024-09-28 17:27:40] httpcore.connection - connect_tcp.started host='www.example.com' port=443 local_address=None timeout=10.0 socket_options=None
+ DEBUG [2024-09-28 17:27:41] httpcore.connection - connect_tcp.complete return_value=<httpcore._backends.sync.SyncStream object at 0x101f1e8e0>
+-DEBUG [2024-09-28 17:27:41] httpcore.connection - start_tls.started ssl_context=SSLContext(verify=True) server_hostname='www.example.com' timeout=5.0
++DEBUG [2024-09-28 17:27:41] httpcore.connection - start_tls.started ssl_context=SSLContext(verify=True) server_hostname='www.example.com' timeout=10.0
+ DEBUG [2024-09-28 17:27:41] httpcore.connection - start_tls.complete return_value=<httpcore._backends.sync.SyncStream object at 0x1020f49a0>
+ DEBUG [2024-09-28 17:27:41] httpcore.http11 - send_request_headers.started request=<Request [b'GET']>
+ DEBUG [2024-09-28 17:27:41] httpcore.http11 - send_request_headers.complete
+diff --git a/docs/quickstart.md b/docs/quickstart.md
+index e140b53..cd7011c 100644
+--- a/docs/quickstart.md
++++ b/docs/quickstart.md
+@@ -454,7 +454,7 @@ HTTPX defaults to including reasonable timeouts for all network operations,
+ meaning that if a connection is not properly established then it should always
+ raise an error rather than hanging indefinitely.
+ 
+-The default timeout for network inactivity is five seconds. You can modify the
++The default timeout for network inactivity is ten seconds. You can modify the
+ value to be more or less strict:
+ 
+ ```pycon
+diff --git a/httpx/_config.py b/httpx/_config.py
+index 467a6c9..d10b32a 100644
+--- a/httpx/_config.py
++++ b/httpx/_config.py
+@@ -243,6 +243,6 @@ class Proxy:
+         return f"Proxy({url_str}{auth_str}{headers_str})"
+ 
+ 
+-DEFAULT_TIMEOUT_CONFIG = Timeout(timeout=5.0)
++DEFAULT_TIMEOUT_CONFIG = Timeout(timeout=10.0)
+ DEFAULT_LIMITS = Limits(max_connections=100, max_keepalive_connections=20)
+ DEFAULT_MAX_REDIRECTS = 20
+diff --git a/httpx/_main.py b/httpx/_main.py
+index cffa4bb..480bc52 100644
+--- a/httpx/_main.py
++++ b/httpx/_main.py
+@@ -81,7 +81,7 @@ def print_help() -> None:
+     table.add_row(
+         "--timeout [cyan]FLOAT",
+         "Timeout value to use for network operations, such as establishing the"
+-        " connection, reading some data, etc... [Default: 5.0]",
++        " connection, reading some data, etc... [Default: 10.0]",
+     )
+ 
+     table.add_row("--follow-redirects", "Automatically follow redirects.")
+@@ -400,10 +400,10 @@ def handle_help(
+     "--timeout",
+     "timeout",
+     type=float,
+-    default=5.0,
++    default=10.0,
+     help=(
+         "Timeout value to use for network operations, such as establishing the "
+-        "connection, reading some data, etc... [Default: 5.0]"
++        "connection, reading some data, etc... [Default: 10.0]"
+     ),
+ )
+ @click.option(
+
+=== ITEM g19 (httpx q2, question)
+TASK: Our pods have HTTPS_PROXY=corp-proxy:3128 (no scheme) and NO_PROXY=localhost,.svc.cluster.local,10.0.0.0/8 set, and no HTTP_PROXY. With a plain httpx.Client(), which of these go direct and which go through the proxy: https://api.svc.cluster.local, https://svc.cluster.local, https://10.2.3.4, http://localhost:8080/health, http://example.com, https://example.com? Then two teammates changed the code: one switched to httpx.Client(transport=httpx.HTTPTransport(retries=3)) to get retries, the other to httpx.Client(proxy=os.environ['HTTPS_PROXY']) to 'be explicit'. What does each of those do?
+KEY: Plain Client() (trust_env defaults True; env proxies come from urllib getproxies via httpx._utils.get_environment_proxies): HTTPS_PROXY without a scheme is accepted and turned into 'http://corp-proxy:3128' mounted on 'https://' only (docs say 'a URL' but scheme-less is accepted). NO_PROXY entries: 'localhost' -> 'all://localhost'; '.svc.cluster.local' -> 'all://*.svc.cluster.local' which matches strict subdomains only (same semantics as '*.example.com' in the transports routing docs); '10.0.0.0/8' is recognised as IPv4 but becomes 'all://10.0.0.0/8', whose host is just 10.0.0.0 -- CIDR ranges are NOT supported (only the exact address matches), despite the code comment suggesting 192.168.0.0/16 works. Results: https://api.svc.cluster.local -> direct; https://svc.cluster.local -> via proxy (leading dot excludes the bare domain); https://10.2.3.4 -> via proxy; http://localhost:8080/health -> direct; http://example.com -> direct (no HTTP_PROXY, HTTPS_PROXY applies only to https:// URLs); https://example.com -> via http://corp-proxy:3128 (tunnelled over an HTTP proxy). Teammate A: passing transport= disables environment proxies entirely (allow_env_proxies = trust_env and transport is None in the client), so everything goes direct; to keep retries and the proxy use HTTPTransport(proxy='http://corp-proxy:3128', retries=3) in mounts (e.g. 'https://' plus None entries for exclusions) or similar. Teammate B: httpx.Proxy requires a URL with scheme http/https/socks5/socks5h, so 'corp-proxy:3128' raises ValueError('Unknown scheme for proxy URL ...') at client construction; even with 'http://' added, an explicit proxy= maps 'all://' to the proxy and ignores the environment completely (including NO_PROXY), so all traffic -- http and https, localhost and cluster hosts -- would go through the proxy.
+SUMMARY: Plain Client: https -> http://corp-proxy:3128 (scheme added), no http rule; NO_PROXY all://localhost, all://*.svc.cluster.local, all://10.0.0.0/8. api.svc direct; svc.cluster.local proxy; 10.2.3.4 proxy (no CIDR, /8 as path); localhost direct; http://example.com direct; https://example.com proxy. Teammate 1 transport=: env proxies off, all direct, retries connection only; proxy on transport or mounts. Teammate 2: ValueError Unknown scheme for proxy URL; fixed becomes all:// ignoring NO_PROXY, everything via proxy. (Wrote a probe outside the repo.)
+
+=== ITEM g20 (vite c2, change-and-update)
+TASK: Users who opt into the future deprecation warnings for server.ssrLoadModule complain that they also get spammed by warnings from server.ssrFixStacktrace and server.ssrRewriteStacktrace, which they call from their error handlers. Split those two out into their own future flag named removeSsrFixStacktrace, so removeSsrLoadModule only covers ssrLoadModule itself. Make sure everything that lists or documents the future flags stays consistent.
+KEY: packages/vite/src/node/config.ts: (1) add removeSsrFixStacktrace?: 'warn' to the FutureOptions interface. (2) Add removeSsrFixStacktrace: 'warn' to the object that `future: 'warn'` expands into in resolveConfig. That object is checked with `satisfies Required<FutureOptions>`, so leaving it out is a type error. (3) Adding removeSsrFixStacktrace: undefined to the config defaults' future block is expected for consistency, but not essential. packages/vite/src/node/deprecations.ts: (4) add removeSsrFixStacktrace to deprecationCode. Both deprecationCode and deprecationMessages are checked with `satisfies Record<keyof FutureOptions, string>`. The code value builds the docs link vite.dev/changes/<code>, so it must be an existing page slug, namely 'ssr-using-modulerunner', not a made-up page. (5) Add a deprecationMessages entry for the new flag, for example saying ssrFixStacktrace/ssrRewriteStacktrace are not needed with Module Runners. packages/vite/src/node/server/index.ts: (6) the ssrFixStacktrace and ssrRewriteStacktrace methods of the ViteDevServer object built in _createServer switch from warnFutureDeprecation(config, 'removeSsrLoadModule', ...) to 'removeSsrFixStacktrace' (keeping or moving their extra messages). ssrLoadModule keeps 'removeSsrLoadModule'. Internal ssrFixStacktrace calls (for example ssrModuleLoader's fixStacktrace path) must not start warning. Docs: (7) docs/changes/ssr-using-modulerunner.md must document the new flag. Its 'Future Deprecation' box currently tells users to set only future.removeSsrLoadModule, and its Migration Guide paragraph about ssrFixStacktrace/ssrRewriteStacktrace should name future.removeSsrFixStacktrace. No new docs/changes page and no change to docs/changes/index.md is needed. A run that only adds the interface key, or forgets the 'warn' expansion or the deprecationCode/Message entries, is incomplete.
+SUMMARY: New flag removeSsrFixStacktrace: config.ts FutureOptions, default undefined, 'warn' list (Required); deprecations.ts docs map and message; server/index.ts both methods use it; docs/changes/ssr-using-modulerunner.md Migration Guide now tells users to set future.removeSsrFixStacktrace and that removeSsrLoadModule only reports ssrLoadModule. Other docs don't name SSR flags. Breaking note; defaults gap left.
+DIFF:
+diff --git a/docs/changes/ssr-using-modulerunner.md b/docs/changes/ssr-using-modulerunner.md
+index 47c334f..e230126 100644
+--- a/docs/changes/ssr-using-modulerunner.md
++++ b/docs/changes/ssr-using-modulerunner.md
+@@ -20,4 +20,4 @@ The `server.ssrLoadModule(url)` only allows importing modules in the `ssr` e
+ 
+ Check out the [Environment API for Frameworks Guide](../guide/api-environment-frameworks.md).
+ 
+-`server.ssrFixStacktrace` and `server.ssrRewriteStacktrace` do not have to be called when using the Module Runner APIs. The stack traces will be updated unless `sourcemapInterceptor` is set to `false`.
++`server.ssrFixStacktrace` and `server.ssrRewriteStacktrace` do not have to be called when using the Module Runner APIs. The stack traces will be updated unless `sourcemapInterceptor` is set to `false`. To identify your usage of these two methods, set `future.removeSsrFixStacktrace` to `"warn"` in your vite config. They are covered by a separate flag so that `future.removeSsrLoadModule` only reports `server.ssrLoadModule` calls.
+diff --git a/packages/vite/src/node/config.ts b/packages/vite/src/node/config.ts
+index 016a97a..c85a46b 100644
+--- a/packages/vite/src/node/config.ts
++++ b/packages/vite/src/node/config.ts
+@@ -598,6 +598,7 @@ export interface FutureOptions {
+   removeServerWarmupRequest?: 'warn'
+ 
+   removeSsrLoadModule?: 'warn'
++  removeSsrFixStacktrace?: 'warn'
+ }
+ 
+ export interface ExperimentalOptions {
+@@ -933,6 +934,7 @@ const configDefaults = Object.freeze({
+     removeServerTransformRequest: undefined,
+     removeServerWarmupRequest: undefined,
+     removeSsrLoadModule: undefined,
++    removeSsrFixStacktrace: undefined,
+   },
+   legacy: {
+     skipWebSocketTokenCheck: false,
+@@ -2161,6 +2163,7 @@ export async function resolveConfig(
+             removeServerTransformRequest: 'warn',
+             removeServerWarmupRequest: 'warn',
+             removeSsrLoadModule: 'warn',
++            removeSsrFixStacktrace: 'warn',
+           } satisfies Required<FutureOptions>)
+         : config.future,
+ 
+diff --git a/packages/vite/src/node/deprecations.ts b/packages/vite/src/node/deprecations.ts
+index f51b71c..2bdd5c0 100644
+--- a/packages/vite/src/node/deprecations.ts
++++ b/packages/vite/src/node/deprecations.ts
+@@ -15,6 +15,7 @@ const deprecationCode = {
+   removeServerWarmupRequest: 'per-environment-apis',
+ 
+   removeSsrLoadModule: 'ssr-using-modulerunner',
++  removeSsrFixStacktrace: 'ssr-using-modulerunner',
+ } satisfies Record<keyof FutureOptions, string>
+ 
+ const deprecationMessages = {
+@@ -37,6 +38,8 @@ const deprecationMessages = {
+ 
+   removeSsrLoadModule:
+     'The `server.ssrLoadModule` is replaced with Environment Runner.',
++  removeSsrFixStacktrace:
++    'The `server.ssrFixStacktrace` and `server.ssrRewriteStacktrace` are not needed with Environment Runner.',
+ } satisfies Record<keyof FutureOptions, string>
+ 
+ let _ignoreDeprecationWarnings = false
+diff --git a/packages/vite/src/node/server/index.ts b/packages/vite/src/node/server/index.ts
+index 0442117..ef5d8f0 100644
+--- a/packages/vite/src/node/server/index.ts
++++ b/packages/vite/src/node/server/index.ts
+@@ -720,7 +720,7 @@ export async function _createServer(
+     ssrFixStacktrace(e) {
+       warnFutureDeprecation(
+         config,
+-        'removeSsrLoadModule',
++        'removeSsrFixStacktrace',
+         "ssrFixStacktrace doesn't need to be used for Environment Module Runners.",
+       )
+       ssrFixStacktrace(e, server.environments.ssr.moduleGraph)
+@@ -728,7 +728,7 @@ export async function _createServer(
+     ssrRewriteStacktrace(stack: string) {
+       warnFutureDeprecation(
+         config,
+-        'removeSsrLoadModule',
++        'removeSsrFixStacktrace',
+         "ssrRewriteStacktrace doesn't need to be used for Environment Module Runners.",
+       )
+       return ssrRewriteStacktrace(stack, server.environments.ssr.moduleGraph)
+
+=== ITEM g21 (httpx q2, question)
+TASK: Our pods have HTTPS_PROXY=corp-proxy:3128 (no scheme) and NO_PROXY=localhost,.svc.cluster.local,10.0.0.0/8 set, and no HTTP_PROXY. With a plain httpx.Client(), which of these go direct and which go through the proxy: https://api.svc.cluster.local, https://svc.cluster.local, https://10.2.3.4, http://localhost:8080/health, http://example.com, https://example.com? Then two teammates changed the code: one switched to httpx.Client(transport=httpx.HTTPTransport(retries=3)) to get retries, the other to httpx.Client(proxy=os.environ['HTTPS_PROXY']) to 'be explicit'. What does each of those do?
+KEY: Plain Client() (trust_env defaults True; env proxies come from urllib getproxies via httpx._utils.get_environment_proxies): HTTPS_PROXY without a scheme is accepted and turned into 'http://corp-proxy:3128' mounted on 'https://' only (docs say 'a URL' but scheme-less is accepted). NO_PROXY entries: 'localhost' -> 'all://localhost'; '.svc.cluster.local' -> 'all://*.svc.cluster.local' which matches strict subdomains only (same semantics as '*.example.com' in the transports routing docs); '10.0.0.0/8' is recognised as IPv4 but becomes 'all://10.0.0.0/8', whose host is just 10.0.0.0 -- CIDR ranges are NOT supported (only the exact address matches), despite the code comment suggesting 192.168.0.0/16 works. Results: https://api.svc.cluster.local -> direct; https://svc.cluster.local -> via proxy (leading dot excludes the bare domain); https://10.2.3.4 -> via proxy; http://localhost:8080/health -> direct; http://example.com -> direct (no HTTP_PROXY, HTTPS_PROXY applies only to https:// URLs); https://example.com -> via http://corp-proxy:3128 (tunnelled over an HTTP proxy). Teammate A: passing transport= disables environment proxies entirely (allow_env_proxies = trust_env and transport is None in the client), so everything goes direct; to keep retries and the proxy use HTTPTransport(proxy='http://corp-proxy:3128', retries=3) in mounts (e.g. 'https://' plus None entries for exclusions) or similar. Teammate B: httpx.Proxy requires a URL with scheme http/https/socks5/socks5h, so 'corp-proxy:3128' raises ValueError('Unknown scheme for proxy URL ...') at client construction; even with 'http://' added, an explicit proxy= maps 'all://' to the proxy and ignores the environment completely (including NO_PROXY), so all traffic -- http and https, localhost and cluster hosts -- would go through the proxy.
+SUMMARY: Mounts https -> http://corp-proxy:3128, localhost, *.svc.cluster.local, 10.0.0.0/8 None. api.svc direct; svc.cluster.local proxy; 10.2.3.4 proxy (no CIDR); localhost direct; http://example.com direct; https://example.com proxy CONNECT. Teammate 1 transport=: env proxies never read, all direct, retries connect only; mounts fix. Teammate 2: ValueError Unknown scheme (confirmed); fixed all:// ignores NO_PROXY, http proxied. Docs gap.
+
+=== ITEM g22 (vite q2, question)
+TASK: Before the next Vite major we want to see every deprecation warning Vite can give us. We maintain an SSR framework with a few plugins. What is the least config that turns all of these warnings on? Which exact flags exist, and what triggers each one? Separately, our server code only holds the ViteDevServer instance (we're not inside a plugin hook). What should we replace our server.hot.send(...) calls with?
+KEY: 1) The shortest config is future: 'warn'. UserConfig types future as FutureOptions | 'warn', and resolveConfig expands the string into all flags set to 'warn' (checked with `satisfies Required<FutureOptions>`). The docs for the future option (shared-options.md) only describe a record of flag names and never mention the string shorthand, so an answer that only lists the individual flags is not the least config. 2) There are exactly nine flags in FutureOptions: removePluginHookSsrArgument (a plugin reads options.ssr in resolveId/load/transform, in dev and in build), removePluginHookHandleHotUpdate (a plugin that has handleHotUpdate and no hotUpdate runs on a file 'update'), removeServerModuleGraph, removeServerReloadModule, removeServerPluginContainer, removeServerHot, removeServerTransformRequest, removeServerWarmupRequest (each fires when the matching ViteDevServer getter or method is used), and removeSsrLoadModule. removeSsrLoadModule fires for server.ssrLoadModule and also for server.ssrFixStacktrace and server.ssrRewriteStacktrace. Each warning is printed once (warnOnce), prefixed '[vite future]', with a link to vite.dev/changes/<page> (this-environment-in-hooks, hotupdate-hook, per-environment-apis or ssr-using-modulerunner) and usually a stack trace. 3) 'Shared plugins during build' (builder.sharedConfigBuild) is listed on the breaking-changes page but has no future flag and gives no warning. 4) server.hot replacement: docs/changes/per-environment-apis.md says `server.hot -> server.client.environment.hot`. That path does not exist, because ViteDevServer has no `client` property. The correct replacement from a server instance is server.environments.client.hot, which the SSR guide (docs/guide/ssr.md) uses and which matches ViteDevServer.environments. Inside plugin hooks it is this.environment.hot, which is what the deprecation message says. An answer that repeats server.client.environment.hot is wrong.
+SUMMARY: future: 'warn' (satisfies Required<FutureOptions>; effectively undocumented). Nine flags table with triggers and docs pages; [vite future], link, stack trace, warnOnce; handleHotUpdate no stack. Replace with server.environments.client.hot.send (type comment, error.ts, docs/guide/ssr.md); runtime text this.environment.hot only in hooks; per-environment-apis.md server.client.environment.hot is a docs error.
+
+=== ITEM g23 (httpx q2, question)
+TASK: Our pods have HTTPS_PROXY=corp-proxy:3128 (no scheme) and NO_PROXY=localhost,.svc.cluster.local,10.0.0.0/8 set, and no HTTP_PROXY. With a plain httpx.Client(), which of these go direct and which go through the proxy: https://api.svc.cluster.local, https://svc.cluster.local, https://10.2.3.4, http://localhost:8080/health, http://example.com, https://example.com? Then two teammates changed the code: one switched to httpx.Client(transport=httpx.HTTPTransport(retries=3)) to get retries, the other to httpx.Client(proxy=os.environ['HTTPS_PROXY']) to 'be explicit'. What does each of those do?
+KEY: Plain Client() (trust_env defaults True; env proxies come from urllib getproxies via httpx._utils.get_environment_proxies): HTTPS_PROXY without a scheme is accepted and turned into 'http://corp-proxy:3128' mounted on 'https://' only (docs say 'a URL' but scheme-less is accepted). NO_PROXY entries: 'localhost' -> 'all://localhost'; '.svc.cluster.local' -> 'all://*.svc.cluster.local' which matches strict subdomains only (same semantics as '*.example.com' in the transports routing docs); '10.0.0.0/8' is recognised as IPv4 but becomes 'all://10.0.0.0/8', whose host is just 10.0.0.0 -- CIDR ranges are NOT supported (only the exact address matches), despite the code comment suggesting 192.168.0.0/16 works. Results: https://api.svc.cluster.local -> direct; https://svc.cluster.local -> via proxy (leading dot excludes the bare domain); https://10.2.3.4 -> via proxy; http://localhost:8080/health -> direct; http://example.com -> direct (no HTTP_PROXY, HTTPS_PROXY applies only to https:// URLs); https://example.com -> via http://corp-proxy:3128 (tunnelled over an HTTP proxy). Teammate A: passing transport= disables environment proxies entirely (allow_env_proxies = trust_env and transport is None in the client), so everything goes direct; to keep retries and the proxy use HTTPTransport(proxy='http://corp-proxy:3128', retries=3) in mounts (e.g. 'https://' plus None entries for exclusions) or similar. Teammate B: httpx.Proxy requires a URL with scheme http/https/socks5/socks5h, so 'corp-proxy:3128' raises ValueError('Unknown scheme for proxy URL ...') at client construction; even with 'http://' added, an explicit proxy= maps 'all://' to the proxy and ignores the environment completely (including NO_PROXY), so all traffic -- http and https, localhost and cluster hosts -- would go through the proxy.
+SUMMARY: Routes {'https://': 'http://corp-proxy:3128', 'all://localhost': None, 'all://*.svc.cluster.local': None, 'all://10.0.0.0/8': None}. api.svc direct; svc.cluster.local proxy; 10.2.3.4 proxy (no CIDR; is_ipv4_hostname checks before /; /8 as path); localhost direct; http://example.com direct; https://example.com proxy. Teammate 1 transport=: env proxies off, all direct; retries connection only; mounts with proxy. Teammate 2: ValueError Unknown scheme for proxy URL; fixed -> all:// ignoring NO_PROXY.
+
+=== ITEM g24 (vite c2, change-and-update)
+TASK: Users who opt into the future deprecation warnings for server.ssrLoadModule complain that they also get spammed by warnings from server.ssrFixStacktrace and server.ssrRewriteStacktrace, which they call from their error handlers. Split those two out into their own future flag named removeSsrFixStacktrace, so removeSsrLoadModule only covers ssrLoadModule itself. Make sure everything that lists or documents the future flags stays consistent.
+KEY: packages/vite/src/node/config.ts: (1) add removeSsrFixStacktrace?: 'warn' to the FutureOptions interface. (2) Add removeSsrFixStacktrace: 'warn' to the object that `future: 'warn'` expands into in resolveConfig. That object is checked with `satisfies Required<FutureOptions>`, so leaving it out is a type error. (3) Adding removeSsrFixStacktrace: undefined to the config defaults' future block is expected for consistency, but not essential. packages/vite/src/node/deprecations.ts: (4) add removeSsrFixStacktrace to deprecationCode. Both deprecationCode and deprecationMessages are checked with `satisfies Record<keyof FutureOptions, string>`. The code value builds the docs link vite.dev/changes/<code>, so it must be an existing page slug, namely 'ssr-using-modulerunner', not a made-up page. (5) Add a deprecationMessages entry for the new flag, for example saying ssrFixStacktrace/ssrRewriteStacktrace are not needed with Module Runners. packages/vite/src/node/server/index.ts: (6) the ssrFixStacktrace and ssrRewriteStacktrace methods of the ViteDevServer object built in _createServer switch from warnFutureDeprecation(config, 'removeSsrLoadModule', ...) to 'removeSsrFixStacktrace' (keeping or moving their extra messages). ssrLoadModule keeps 'removeSsrLoadModule'. Internal ssrFixStacktrace calls (for example ssrModuleLoader's fixStacktrace path) must not start warning. Docs: (7) docs/changes/ssr-using-modulerunner.md must document the new flag. Its 'Future Deprecation' box currently tells users to set only future.removeSsrLoadModule, and its Migration Guide paragraph about ssrFixStacktrace/ssrRewriteStacktrace should name future.removeSsrFixStacktrace. No new docs/changes page and no change to docs/changes/index.md is needed. A run that only adds the interface key, or forgets the 'warn' expansion or the deprecationCode/Message entries, is incomplete.
+SUMMARY: New flag removeSsrFixStacktrace: config.ts FutureOptions, defaults, 'warn' list; deprecations.ts docs page and message; server/index.ts both methods; docs/changes/ssr-using-modulerunner.md Future Deprecation box shows both flags in a future block and which methods each covers. Added two missing defaults. Upgrade note.
+DIFF:
+diff --git a/docs/changes/ssr-using-modulerunner.md b/docs/changes/ssr-using-modulerunner.md
+index 47c334f..3cd0848 100644
+--- a/docs/changes/ssr-using-modulerunner.md
++++ b/docs/changes/ssr-using-modulerunner.md
+@@ -9,7 +9,16 @@ Give us feedback at [Environment API feedback discussion](https://github.com/vit
+ Affected scope: `Vite Plugin Authors`
+ 
+ ::: warning Future Deprecation
+-`ModuleRunner` was first introduced in `v6.0`. The deprecation of `server.ssrLoadModule` is planned for a future major. To identify your usage, set `future.removeSsrLoadModule` to `"warn"` in your vite config.
++`ModuleRunner` was first introduced in `v6.0`. The deprecation of `server.ssrLoadModule` is planned for a future major. To identify your usage, set these in your vite config.
++
++```ts
++future: {
++  removeSsrLoadModule: 'warn',
++  removeSsrFixStacktrace: 'warn',
++}
++```
++
++`removeSsrLoadModule` covers `server.ssrLoadModule`, and `removeSsrFixStacktrace` covers `server.ssrFixStacktrace` and `server.ssrRewriteStacktrace`.
+ :::
+ 
+ ## Motivation
+diff --git a/packages/vite/src/node/config.ts b/packages/vite/src/node/config.ts
+index 016a97a..25d0bc9 100644
+--- a/packages/vite/src/node/config.ts
++++ b/packages/vite/src/node/config.ts
+@@ -598,6 +598,7 @@ export interface FutureOptions {
+   removeServerWarmupRequest?: 'warn'
+ 
+   removeSsrLoadModule?: 'warn'
++  removeSsrFixStacktrace?: 'warn'
+ }
+ 
+ export interface ExperimentalOptions {
+@@ -929,10 +930,13 @@ const configDefaults = Object.freeze({
+     removePluginHookHandleHotUpdate: undefined,
+     removePluginHookSsrArgument: undefined,
+     removeServerModuleGraph: undefined,
++    removeServerReloadModule: undefined,
++    removeServerPluginContainer: undefined,
+     removeServerHot: undefined,
+     removeServerTransformRequest: undefined,
+     removeServerWarmupRequest: undefined,
+     removeSsrLoadModule: undefined,
++    removeSsrFixStacktrace: undefined,
+   },
+   legacy: {
+     skipWebSocketTokenCheck: false,
+@@ -2161,6 +2165,7 @@ export async function resolveConfig(
+             removeServerTransformRequest: 'warn',
+             removeServerWarmupRequest: 'warn',
+             removeSsrLoadModule: 'warn',
++            removeSsrFixStacktrace: 'warn',
+           } satisfies Required<FutureOptions>)
+         : config.future,
+ 
+diff --git a/packages/vite/src/node/deprecations.ts b/packages/vite/src/node/deprecations.ts
+index f51b71c..1671c84 100644
+--- a/packages/vite/src/node/deprecations.ts
++++ b/packages/vite/src/node/deprecations.ts
+@@ -15,6 +15,7 @@ const deprecationCode = {
+   removeServerWarmupRequest: 'per-environment-apis',
+ 
+   removeSsrLoadModule: 'ssr-using-modulerunner',
++  removeSsrFixStacktrace: 'ssr-using-modulerunner',
+ } satisfies Record<keyof FutureOptions, string>
+ 
+ const deprecationMessages = {
+@@ -37,6 +38,8 @@ const deprecationMessages = {
+ 
+   removeSsrLoadModule:
+     'The `server.ssrLoadModule` is replaced with Environment Runner.',
++  removeSsrFixStacktrace:
++    'The `server.ssrFixStacktrace` and `server.ssrRewriteStacktrace` are replaced with the source-mapped stack traces of Environment Runner.',
+ } satisfies Record<keyof FutureOptions, string>
+ 
+ let _ignoreDeprecationWarnings = false
+diff --git a/packages/vite/src/node/server/index.ts b/packages/vite/src/node/server/index.ts
+index 0442117..ef5d8f0 100644
+--- a/packages/vite/src/node/server/index.ts
++++ b/packages/vite/src/node/server/index.ts
+@@ -720,7 +720,7 @@ export async function _createServer(
+     ssrFixStacktrace(e) {
+       warnFutureDeprecation(
+         config,
+-        'removeSsrLoadModule',
++        'removeSsrFixStacktrace',
+         "ssrFixStacktrace doesn't need to be used for Environment Module Runners.",
+       )
+       ssrFixStacktrace(e, server.environments.ssr.moduleGraph)
+@@ -728,7 +728,7 @@ export async function _createServer(
+     ssrRewriteStacktrace(stack: string) {
+       warnFutureDeprecation(
+         config,
+-        'removeSsrLoadModule',
++        'removeSsrFixStacktrace',
+         "ssrRewriteStacktrace doesn't need to be used for Environment Module Runners.",
+       )
+       return ssrRewriteStacktrace(stack, server.environments.ssr.moduleGraph)
+
+=== ITEM g25 (vite c2, change-and-update)
+TASK: Users who opt into the future deprecation warnings for server.ssrLoadModule complain that they also get spammed by warnings from server.ssrFixStacktrace and server.ssrRewriteStacktrace, which they call from their error handlers. Split those two out into their own future flag named removeSsrFixStacktrace, so removeSsrLoadModule only covers ssrLoadModule itself. Make sure everything that lists or documents the future flags stays consistent.
+KEY: packages/vite/src/node/config.ts: (1) add removeSsrFixStacktrace?: 'warn' to the FutureOptions interface. (2) Add removeSsrFixStacktrace: 'warn' to the object that `future: 'warn'` expands into in resolveConfig. That object is checked with `satisfies Required<FutureOptions>`, so leaving it out is a type error. (3) Adding removeSsrFixStacktrace: undefined to the config defaults' future block is expected for consistency, but not essential. packages/vite/src/node/deprecations.ts: (4) add removeSsrFixStacktrace to deprecationCode. Both deprecationCode and deprecationMessages are checked with `satisfies Record<keyof FutureOptions, string>`. The code value builds the docs link vite.dev/changes/<code>, so it must be an existing page slug, namely 'ssr-using-modulerunner', not a made-up page. (5) Add a deprecationMessages entry for the new flag, for example saying ssrFixStacktrace/ssrRewriteStacktrace are not needed with Module Runners. packages/vite/src/node/server/index.ts: (6) the ssrFixStacktrace and ssrRewriteStacktrace methods of the ViteDevServer object built in _createServer switch from warnFutureDeprecation(config, 'removeSsrLoadModule', ...) to 'removeSsrFixStacktrace' (keeping or moving their extra messages). ssrLoadModule keeps 'removeSsrLoadModule'. Internal ssrFixStacktrace calls (for example ssrModuleLoader's fixStacktrace path) must not start warning. Docs: (7) docs/changes/ssr-using-modulerunner.md must document the new flag. Its 'Future Deprecation' box currently tells users to set only future.removeSsrLoadModule, and its Migration Guide paragraph about ssrFixStacktrace/ssrRewriteStacktrace should name future.removeSsrFixStacktrace. No new docs/changes page and no change to docs/changes/index.md is needed. A run that only adds the interface key, or forgets the 'warn' expansion or the deprecationCode/Message entries, is incomplete.
+SUMMARY: New flag removeSsrFixStacktrace: config.ts FutureOptions, defaults, 'warn' list; deprecations.ts message and link; server/index.ts both stack-trace methods; docs/changes/ssr-using-modulerunner.md future-deprecation box shows both flags in a sample and what each covers. Added two missing defaults. Other docs don't name flags.
+DIFF:
+diff --git a/docs/changes/ssr-using-modulerunner.md b/docs/changes/ssr-using-modulerunner.md
+index 47c334f..f295161 100644
+--- a/docs/changes/ssr-using-modulerunner.md
++++ b/docs/changes/ssr-using-modulerunner.md
+@@ -9,7 +9,16 @@ Give us feedback at [Environment API feedback discussion](https://github.com/vit
+ Affected scope: `Vite Plugin Authors`
+ 
+ ::: warning Future Deprecation
+-`ModuleRunner` was first introduced in `v6.0`. The deprecation of `server.ssrLoadModule` is planned for a future major. To identify your usage, set `future.removeSsrLoadModule` to `"warn"` in your vite config.
++`ModuleRunner` was first introduced in `v6.0`. The deprecation of `server.ssrLoadModule` is planned for a future major. To identify your usage, set these in your vite config.
++
++```ts
++future: {
++  removeSsrLoadModule: 'warn',
++  removeSsrFixStacktrace: 'warn',
++}
++```
++
++`removeSsrLoadModule` only warns about `server.ssrLoadModule` itself. `removeSsrFixStacktrace` warns about `server.ssrFixStacktrace` and `server.ssrRewriteStacktrace`, so you can enable it separately if you call them from error handlers.
+ :::
+ 
+ ## Motivation
+diff --git a/packages/vite/src/node/config.ts b/packages/vite/src/node/config.ts
+index 016a97a..25d0bc9 100644
+--- a/packages/vite/src/node/config.ts
++++ b/packages/vite/src/node/config.ts
+@@ -598,6 +598,7 @@ export interface FutureOptions {
+   removeServerWarmupRequest?: 'warn'
+ 
+   removeSsrLoadModule?: 'warn'
++  removeSsrFixStacktrace?: 'warn'
+ }
+ 
+ export interface ExperimentalOptions {
+@@ -929,10 +930,13 @@ const configDefaults = Object.freeze({
+     removePluginHookHandleHotUpdate: undefined,
+     removePluginHookSsrArgument: undefined,
+     removeServerModuleGraph: undefined,
++    removeServerReloadModule: undefined,
++    removeServerPluginContainer: undefined,
+     removeServerHot: undefined,
+     removeServerTransformRequest: undefined,
+     removeServerWarmupRequest: undefined,
+     removeSsrLoadModule: undefined,
++    removeSsrFixStacktrace: undefined,
+   },
+   legacy: {
+     skipWebSocketTokenCheck: false,
+@@ -2161,6 +2165,7 @@ export async function resolveConfig(
+             removeServerTransformRequest: 'warn',
+             removeServerWarmupRequest: 'warn',
+             removeSsrLoadModule: 'warn',
++            removeSsrFixStacktrace: 'warn',
+           } satisfies Required<FutureOptions>)
+         : config.future,
+ 
+diff --git a/packages/vite/src/node/deprecations.ts b/packages/vite/src/node/deprecations.ts
+index f51b71c..2bdd5c0 100644
+--- a/packages/vite/src/node/deprecations.ts
++++ b/packages/vite/src/node/deprecations.ts
+@@ -15,6 +15,7 @@ const deprecationCode = {
+   removeServerWarmupRequest: 'per-environment-apis',
+ 
+   removeSsrLoadModule: 'ssr-using-modulerunner',
++  removeSsrFixStacktrace: 'ssr-using-modulerunner',
+ } satisfies Record<keyof FutureOptions, string>
+ 
+ const deprecationMessages = {
+@@ -37,6 +38,8 @@ const deprecationMessages = {
+ 
+   removeSsrLoadModule:
+     'The `server.ssrLoadModule` is replaced with Environment Runner.',
++  removeSsrFixStacktrace:
++    'The `server.ssrFixStacktrace` and `server.ssrRewriteStacktrace` are not needed with Environment Runner.',
+ } satisfies Record<keyof FutureOptions, string>
+ 
+ let _ignoreDeprecationWarnings = false
+diff --git a/packages/vite/src/node/server/index.ts b/packages/vite/src/node/server/index.ts
+index 0442117..ef5d8f0 100644
+--- a/packages/vite/src/node/server/index.ts
++++ b/packages/vite/src/node/server/index.ts
+@@ -720,7 +720,7 @@ export async function _createServer(
+     ssrFixStacktrace(e) {
+       warnFutureDeprecation(
+         config,
+-        'removeSsrLoadModule',
++        'removeSsrFixStacktrace',
+         "ssrFixStacktrace doesn't need to be used for Environment Module Runners.",
+       )
+       ssrFixStacktrace(e, server.environments.ssr.moduleGraph)
+@@ -728,7 +728,7 @@ export async function _createServer(
+     ssrRewriteStacktrace(stack: string) {
+       warnFutureDeprecation(
+         config,
+-        'removeSsrLoadModule',
++        'removeSsrFixStacktrace',
+         "ssrRewriteStacktrace doesn't need to be used for Environment Module Runners.",
+       )
+       return ssrRewriteStacktrace(stack, server.environments.ssr.moduleGraph)
+
+=== ITEM g26 (vite c2, change-and-update)
+TASK: Users who opt into the future deprecation warnings for server.ssrLoadModule complain that they also get spammed by warnings from server.ssrFixStacktrace and server.ssrRewriteStacktrace, which they call from their error handlers. Split those two out into their own future flag named removeSsrFixStacktrace, so removeSsrLoadModule only covers ssrLoadModule itself. Make sure everything that lists or documents the future flags stays consistent.
+KEY: packages/vite/src/node/config.ts: (1) add removeSsrFixStacktrace?: 'warn' to the FutureOptions interface. (2) Add removeSsrFixStacktrace: 'warn' to the object that `future: 'warn'` expands into in resolveConfig. That object is checked with `satisfies Required<FutureOptions>`, so leaving it out is a type error. (3) Adding removeSsrFixStacktrace: undefined to the config defaults' future block is expected for consistency, but not essential. packages/vite/src/node/deprecations.ts: (4) add removeSsrFixStacktrace to deprecationCode. Both deprecationCode and deprecationMessages are checked with `satisfies Record<keyof FutureOptions, string>`. The code value builds the docs link vite.dev/changes/<code>, so it must be an existing page slug, namely 'ssr-using-modulerunner', not a made-up page. (5) Add a deprecationMessages entry for the new flag, for example saying ssrFixStacktrace/ssrRewriteStacktrace are not needed with Module Runners. packages/vite/src/node/server/index.ts: (6) the ssrFixStacktrace and ssrRewriteStacktrace methods of the ViteDevServer object built in _createServer switch from warnFutureDeprecation(config, 'removeSsrLoadModule', ...) to 'removeSsrFixStacktrace' (keeping or moving their extra messages). ssrLoadModule keeps 'removeSsrLoadModule'. Internal ssrFixStacktrace calls (for example ssrModuleLoader's fixStacktrace path) must not start warning. Docs: (7) docs/changes/ssr-using-modulerunner.md must document the new flag. Its 'Future Deprecation' box currently tells users to set only future.removeSsrLoadModule, and its Migration Guide paragraph about ssrFixStacktrace/ssrRewriteStacktrace should name future.removeSsrFixStacktrace. No new docs/changes page and no change to docs/changes/index.md is needed. A run that only adds the interface key, or forgets the 'warn' expansion or the deprecationCode/Message entries, is incomplete.
+SUMMARY: New flag removeSsrFixStacktrace: config.ts FutureOptions, defaults, 'warn' set; deprecations.ts link and message; server/index.ts both methods; docs/changes/ssr-using-modulerunner.md warning box shows both flags in a future block and which calls each covers. Added two missing defaults. shared-options.md and changes/index.md don't list flags.
+DIFF:
+diff --git a/docs/changes/ssr-using-modulerunner.md b/docs/changes/ssr-using-modulerunner.md
+index 47c334f..881ecde 100644
+--- a/docs/changes/ssr-using-modulerunner.md
++++ b/docs/changes/ssr-using-modulerunner.md
+@@ -9,7 +9,17 @@ Give us feedback at [Environment API feedback discussion](https://github.com/vit
+ Affected scope: `Vite Plugin Authors`
+ 
+ ::: warning Future Deprecation
+-`ModuleRunner` was first introduced in `v6.0`. The deprecation of `server.ssrLoadModule` is planned for a future major. To identify your usage, set `future.removeSsrLoadModule` to `"warn"` in your vite config.
++`ModuleRunner` was first introduced in `v6.0`. The deprecation of `server.ssrLoadModule` is planned for a future major. To identify your usage, set these in your vite config.
++
++```ts
++future: {
++  removeSsrLoadModule: 'warn',
++  removeSsrFixStacktrace: 'warn',
++}
++```
++
++`removeSsrLoadModule` warns on `server.ssrLoadModule` calls, and `removeSsrFixStacktrace` warns on `server.ssrFixStacktrace` and `server.ssrRewriteStacktrace` calls.
++
+ :::
+ 
+ ## Motivation
+diff --git a/packages/vite/src/node/config.ts b/packages/vite/src/node/config.ts
+index 016a97a..25d0bc9 100644
+--- a/packages/vite/src/node/config.ts
++++ b/packages/vite/src/node/config.ts
+@@ -598,6 +598,7 @@ export interface FutureOptions {
+   removeServerWarmupRequest?: 'warn'
+ 
+   removeSsrLoadModule?: 'warn'
++  removeSsrFixStacktrace?: 'warn'
+ }
+ 
+ export interface ExperimentalOptions {
+@@ -929,10 +930,13 @@ const configDefaults = Object.freeze({
+     removePluginHookHandleHotUpdate: undefined,
+     removePluginHookSsrArgument: undefined,
+     removeServerModuleGraph: undefined,
++    removeServerReloadModule: undefined,
++    removeServerPluginContainer: undefined,
+     removeServerHot: undefined,
+     removeServerTransformRequest: undefined,
+     removeServerWarmupRequest: undefined,
+     removeSsrLoadModule: undefined,
++    removeSsrFixStacktrace: undefined,
+   },
+   legacy: {
+     skipWebSocketTokenCheck: false,
+@@ -2161,6 +2165,7 @@ export async function resolveConfig(
+             removeServerTransformRequest: 'warn',
+             removeServerWarmupRequest: 'warn',
+             removeSsrLoadModule: 'warn',
++            removeSsrFixStacktrace: 'warn',
+           } satisfies Required<FutureOptions>)
+         : config.future,
+ 
+diff --git a/packages/vite/src/node/deprecations.ts b/packages/vite/src/node/deprecations.ts
+index f51b71c..2bdd5c0 100644
+--- a/packages/vite/src/node/deprecations.ts
++++ b/packages/vite/src/node/deprecations.ts
+@@ -15,6 +15,7 @@ const deprecationCode = {
+   removeServerWarmupRequest: 'per-environment-apis',
+ 
+   removeSsrLoadModule: 'ssr-using-modulerunner',
++  removeSsrFixStacktrace: 'ssr-using-modulerunner',
+ } satisfies Record<keyof FutureOptions, string>
+ 
+ const deprecationMessages = {
+@@ -37,6 +38,8 @@ const deprecationMessages = {
+ 
+   removeSsrLoadModule:
+     'The `server.ssrLoadModule` is replaced with Environment Runner.',
++  removeSsrFixStacktrace:
++    'The `server.ssrFixStacktrace` and `server.ssrRewriteStacktrace` are not needed with Environment Runner.',
+ } satisfies Record<keyof FutureOptions, string>
+ 
+ let _ignoreDeprecationWarnings = false
+diff --git a/packages/vite/src/node/server/index.ts b/packages/vite/src/node/server/index.ts
+index 0442117..ef5d8f0 100644
+--- a/packages/vite/src/node/server/index.ts
++++ b/packages/vite/src/node/server/index.ts
+@@ -720,7 +720,7 @@ export async function _createServer(
+     ssrFixStacktrace(e) {
+       warnFutureDeprecation(
+         config,
+-        'removeSsrLoadModule',
++        'removeSsrFixStacktrace',
+         "ssrFixStacktrace doesn't need to be used for Environment Module Runners.",
+       )
+       ssrFixStacktrace(e, server.environments.ssr.moduleGraph)
+@@ -728,7 +728,7 @@ export async function _createServer(
+     ssrRewriteStacktrace(stack: string) {
+       warnFutureDeprecation(
+         config,
+-        'removeSsrLoadModule',
++        'removeSsrFixStacktrace',
+         "ssrRewriteStacktrace doesn't need to be used for Environment Module Runners.",
+       )
+       return ssrRewriteStacktrace(stack, server.environments.ssr.moduleGraph)
+
+=== ITEM g27 (vite c2, change-and-update)
+TASK: Users who opt into the future deprecation warnings for server.ssrLoadModule complain that they also get spammed by warnings from server.ssrFixStacktrace and server.ssrRewriteStacktrace, which they call from their error handlers. Split those two out into their own future flag named removeSsrFixStacktrace, so removeSsrLoadModule only covers ssrLoadModule itself. Make sure everything that lists or documents the future flags stays consistent.
+KEY: packages/vite/src/node/config.ts: (1) add removeSsrFixStacktrace?: 'warn' to the FutureOptions interface. (2) Add removeSsrFixStacktrace: 'warn' to the object that `future: 'warn'` expands into in resolveConfig. That object is checked with `satisfies Required<FutureOptions>`, so leaving it out is a type error. (3) Adding removeSsrFixStacktrace: undefined to the config defaults' future block is expected for consistency, but not essential. packages/vite/src/node/deprecations.ts: (4) add removeSsrFixStacktrace to deprecationCode. Both deprecationCode and deprecationMessages are checked with `satisfies Record<keyof FutureOptions, string>`. The code value builds the docs link vite.dev/changes/<code>, so it must be an existing page slug, namely 'ssr-using-modulerunner', not a made-up page. (5) Add a deprecationMessages entry for the new flag, for example saying ssrFixStacktrace/ssrRewriteStacktrace are not needed with Module Runners. packages/vite/src/node/server/index.ts: (6) the ssrFixStacktrace and ssrRewriteStacktrace methods of the ViteDevServer object built in _createServer switch from warnFutureDeprecation(config, 'removeSsrLoadModule', ...) to 'removeSsrFixStacktrace' (keeping or moving their extra messages). ssrLoadModule keeps 'removeSsrLoadModule'. Internal ssrFixStacktrace calls (for example ssrModuleLoader's fixStacktrace path) must not start warning. Docs: (7) docs/changes/ssr-using-modulerunner.md must document the new flag. Its 'Future Deprecation' box currently tells users to set only future.removeSsrLoadModule, and its Migration Guide paragraph about ssrFixStacktrace/ssrRewriteStacktrace should name future.removeSsrFixStacktrace. No new docs/changes page and no change to docs/changes/index.md is needed. A run that only adds the interface key, or forgets the 'warn' expansion or the deprecationCode/Message entries, is incomplete.
+SUMMARY: New flag removeSsrFixStacktrace: config.ts FutureOptions, default undefined, 'warn' list; server/index.ts both stacktrace methods; deprecations.ts link ssr-using-modulerunner and message 'Stack traces are fixed automatically when using Environment Runner.'; docs/changes/ssr-using-modulerunner.md Future Deprecation note mentions setting future.removeSsrFixStacktrace. Added two missing defaults. Changelog line suggested.
+DIFF:
+diff --git a/docs/changes/ssr-using-modulerunner.md b/docs/changes/ssr-using-modulerunner.md
+index 47c334f..2a45c34 100644
+--- a/docs/changes/ssr-using-modulerunner.md
++++ b/docs/changes/ssr-using-modulerunner.md
+@@ -9,7 +9,7 @@ Give us feedback at [Environment API feedback discussion](https://github.com/vit
+ Affected scope: `Vite Plugin Authors`
+ 
+ ::: warning Future Deprecation
+-`ModuleRunner` was first introduced in `v6.0`. The deprecation of `server.ssrLoadModule` is planned for a future major. To identify your usage, set `future.removeSsrLoadModule` to `"warn"` in your vite config.
++`ModuleRunner` was first introduced in `v6.0`. The deprecation of `server.ssrLoadModule` is planned for a future major. To identify your usage, set `future.removeSsrLoadModule` to `"warn"` in your vite config. To identify usage of `server.ssrFixStacktrace` and `server.ssrRewriteStacktrace`, set `future.removeSsrFixStacktrace` to `"warn"`.
+ :::
+ 
+ ## Motivation
+diff --git a/packages/vite/src/node/config.ts b/packages/vite/src/node/config.ts
+index 016a97a..25d0bc9 100644
+--- a/packages/vite/src/node/config.ts
++++ b/packages/vite/src/node/config.ts
+@@ -598,6 +598,7 @@ export interface FutureOptions {
+   removeServerWarmupRequest?: 'warn'
+ 
+   removeSsrLoadModule?: 'warn'
++  removeSsrFixStacktrace?: 'warn'
+ }
+ 
+ export interface ExperimentalOptions {
+@@ -929,10 +930,13 @@ const configDefaults = Object.freeze({
+     removePluginHookHandleHotUpdate: undefined,
+     removePluginHookSsrArgument: undefined,
+     removeServerModuleGraph: undefined,
++    removeServerReloadModule: undefined,
++    removeServerPluginContainer: undefined,
+     removeServerHot: undefined,
+     removeServerTransformRequest: undefined,
+     removeServerWarmupRequest: undefined,
+     removeSsrLoadModule: undefined,
++    removeSsrFixStacktrace: undefined,
+   },
+   legacy: {
+     skipWebSocketTokenCheck: false,
+@@ -2161,6 +2165,7 @@ export async function resolveConfig(
+             removeServerTransformRequest: 'warn',
+             removeServerWarmupRequest: 'warn',
+             removeSsrLoadModule: 'warn',
++            removeSsrFixStacktrace: 'warn',
+           } satisfies Required<FutureOptions>)
+         : config.future,
+ 
+diff --git a/packages/vite/src/node/deprecations.ts b/packages/vite/src/node/deprecations.ts
+index f51b71c..2b8cccd 100644
+--- a/packages/vite/src/node/deprecations.ts
++++ b/packages/vite/src/node/deprecations.ts
+@@ -15,6 +15,7 @@ const deprecationCode = {
+   removeServerWarmupRequest: 'per-environment-apis',
+ 
+   removeSsrLoadModule: 'ssr-using-modulerunner',
++  removeSsrFixStacktrace: 'ssr-using-modulerunner',
+ } satisfies Record<keyof FutureOptions, string>
+ 
+ const deprecationMessages = {
+@@ -37,6 +38,8 @@ const deprecationMessages = {
+ 
+   removeSsrLoadModule:
+     'The `server.ssrLoadModule` is replaced with Environment Runner.',
++  removeSsrFixStacktrace:
++    'Stack traces are fixed automatically when using Environment Runner.',
+ } satisfies Record<keyof FutureOptions, string>
+ 
+ let _ignoreDeprecationWarnings = false
+diff --git a/packages/vite/src/node/server/index.ts b/packages/vite/src/node/server/index.ts
+index 0442117..ef5d8f0 100644
+--- a/packages/vite/src/node/server/index.ts
++++ b/packages/vite/src/node/server/index.ts
+@@ -720,7 +720,7 @@ export async function _createServer(
+     ssrFixStacktrace(e) {
+       warnFutureDeprecation(
+         config,
+-        'removeSsrLoadModule',
++        'removeSsrFixStacktrace',
+         "ssrFixStacktrace doesn't need to be used for Environment Module Runners.",
+       )
+       ssrFixStacktrace(e, server.environments.ssr.moduleGraph)
+@@ -728,7 +728,7 @@ export async function _createServer(
+     ssrRewriteStacktrace(stack: string) {
+       warnFutureDeprecation(
+         config,
+-        'removeSsrLoadModule',
++        'removeSsrFixStacktrace',
+         "ssrRewriteStacktrace doesn't need to be used for Environment Module Runners.",
+       )
+       return ssrRewriteStacktrace(stack, server.environments.ssr.moduleGraph)
+
+=== ITEM g28 (vite q2, question)
+TASK: Before the next Vite major we want to see every deprecation warning Vite can give us. We maintain an SSR framework with a few plugins. What is the least config that turns all of these warnings on? Which exact flags exist, and what triggers each one? Separately, our server code only holds the ViteDevServer instance (we're not inside a plugin hook). What should we replace our server.hot.send(...) calls with?
+KEY: 1) The shortest config is future: 'warn'. UserConfig types future as FutureOptions | 'warn', and resolveConfig expands the string into all flags set to 'warn' (checked with `satisfies Required<FutureOptions>`). The docs for the future option (shared-options.md) only describe a record of flag names and never mention the string shorthand, so an answer that only lists the individual flags is not the least config. 2) There are exactly nine flags in FutureOptions: removePluginHookSsrArgument (a plugin reads options.ssr in resolveId/load/transform, in dev and in build), removePluginHookHandleHotUpdate (a plugin that has handleHotUpdate and no hotUpdate runs on a file 'update'), removeServerModuleGraph, removeServerReloadModule, removeServerPluginContainer, removeServerHot, removeServerTransformRequest, removeServerWarmupRequest (each fires when the matching ViteDevServer getter or method is used), and removeSsrLoadModule. removeSsrLoadModule fires for server.ssrLoadModule and also for server.ssrFixStacktrace and server.ssrRewriteStacktrace. Each warning is printed once (warnOnce), prefixed '[vite future]', with a link to vite.dev/changes/<page> (this-environment-in-hooks, hotupdate-hook, per-environment-apis or ssr-using-modulerunner) and usually a stack trace. 3) 'Shared plugins during build' (builder.sharedConfigBuild) is listed on the breaking-changes page but has no future flag and gives no warning. 4) server.hot replacement: docs/changes/per-environment-apis.md says `server.hot -> server.client.environment.hot`. That path does not exist, because ViteDevServer has no `client` property. The correct replacement from a server instance is server.environments.client.hot, which the SSR guide (docs/guide/ssr.md) uses and which matches ViteDevServer.environments. Inside plugin hooks it is this.environment.hot, which is what the deprecation message says. An answer that repeats server.client.environment.hot is wrong.
+SUMMARY: future: 'warn' (satisfies Required<FutureOptions>; docs only show flags across four pages, shared-options doesn't mention shorthand). Nine flags with triggers (ssr getter dev/build; handleHotUpdate no stack; removeServer*; removeSsrLoadModule incl stacktrace methods). warnOnce; runtime only; server.ws not covered; shared-options type wrong. Replace with server.environments.client.hot.send; this.environment.hot only in hooks; per-environment-apis.md server.client.environment.hot is a doc error.
+
+=== ITEM g29 (httpx q2, question)
+TASK: Our pods have HTTPS_PROXY=corp-proxy:3128 (no scheme) and NO_PROXY=localhost,.svc.cluster.local,10.0.0.0/8 set, and no HTTP_PROXY. With a plain httpx.Client(), which of these go direct and which go through the proxy: https://api.svc.cluster.local, https://svc.cluster.local, https://10.2.3.4, http://localhost:8080/health, http://example.com, https://example.com? Then two teammates changed the code: one switched to httpx.Client(transport=httpx.HTTPTransport(retries=3)) to get retries, the other to httpx.Client(proxy=os.environ['HTTPS_PROXY']) to 'be explicit'. What does each of those do?
+KEY: Plain Client() (trust_env defaults True; env proxies come from urllib getproxies via httpx._utils.get_environment_proxies): HTTPS_PROXY without a scheme is accepted and turned into 'http://corp-proxy:3128' mounted on 'https://' only (docs say 'a URL' but scheme-less is accepted). NO_PROXY entries: 'localhost' -> 'all://localhost'; '.svc.cluster.local' -> 'all://*.svc.cluster.local' which matches strict subdomains only (same semantics as '*.example.com' in the transports routing docs); '10.0.0.0/8' is recognised as IPv4 but becomes 'all://10.0.0.0/8', whose host is just 10.0.0.0 -- CIDR ranges are NOT supported (only the exact address matches), despite the code comment suggesting 192.168.0.0/16 works. Results: https://api.svc.cluster.local -> direct; https://svc.cluster.local -> via proxy (leading dot excludes the bare domain); https://10.2.3.4 -> via proxy; http://localhost:8080/health -> direct; http://example.com -> direct (no HTTP_PROXY, HTTPS_PROXY applies only to https:// URLs); https://example.com -> via http://corp-proxy:3128 (tunnelled over an HTTP proxy). Teammate A: passing transport= disables environment proxies entirely (allow_env_proxies = trust_env and transport is None in the client), so everything goes direct; to keep retries and the proxy use HTTPTransport(proxy='http://corp-proxy:3128', retries=3) in mounts (e.g. 'https://' plus None entries for exclusions) or similar. Teammate B: httpx.Proxy requires a URL with scheme http/https/socks5/socks5h, so 'corp-proxy:3128' raises ValueError('Unknown scheme for proxy URL ...') at client construction; even with 'http://' added, an explicit proxy= maps 'all://' to the proxy and ignores the environment completely (including NO_PROXY), so all traffic -- http and https, localhost and cluster hosts -- would go through the proxy.
+SUMMARY: Mount map {'https://': 'http://corp-proxy:3128', 'all://localhost': None, 'all://*.svc.cluster.local': None, 'all://10.0.0.0/8': None}. api.svc direct; svc.cluster.local proxy; 10.2.3.4 proxy (no CIDR); localhost direct; http://example.com direct; https://example.com proxy via CONNECT. Teammate 1 transport=: env proxies dropped silently, all direct; retries only ConnectError/ConnectTimeout; docs don't say. Teammate 2: ValueError Unknown scheme for proxy URL; fixed -> {"all://": proxy} skipping env, all via proxy. Suggested mounts fix.
+
+=== ITEM g30 (httpx c1, change-and-update)
+TASK: Five seconds is too aggressive for our users. Change httpx's default timeout to 10 seconds, and make sure everything that describes the default is consistent with that.
+KEY: Code: DEFAULT_TIMEOUT_CONFIG in httpx/_config.py becomes Timeout(timeout=10.0) (client and top-level API defaults all use it). Docs that state the default must change: docs/advanced/timeouts.md intro ('after 5 seconds of network inactivity') and the 'Setting a default timeout on a client' comment ('Use a default 5s timeout everywhere'); docs/quickstart.md Timeouts section ('The default timeout for network inactivity is five seconds'); docs/logging.md sample debug output shows timeout=5.0 on connect_tcp.started and start_tls.started for a default httpx.get -- both should become timeout=10.0. CHANGELOG.md: an entry under the existing '## 1.0.0 (Unreleased)' heading (e.g. a '### Changed' bullet), not a new version heading (scripts/sync-version requires the changelog's version to match __version__.py; the release process says changed features must be listed). Must NOT change: Limits keepalive_expiry default 5.0 and its 'Default 5' in docs/advanced/resource-limits.md; the explicit 5.0 examples in the Timeout docstring, the extensions.md timeout example, or tests that construct Timeout(5.0) explicitly. A test asserting the new default (e.g. httpx.Client().timeout == httpx.Timeout(10.0)) is expected per the contributor checklist.
+SUMMARY: DEFAULT_TIMEOUT_CONFIG Timeout(timeout=10.0). docs/advanced/timeouts.md intro 10 seconds, client comment default 10s, three custom examples to 20.0; docs/quickstart.md ten seconds; docs/logging.md sample output timeout=10.0 twice; CHANGELOG Changed entry. Did not change httpx/_main.py CLI. No test. Used refs --mention timeout=5.
+DIFF:
+diff --git a/CHANGELOG.md b/CHANGELOG.md
+index a3fa798..e53222d 100644
+--- a/CHANGELOG.md
++++ b/CHANGELOG.md
+@@ -12,6 +12,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
+ 
+ * Expose `FunctionAuth` from the public API. (#3699)
+ 
++### Changed
++
++* The default timeout is now 10 seconds, instead of 5 seconds.
++
+ ## 0.28.1 (6th December, 2024)
+ 
+ * Fix SSL case where `verify=False` together with client side certificates.
+diff --git a/docs/advanced/timeouts.md b/docs/advanced/timeouts.md
+index aedcfb6..ebd7d03 100644
+--- a/docs/advanced/timeouts.md
++++ b/docs/advanced/timeouts.md
+@@ -1,6 +1,6 @@
+ HTTPX is careful to enforce timeouts everywhere by default.
+ 
+-The default behavior is to raise a `TimeoutException` after 5 seconds of
++The default behavior is to raise a `TimeoutException` after 10 seconds of
+ network inactivity.
+ 
+ ## Setting and disabling timeouts
+@@ -9,11 +9,11 @@ You can set timeouts for an individual request:
+ 
+ ```python
+ # Using the top-level API:
+-httpx.get('http://example.com/api/v1/example', timeout=10.0)
++httpx.get('http://example.com/api/v1/example', timeout=20.0)
+ 
+ # Using a client instance:
+ with httpx.Client() as client:
+-    client.get("http://example.com/api/v1/example", timeout=10.0)
++    client.get("http://example.com/api/v1/example", timeout=20.0)
+ ```
+ 
+ Or disable timeouts for an individual request:
+@@ -33,8 +33,8 @@ You can set a timeout on a client instance, which results in the given
+ `timeout` being used as the default for requests made with this client:
+ 
+ ```python
+-client = httpx.Client()              # Use a default 5s timeout everywhere.
+-client = httpx.Client(timeout=10.0)  # Use a default 10s timeout everywhere.
++client = httpx.Client()              # Use a default 10s timeout everywhere.
++client = httpx.Client(timeout=20.0)  # Use a default 20s timeout everywhere.
+ client = httpx.Client(timeout=None)  # Disable all timeouts by default.
+ ```
+ 
+diff --git a/docs/logging.md b/docs/logging.md
+index b3c5781..4ba1af2 100644
+--- a/docs/logging.md
++++ b/docs/logging.md
+@@ -20,9 +20,9 @@ httpx.get("https://www.example.com")
+ Will send debug level output to the console, or wherever `stdout` is directed too...
+ 
+ ```
+-DEBUG [2024-09-28 17:27:40] httpcore.connection - connect_tcp.started host='www.example.com' port=443 local_address=None timeout=5.0 socket_options=None
++DEBUG [2024-09-28 17:27:40] httpcore.connection - connect_tcp.started host='www.example.com' port=443 local_address=None timeout=10.0 socket_options=None
+ DEBUG [2024-09-28 17:27:41] httpcore.connection - connect_tcp.complete return_value=<httpcore._backends.sync.SyncStream object at 0x101f1e8e0>
+-DEBUG [2024-09-28 17:27:41] httpcore.connection - start_tls.started ssl_context=SSLContext(verify=True) server_hostname='www.example.com' timeout=5.0
++DEBUG [2024-09-28 17:27:41] httpcore.connection - start_tls.started ssl_context=SSLContext(verify=True) server_hostname='www.example.com' timeout=10.0
+ DEBUG [2024-09-28 17:27:41] httpcore.connection - start_tls.complete return_value=<httpcore._backends.sync.SyncStream object at 0x1020f49a0>
+ DEBUG [2024-09-28 17:27:41] httpcore.http11 - send_request_headers.started request=<Request [b'GET']>
+ DEBUG [2024-09-28 17:27:41] httpcore.http11 - send_request_headers.complete
+diff --git a/docs/quickstart.md b/docs/quickstart.md
+index e140b53..cd7011c 100644
+--- a/docs/quickstart.md
++++ b/docs/quickstart.md
+@@ -454,7 +454,7 @@ HTTPX defaults to including reasonable timeouts for all network operations,
+ meaning that if a connection is not properly established then it should always
+ raise an error rather than hanging indefinitely.
+ 
+-The default timeout for network inactivity is five seconds. You can modify the
++The default timeout for network inactivity is ten seconds. You can modify the
+ value to be more or less strict:
+ 
+ ```pycon
+diff --git a/httpx/_config.py b/httpx/_config.py
+index 467a6c9..d10b32a 100644
+--- a/httpx/_config.py
++++ b/httpx/_config.py
+@@ -243,6 +243,6 @@ class Proxy:
+         return f"Proxy({url_str}{auth_str}{headers_str})"
+ 
+ 
+-DEFAULT_TIMEOUT_CONFIG = Timeout(timeout=5.0)
++DEFAULT_TIMEOUT_CONFIG = Timeout(timeout=10.0)
+ DEFAULT_LIMITS = Limits(max_connections=100, max_keepalive_connections=20)
+ DEFAULT_MAX_REDIRECTS = 20
+
+=== ITEM g31 (httpx c1, change-and-update)
+TASK: Five seconds is too aggressive for our users. Change httpx's default timeout to 10 seconds, and make sure everything that describes the default is consistent with that.
+KEY: Code: DEFAULT_TIMEOUT_CONFIG in httpx/_config.py becomes Timeout(timeout=10.0) (client and top-level API defaults all use it). Docs that state the default must change: docs/advanced/timeouts.md intro ('after 5 seconds of network inactivity') and the 'Setting a default timeout on a client' comment ('Use a default 5s timeout everywhere'); docs/quickstart.md Timeouts section ('The default timeout for network inactivity is five seconds'); docs/logging.md sample debug output shows timeout=5.0 on connect_tcp.started and start_tls.started for a default httpx.get -- both should become timeout=10.0. CHANGELOG.md: an entry under the existing '## 1.0.0 (Unreleased)' heading (e.g. a '### Changed' bullet), not a new version heading (scripts/sync-version requires the changelog's version to match __version__.py; the release process says changed features must be listed). Must NOT change: Limits keepalive_expiry default 5.0 and its 'Default 5' in docs/advanced/resource-limits.md; the explicit 5.0 examples in the Timeout docstring, the extensions.md timeout example, or tests that construct Timeout(5.0) explicitly. A test asserting the new default (e.g. httpx.Client().timeout == httpx.Timeout(10.0)) is expected per the contributor checklist.
+SUMMARY: DEFAULT_TIMEOUT_CONFIG 10.0; docs/quickstart.md ten seconds; docs/advanced/timeouts.md after 10 seconds, Client() comment 10s, override example bumped to 20.0; docs/logging.md timeout=10.0 twice; CHANGELOG Changed entry. Did not change httpx/_main.py CLI. No test.
+DIFF:
+diff --git a/CHANGELOG.md b/CHANGELOG.md
+index a3fa798..526476f 100644
+--- a/CHANGELOG.md
++++ b/CHANGELOG.md
+@@ -12,6 +12,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
+ 
+ * Expose `FunctionAuth` from the public API. (#3699)
+ 
++### Changed
++
++* The default timeout is now 10 seconds, increased from 5 seconds.
++
+ ## 0.28.1 (6th December, 2024)
+ 
+ * Fix SSL case where `verify=False` together with client side certificates.
+diff --git a/docs/advanced/timeouts.md b/docs/advanced/timeouts.md
+index aedcfb6..ac5392d 100644
+--- a/docs/advanced/timeouts.md
++++ b/docs/advanced/timeouts.md
+@@ -1,6 +1,6 @@
+ HTTPX is careful to enforce timeouts everywhere by default.
+ 
+-The default behavior is to raise a `TimeoutException` after 5 seconds of
++The default behavior is to raise a `TimeoutException` after 10 seconds of
+ network inactivity.
+ 
+ ## Setting and disabling timeouts
+@@ -33,8 +33,8 @@ You can set a timeout on a client instance, which results in the given
+ `timeout` being used as the default for requests made with this client:
+ 
+ ```python
+-client = httpx.Client()              # Use a default 5s timeout everywhere.
+-client = httpx.Client(timeout=10.0)  # Use a default 10s timeout everywhere.
++client = httpx.Client()              # Use the default 10s timeout everywhere.
++client = httpx.Client(timeout=20.0)  # Use a default 20s timeout everywhere.
+ client = httpx.Client(timeout=None)  # Disable all timeouts by default.
+ ```
+ 
+diff --git a/docs/logging.md b/docs/logging.md
+index b3c5781..4ba1af2 100644
+--- a/docs/logging.md
++++ b/docs/logging.md
+@@ -20,9 +20,9 @@ httpx.get("https://www.example.com")
+ Will send debug level output to the console, or wherever `stdout` is directed too...
+ 
+ ```
+-DEBUG [2024-09-28 17:27:40] httpcore.connection - connect_tcp.started host='www.example.com' port=443 local_address=None timeout=5.0 socket_options=None
++DEBUG [2024-09-28 17:27:40] httpcore.connection - connect_tcp.started host='www.example.com' port=443 local_address=None timeout=10.0 socket_options=None
+ DEBUG [2024-09-28 17:27:41] httpcore.connection - connect_tcp.complete return_value=<httpcore._backends.sync.SyncStream object at 0x101f1e8e0>
+-DEBUG [2024-09-28 17:27:41] httpcore.connection - start_tls.started ssl_context=SSLContext(verify=True) server_hostname='www.example.com' timeout=5.0
++DEBUG [2024-09-28 17:27:41] httpcore.connection - start_tls.started ssl_context=SSLContext(verify=True) server_hostname='www.example.com' timeout=10.0
+ DEBUG [2024-09-28 17:27:41] httpcore.connection - start_tls.complete return_value=<httpcore._backends.sync.SyncStream object at 0x1020f49a0>
+ DEBUG [2024-09-28 17:27:41] httpcore.http11 - send_request_headers.started request=<Request [b'GET']>
+ DEBUG [2024-09-28 17:27:41] httpcore.http11 - send_request_headers.complete
+diff --git a/docs/quickstart.md b/docs/quickstart.md
+index e140b53..cd7011c 100644
+--- a/docs/quickstart.md
++++ b/docs/quickstart.md
+@@ -454,7 +454,7 @@ HTTPX defaults to including reasonable timeouts for all network operations,
+ meaning that if a connection is not properly established then it should always
+ raise an error rather than hanging indefinitely.
+ 
+-The default timeout for network inactivity is five seconds. You can modify the
++The default timeout for network inactivity is ten seconds. You can modify the
+ value to be more or less strict:
+ 
+ ```pycon
+diff --git a/httpx/_config.py b/httpx/_config.py
+index 467a6c9..d10b32a 100644
+--- a/httpx/_config.py
++++ b/httpx/_config.py
+@@ -243,6 +243,6 @@ class Proxy:
+         return f"Proxy({url_str}{auth_str}{headers_str})"
+ 
+ 
+-DEFAULT_TIMEOUT_CONFIG = Timeout(timeout=5.0)
++DEFAULT_TIMEOUT_CONFIG = Timeout(timeout=10.0)
+ DEFAULT_LIMITS = Limits(max_connections=100, max_keepalive_connections=20)
+ DEFAULT_MAX_REDIRECTS = 20
+
+=== ITEM g32 (vite q2, question)
+TASK: Before the next Vite major we want to see every deprecation warning Vite can give us. We maintain an SSR framework with a few plugins. What is the least config that turns all of these warnings on? Which exact flags exist, and what triggers each one? Separately, our server code only holds the ViteDevServer instance (we're not inside a plugin hook). What should we replace our server.hot.send(...) calls with?
+KEY: 1) The shortest config is future: 'warn'. UserConfig types future as FutureOptions | 'warn', and resolveConfig expands the string into all flags set to 'warn' (checked with `satisfies Required<FutureOptions>`). The docs for the future option (shared-options.md) only describe a record of flag names and never mention the string shorthand, so an answer that only lists the individual flags is not the least config. 2) There are exactly nine flags in FutureOptions: removePluginHookSsrArgument (a plugin reads options.ssr in resolveId/load/transform, in dev and in build), removePluginHookHandleHotUpdate (a plugin that has handleHotUpdate and no hotUpdate runs on a file 'update'), removeServerModuleGraph, removeServerReloadModule, removeServerPluginContainer, removeServerHot, removeServerTransformRequest, removeServerWarmupRequest (each fires when the matching ViteDevServer getter or method is used), and removeSsrLoadModule. removeSsrLoadModule fires for server.ssrLoadModule and also for server.ssrFixStacktrace and server.ssrRewriteStacktrace. Each warning is printed once (warnOnce), prefixed '[vite future]', with a link to vite.dev/changes/<page> (this-environment-in-hooks, hotupdate-hook, per-environment-apis or ssr-using-modulerunner) and usually a stack trace. 3) 'Shared plugins during build' (builder.sharedConfigBuild) is listed on the breaking-changes page but has no future flag and gives no warning. 4) server.hot replacement: docs/changes/per-environment-apis.md says `server.hot -> server.client.environment.hot`. That path does not exist, because ViteDevServer has no `client` property. The correct replacement from a server instance is server.environments.client.hot, which the SSR guide (docs/guide/ssr.md) uses and which matches ViteDevServer.environments. Inside plugin hooks it is this.environment.hot, which is what the deprecation message says. An answer that repeats server.client.environment.hot is wrong.
+SUMMARY: future: 'warn' (FutureOptions | 'warn'; docs don't mention). Nine flags with triggers, [vite future] prefix, warnOnce, docs links, stack traces; handleHotUpdate no stack; ssr getter; removeSsrLoadModule incl stacktrace methods. Replace with server.environments.client.hot.send (docs/guide/ssr.md); this.environment.hot only in hooks; per-environment-apis.md server.client.environment.hot wrong. Default object omits two flags; shorthand undocumented.

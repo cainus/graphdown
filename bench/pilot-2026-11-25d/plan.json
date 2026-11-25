@@ -1,0 +1,258 @@
+[
+ {
+  "run": "h401",
+  "repo": "vite",
+  "task": "c2",
+  "arm": "B",
+  "rep": 1,
+  "dir": "/tmp/bench4/runs/h401"
+ },
+ {
+  "run": "h402",
+  "repo": "httpx",
+  "task": "c1",
+  "arm": "B",
+  "rep": 2,
+  "dir": "/tmp/bench4/runs/h402"
+ },
+ {
+  "run": "h403",
+  "repo": "vite",
+  "task": "q2",
+  "arm": "B",
+  "rep": 2,
+  "dir": "/tmp/bench4/runs/h403"
+ },
+ {
+  "run": "h404",
+  "repo": "vite",
+  "task": "c2",
+  "arm": "B",
+  "rep": 3,
+  "dir": "/tmp/bench4/runs/h404"
+ },
+ {
+  "run": "h405",
+  "repo": "vite",
+  "task": "q2",
+  "arm": "A",
+  "rep": 3,
+  "dir": "/tmp/bench4/runs/h405"
+ },
+ {
+  "run": "h406",
+  "repo": "vite",
+  "task": "q2",
+  "arm": "A",
+  "rep": 2,
+  "dir": "/tmp/bench4/runs/h406"
+ },
+ {
+  "run": "h407",
+  "repo": "httpx",
+  "task": "c1",
+  "arm": "B",
+  "rep": 3,
+  "dir": "/tmp/bench4/runs/h407"
+ },
+ {
+  "run": "h408",
+  "repo": "vite",
+  "task": "c2",
+  "arm": "A",
+  "rep": 2,
+  "dir": "/tmp/bench4/runs/h408"
+ },
+ {
+  "run": "h409",
+  "repo": "httpx",
+  "task": "c1",
+  "arm": "B",
+  "rep": 1,
+  "dir": "/tmp/bench4/runs/h409"
+ },
+ {
+  "run": "h410",
+  "repo": "httpx",
+  "task": "c1",
+  "arm": "A",
+  "rep": 4,
+  "dir": "/tmp/bench4/runs/h410"
+ },
+ {
+  "run": "h411",
+  "repo": "httpx",
+  "task": "q2",
+  "arm": "A",
+  "rep": 3,
+  "dir": "/tmp/bench4/runs/h411"
+ },
+ {
+  "run": "h412",
+  "repo": "httpx",
+  "task": "c1",
+  "arm": "A",
+  "rep": 1,
+  "dir": "/tmp/bench4/runs/h412"
+ },
+ {
+  "run": "h413",
+  "repo": "vite",
+  "task": "q2",
+  "arm": "B",
+  "rep": 4,
+  "dir": "/tmp/bench4/runs/h413"
+ },
+ {
+  "run": "h414",
+  "repo": "vite",
+  "task": "c2",
+  "arm": "A",
+  "rep": 4,
+  "dir": "/tmp/bench4/runs/h414"
+ },
+ {
+  "run": "h415",
+  "repo": "httpx",
+  "task": "q2",
+  "arm": "B",
+  "rep": 2,
+  "dir": "/tmp/bench4/runs/h415"
+ },
+ {
+  "run": "h416",
+  "repo": "vite",
+  "task": "c2",
+  "arm": "A",
+  "rep": 1,
+  "dir": "/tmp/bench4/runs/h416"
+ },
+ {
+  "run": "h417",
+  "repo": "vite",
+  "task": "q2",
+  "arm": "A",
+  "rep": 4,
+  "dir": "/tmp/bench4/runs/h417"
+ },
+ {
+  "run": "h418",
+  "repo": "vite",
+  "task": "c2",
+  "arm": "A",
+  "rep": 3,
+  "dir": "/tmp/bench4/runs/h418"
+ },
+ {
+  "run": "h419",
+  "repo": "vite",
+  "task": "q2",
+  "arm": "B",
+  "rep": 1,
+  "dir": "/tmp/bench4/runs/h419"
+ },
+ {
+  "run": "h420",
+  "repo": "vite",
+  "task": "q2",
+  "arm": "A",
+  "rep": 1,
+  "dir": "/tmp/bench4/runs/h420"
+ },
+ {
+  "run": "h421",
+  "repo": "httpx",
+  "task": "c1",
+  "arm": "A",
+  "rep": 3,
+  "dir": "/tmp/bench4/runs/h421"
+ },
+ {
+  "run": "h422",
+  "repo": "httpx",
+  "task": "q2",
+  "arm": "A",
+  "rep": 4,
+  "dir": "/tmp/bench4/runs/h422"
+ },
+ {
+  "run": "h423",
+  "repo": "httpx",
+  "task": "q2",
+  "arm": "A",
+  "rep": 2,
+  "dir": "/tmp/bench4/runs/h423"
+ },
+ {
+  "run": "h424",
+  "repo": "httpx",
+  "task": "q2",
+  "arm": "A",
+  "rep": 1,
+  "dir": "/tmp/bench4/runs/h424"
+ },
+ {
+  "run": "h425",
+  "repo": "httpx",
+  "task": "c1",
+  "arm": "B",
+  "rep": 4,
+  "dir": "/tmp/bench4/runs/h425"
+ },
+ {
+  "run": "h426",
+  "repo": "httpx",
+  "task": "q2",
+  "arm": "B",
+  "rep": 4,
+  "dir": "/tmp/bench4/runs/h426"
+ },
+ {
+  "run": "h427",
+  "repo": "vite",
+  "task": "q2",
+  "arm": "B",
+  "rep": 3,
+  "dir": "/tmp/bench4/runs/h427"
+ },
+ {
+  "run": "h428",
+  "repo": "httpx",
+  "task": "c1",
+  "arm": "A",
+  "rep": 2,
+  "dir": "/tmp/bench4/runs/h428"
+ },
+ {
+  "run": "h429",
+  "repo": "vite",
+  "task": "c2",
+  "arm": "B",
+  "rep": 4,
+  "dir": "/tmp/bench4/runs/h429"
+ },
+ {
+  "run": "h430",
+  "repo": "httpx",
+  "task": "q2",
+  "arm": "B",
+  "rep": 3,
+  "dir": "/tmp/bench4/runs/h430"
+ },
+ {
+  "run": "h431",
+  "repo": "vite",
+  "task": "c2",
+  "arm": "B",
+  "rep": 2,
+  "dir": "/tmp/bench4/runs/h431"
+ },
+ {
+  "run": "h432",
+  "repo": "httpx",
+  "task": "q2",
+  "arm": "B",
+  "rep": 1,
+  "dir": "/tmp/bench4/runs/h432"
+ }
+]

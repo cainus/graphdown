@@ -1,0 +1,32 @@
+{"id": "g01", "score": 0.5, "hidden_point": true, "note": "All code/docs/changelog correct incl logging.md; no test asserting new default."}
+{"id": "g02", "score": 1, "hidden_point": true, "note": "future:'warn', nine flags, stacktrace methods, sharedConfigBuild, correct server.environments.client.hot."}
+{"id": "g03", "score": 1, "hidden_point": true, "note": "All routes correct incl no CIDR; both teammate outcomes correct."}
+{"id": "g04", "score": 0.5, "hidden_point": true, "note": "Correct shorthand, flags, hot replacement; omits sharedConfigBuild having no flag."}
+{"id": "g05", "score": 1, "hidden_point": true, "note": "All code points, correct slug, warn expansion; docs box updated; migration paragraph not."}
+{"id": "g06", "score": 0.5, "hidden_point": true, "note": "Shorthand, flags, hot fix correct; omits sharedConfigBuild no-warning point."}
+{"id": "g07", "score": 0.5, "hidden_point": false, "note": "Missed docs/logging.md sample output; no test."}
+{"id": "g08", "score": 0.5, "hidden_point": true, "note": "Missed timeouts.md client default comment; no test."}
+{"id": "g09", "score": 0.5, "hidden_point": true, "note": "All code/docs/changelog incl logging.md; no test added."}
+{"id": "g10", "score": 1, "hidden_point": true, "note": "Complete code changes, correct slug, defaults; docs box documents new flag."}
+{"id": "g11", "score": 0.5, "hidden_point": true, "note": "Shorthand, flags, hot fix correct; omits sharedConfigBuild point."}
+{"id": "g12", "score": 1, "hidden_point": true, "note": "All routing and teammate outcomes correct."}
+{"id": "g13", "score": 1, "hidden_point": true, "note": "Covers all four key points incl sharedConfigBuild and doc error."}
+{"id": "g14", "score": 1, "hidden_point": true, "note": "All routes and both teammates correct with mounts fix."}
+{"id": "g15", "score": 1, "hidden_point": true, "note": "All code points, correct slug and warn expansion; docs box updated."}
+{"id": "g16", "score": 0.5, "hidden_point": true, "note": "All docs incl logging.md and changelog; no test."}
+{"id": "g17", "score": 1, "hidden_point": true, "note": "All routes and teammate outcomes correct."}
+{"id": "g18", "score": 0.5, "hidden_point": true, "note": "All code/docs/changelog correct incl logging.md; no test."}
+{"id": "g19", "score": 1, "hidden_point": true, "note": "All routes and teammate outcomes correct."}
+{"id": "g20", "score": 1, "hidden_point": true, "note": "All code points; migration guide documents new flag; box unchanged."}
+{"id": "g21", "score": 1, "hidden_point": true, "note": "All routes and teammate outcomes correct."}
+{"id": "g22", "score": 0.5, "hidden_point": true, "note": "Shorthand, flags, hot fix correct; omits sharedConfigBuild point."}
+{"id": "g23", "score": 1, "hidden_point": true, "note": "All routes, CIDR detail, teammates correct."}
+{"id": "g24", "score": 1, "hidden_point": true, "note": "Complete code changes and docs box with both flags."}
+{"id": "g25", "score": 1, "hidden_point": true, "note": "Complete code changes and docs box with both flags."}
+{"id": "g26", "score": 1, "hidden_point": true, "note": "Complete code changes and docs box with both flags."}
+{"id": "g27", "score": 1, "hidden_point": true, "note": "Complete code changes, correct slug; docs box updated."}
+{"id": "g28", "score": 0.5, "hidden_point": true, "note": "Shorthand, flags, hot fix correct; omits sharedConfigBuild point."}
+{"id": "g29", "score": 1, "hidden_point": true, "note": "All routes and teammate outcomes correct with fix."}
+{"id": "g30", "score": 0.5, "hidden_point": true, "note": "Key docs incl logging.md and changelog done; no test."}
+{"id": "g31", "score": 0.5, "hidden_point": true, "note": "Key docs incl logging.md and changelog done; no test."}
+{"id": "g32", "score": 0.5, "hidden_point": true, "note": "Shorthand, flags, hot fix correct; omits sharedConfigBuild point."}

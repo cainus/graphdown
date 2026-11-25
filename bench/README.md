@@ -17,3 +17,5 @@ Run directories get neutral names (`r01`, `r02`, ...) so nothing in a path tells
 `corpus/writer-prompt.txt` is the prompt given to the agents that write tasks for a foreign repo; they are told nothing about graphdown. `pilot-2026-11-25b/` holds the second pilot's data, written up in @docs/benchmark-pilot-2.
 
 `pilot-2026-11-25c/` holds the third pilot (hard tasks, with its screening runs under `screen/`), written up in @docs/benchmark-pilot-3.
+
+`pilot-2026-11-25d/` holds the fourth pilot (the same hard tasks, rerun with mentions in `refs`), written up in @docs/benchmark-pilot-4.

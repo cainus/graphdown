@@ -1,0 +1,100 @@
+h401	1795636211	11109	--root . outline
+h401	1795636226	3970	--root . check
+h401	1795636230	3970	--root . check
+h401	1795636231	225	--root . refs docs/changes/ssr-using-modulerunner
+h402	1795636210	3584	--root . outline
+h402	1795636213	311	--root . refs httpx/_config.py#DEFAULT_TIMEOUT_CONFIG --mention timeout=5.0
+h402	1795636214	226	--root . refs httpx/_config.py#DEFAULT_TIMEOUT_CONFIG --mention five seconds
+h402	1795636214	331	--root . refs httpx/_config.py#DEFAULT_TIMEOUT_CONFIG --mention 5 seconds
+h402	1795636227	1140	--root . check
+h403	1795636212	11109	--root . outline
+h403	1795636215	1574	--root . show docs/changes/index
+h403	1795636215	2342	--root . show docs/changes/per-environment-apis
+h403	1795636216	3605	--root . show docs/changes/hotupdate-hook
+h403	1795636219	4468	--root . outline docs/config/shared-options
+h403	1795636219	456	--root . show docs/config/shared-options#future
+h403	1795636219	2472	--root . show docs/changes/this-environment-in-hooks
+h403	1795636220	1355	--root . show docs/changes/ssr-using-modulerunner
+h404	1795636214	11109	--root /tmp/bench4/runs/h404 outline
+h404	1795636236	3970	--root /tmp/bench4/runs/h404 check
+h404	1795636238	3970	--root /tmp/bench4/runs/h404 check
+h407	1795636217	3584	--root . outline
+h407	1795636219	311	--root . refs httpx/_config.py#DEFAULT_TIMEOUT_CONFIG --mention timeout=5
+h407	1795636229	1140	--root . check
+h409	1795636260	3584	--root . outline
+h409	1795636262	311	--root . refs httpx/_config.py#DEFAULT_TIMEOUT_CONFIG --mention timeout=5
+h409	1795636277	1140	--root . check
+h409	1795636279	1140	--root . check
+h413	1795636266	11109	--root . outline
+h413	1795636267	11109	--root . outline
+h413	1795636269	1574	--root . show docs/changes/index
+h413	1795636269	635	--root . outline docs/changes/per-environment-apis docs/changes/hotupdate-hook
+h413	1795636272	4468	--root . outline docs/config/shared-options
+h413	1795636272	456	--root . show docs/config/shared-options#future
+h413	1795636273	2342	--root . show docs/changes/per-environment-apis
+h413	1795636273	2472	--root . show docs/changes/this-environment-in-hooks
+h413	1795636274	1355	--root . show docs/changes/ssr-using-modulerunner
+h413	1795636274	2348	--root . show docs/changes/shared-plugins-during-build
+h413	1795636278	3605	--root . show docs/changes/hotupdate-hook
+h415	1795636266	3584	--root . outline
+h415	1795636268	2917	--root . show docs/environment_variables
+h415	1795636268	3626	--root . show docs/advanced/proxies
+h415	1795636268	985	--root . outline httpx/_utils.py
+h415	1795636268	7755	--root . outline httpx/_client.py
+h415	1795636270	2213	--root . show httpx/_utils.py#get_environment_proxies
+h415	1795636270	3898	--root . show httpx/_utils.py#URLPattern
+h415	1795636271	593	--root . show httpx/_client.py#BaseClient._get_proxy_map
+h415	1795636271	2823	--root . show httpx/_client.py#Client.__init__
+h415	1795636271	7755	--root . outline httpx/_client.py
+h415	1795636274	235	--root . show httpx/_utils.py#is_ipv4_hostname
+h415	1795636275	510	--root . show httpx/_client.py#Client._transport_for_url
+h415	1795636275	619	--root . show httpx/_client.py#Client._init_proxy_transport
+h415	1795636275	1150	--root . outline httpx/_config.py
+h419	1795636370	11109	--root . outline
+h419	1795636374	1574	--root . show docs/changes/index
+h419	1795636375	800	--root . refs docs/changes/index
+h419	1795636379	456	--root . show docs/config/shared-options#future
+h419	1795636379	2472	--root . show docs/changes/this-environment-in-hooks
+h419	1795636379	3605	--root . show docs/changes/hotupdate-hook
+h419	1795636380	1355	--root . show docs/changes/ssr-using-modulerunner
+h419	1795636380	2342	--root . show docs/changes/per-environment-apis
+h419	1795636381	2348	--root . show docs/changes/shared-plugins-during-build
+h425	1795636438	3584	--root . outline
+h425	1795636443	311	--root . refs httpx/_config.py#DEFAULT_TIMEOUT_CONFIG --mention timeout=5.0
+h425	1795636443	2829	--root . show docs/advanced/timeouts
+h425	1795636466	1140	--root . check
+h426	1795636439	3584	--root . outline
+h426	1795636442	2917	--root . show docs/environment_variables
+h426	1795636442	985	--root . outline httpx/_utils.py
+h426	1795636443	7755	--root . outline httpx/_client.py
+h426	1795636446	2213	--root . show httpx/_utils.py#get_environment_proxies
+h426	1795636446	3898	--root . show httpx/_utils.py#URLPattern
+h426	1795636446	593	--root . show httpx/_client.py#BaseClient._get_proxy_map
+h426	1795636446	7755	--root . outline httpx/_client.py
+h426	1795636452	235	--root . show httpx/_utils.py#is_ipv4_hostname
+h426	1795636453	2823	--root . show httpx/_client.py#Client.__init__
+h426	1795636453	672	--root . show httpx/_client.py#Client._init_transport
+h426	1795636453	510	--root . show httpx/_client.py#Client._transport_for_url
+h426	1795636471	57	--root . refs httpx/_utils.py#get_environment_proxies
+h427	1795636443	11109	--root . outline
+h427	1795636444	11109	--root . outline
+h427	1795636447	1574	--root . show docs/changes/index
+h427	1795636448	2342	--root . show docs/changes/per-environment-apis
+h427	1795636448	4468	--root . outline docs/config/shared-options
+h427	1795636453	456	--root . show docs/config/shared-options#future
+h427	1795636453	2472	--root . show docs/changes/this-environment-in-hooks
+h427	1795636454	3605	--root . show docs/changes/hotupdate-hook
+h427	1795636454	1355	--root . show docs/changes/ssr-using-modulerunner
+h427	1795636455	2348	--root . show docs/changes/shared-plugins-during-build
+h429	1795636444	11109	--root . outline
+h429	1795636453	456	--root . show docs/config/shared-options#future
+h429	1795636465	3970	--root . check
+h429	1795636468	3970	--root . check
+h430	1795636444	3584	--root . outline
+h430	1795636446	2917	--root . show docs/environment_variables
+h430	1795636447	3626	--root . show docs/advanced/proxies
+h431	1795636446	11109	--root . outline
+h431	1795636466	3970	--root . check
+h432	1795636446	3584	--root . outline
+h432	1795636449	2917	--root . show docs/environment_variables
+h432	1795636480	559	--root . outline docs/advanced/proxies

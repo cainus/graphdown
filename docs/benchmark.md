@@ -1,6 +1,6 @@
 # Benchmark plan
 
-Graphdown's claim is that agents do better work on documented code when they can address, slice and reverse-search docs, not just read files. Without evidence it is a link checker (@docs/design). This page is the plan for getting that evidence. Three pilots have run: @docs/benchmark-pilot on this repo, @docs/benchmark-pilot-2 on httpx and vite, and @docs/benchmark-pilot-3 on hard tasks chosen because agents without graphdown fail them.
+Graphdown's claim is that agents do better work on documented code when they can address, slice and reverse-search docs, not just read files. Without evidence it is a link checker (@docs/design). This page is the plan for getting that evidence. Four pilots have run: @docs/benchmark-pilot on this repo, @docs/benchmark-pilot-2 on httpx and vite, @docs/benchmark-pilot-3 on hard tasks chosen because agents without graphdown fail them, and @docs/benchmark-pilot-4 rerunning those tasks with unlinked mentions in `refs`.
 
 ## Question
 

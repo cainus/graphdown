@@ -1,0 +1,32 @@
+{"id": "g01", "score": 0.5, "hidden_point": true, "note": "All code/docs/changelog correct incl logging.md; no test asserting new default."}
+{"id": "g02", "score": 1, "hidden_point": true, "note": "future:'warn', nine flags, sharedConfigBuild, environments.client.hot and doc error all covered."}
+{"id": "g03", "score": 1, "hidden_point": true, "note": "All routes correct incl no CIDR; both teammates correctly explained."}
+{"id": "g04", "score": 0.5, "hidden_point": true, "note": "Correct shorthand, flags, hot replacement; omits sharedConfigBuild having no flag."}
+{"id": "g05", "score": 0.5, "hidden_point": true, "note": "Code complete; docs box updated but Migration Guide paragraph not."}
+{"id": "g06", "score": 0.5, "hidden_point": true, "note": "Shorthand, flags, hot replacement right; sharedConfigBuild point missing."}
+{"id": "g07", "score": 0.5, "hidden_point": false, "note": "Missed docs/logging.md sample output; no test."}
+{"id": "g08", "score": 0.5, "hidden_point": true, "note": "Missed timeouts.md client comment; no test; logging.md done."}
+{"id": "g09", "score": 0.5, "hidden_point": true, "note": "All docs, code, changelog right; no test added."}
+{"id": "g10", "score": 0.5, "hidden_point": true, "note": "Code complete; only warning box documented, Migration Guide paragraph untouched."}
+{"id": "g11", "score": 0.5, "hidden_point": true, "note": "Shorthand, flags, hot replacement right; sharedConfigBuild not mentioned."}
+{"id": "g12", "score": 1, "hidden_point": true, "note": "All routes and both teammates correct, CIDR noted."}
+{"id": "g13", "score": 1, "hidden_point": true, "note": "All four key points including sharedConfigBuild and docs error."}
+{"id": "g14", "score": 1, "hidden_point": true, "note": "Complete and correct per key."}
+{"id": "g15", "score": 0.5, "hidden_point": true, "note": "Code complete; box updated, Migration Guide paragraph not."}
+{"id": "g16", "score": 0.5, "hidden_point": true, "note": "All docs, code, changelog right; no test added."}
+{"id": "g17", "score": 1, "hidden_point": true, "note": "Complete and correct per key."}
+{"id": "g18", "score": 0.5, "hidden_point": true, "note": "All docs, code, changelog right; no test added."}
+{"id": "g19", "score": 1, "hidden_point": true, "note": "Complete and correct per key, incl mounts fix."}
+{"id": "g20", "score": 0.5, "hidden_point": true, "note": "Code complete; Migration Guide updated but Future Deprecation box not."}
+{"id": "g21", "score": 1, "hidden_point": true, "note": "Complete and correct per key."}
+{"id": "g22", "score": 0.5, "hidden_point": true, "note": "Shorthand, flags, hot replacement right; sharedConfigBuild missing."}
+{"id": "g23", "score": 1, "hidden_point": true, "note": "Complete and correct per key."}
+{"id": "g24", "score": 0.5, "hidden_point": true, "note": "Code complete; box rewritten, Migration Guide paragraph not."}
+{"id": "g25", "score": 0.5, "hidden_point": true, "note": "Code complete; box rewritten, Migration Guide paragraph not."}
+{"id": "g26", "score": 0.5, "hidden_point": true, "note": "Code complete; box rewritten, Migration Guide paragraph not."}
+{"id": "g27", "score": 0.5, "hidden_point": true, "note": "Code complete; box updated, Migration Guide paragraph not."}
+{"id": "g28", "score": 0.5, "hidden_point": true, "note": "Shorthand, flags, hot replacement right; sharedConfigBuild missing."}
+{"id": "g29", "score": 1, "hidden_point": true, "note": "Complete and correct per key."}
+{"id": "g30", "score": 0.5, "hidden_point": true, "note": "Docs, code, changelog right incl logging.md; no test."}
+{"id": "g31", "score": 0.5, "hidden_point": true, "note": "Docs, code, changelog right incl logging.md; no test."}
+{"id": "g32", "score": 0.5, "hidden_point": true, "note": "Shorthand, flags, hot replacement right; sharedConfigBuild missing."}
