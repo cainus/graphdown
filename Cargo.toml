@@ -1,0 +1,31 @@
+[package]
+name = "graphdown"
+version = "0.1.0"
+edition = "2021"
+description = "Navigate markdown docs like code: checked @references, outlines, find-references and context slices"
+license = "MIT"
+repository = "https://github.com/cainus/graphdown"
+readme = "README.md"
+keywords = ["markdown", "documentation", "agents", "llm", "linter"]
+categories = ["command-line-utilities", "development-tools"]
+
+[[bin]]
+name = "graphdown"
+path = "src/main.rs"
+
+[dependencies]
+anyhow = "1"
+clap = { version = "4.6", features = ["derive"] }
+ignore = "0.4"
+pulldown-cmark = { version = "0.13", default-features = false }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tree-sitter = "0.25"
+tree-sitter-javascript = "0.25"
+tree-sitter-python = "0.25"
+tree-sitter-rust = "0.24"
+tree-sitter-typescript = "0.23"
+
+[profile.release]
+lto = true
+strip = true
