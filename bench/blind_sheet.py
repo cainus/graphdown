@@ -36,7 +36,7 @@ for i, rid in enumerate(items, 1):
     key[gid] = rid
     p = plan[rid]
     t = tasks[(p["repo"], p["task"])]
-    lines += [f"=== ITEM {gid} ({p['repo']} {p['task']}, {t['type']})", "TASK: " + t["prompt"], "KEY: " + t["key"],
+    lines += [f"=== ITEM {gid} ({p['repo']} {p['task']}, {t['type']})", "TASK: " + t["prompt"], "KEY: " + (t["key"] if isinstance(t["key"], str) else json.dumps(t["key"], indent=1)),
               "SUMMARY: " + res[rid]["answer"]]
     if t["type"] != "question":
         d = p["dir"]

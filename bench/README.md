@@ -22,4 +22,4 @@ Run directories get neutral names (`r01`, `r02`, ...) so nothing in a path tells
 
 `pilot-2026-11-25e/` holds the fifth pilot (the vite flag task only, testing the changed-code list in `check`), written up in @docs/benchmark-pilot-5.
 
-`study-tasks/` holds the tasks for the larger study: four change tasks each for httpx, vite and mdBook, written with `corpus/writer-prompt-stale.txt`. Each is a small code change that leaves at least three doc passages plainly false, and every key was checked against the checkout before any run.
+`study-2026-11-25/` holds the larger study: 12 change tasks (four each for httpx, vite and mdBook, written with `corpus/writer-prompt-stale.txt`), 120 runs, and both the first and the corrected grades. It is written up in @docs/benchmark-study-1. Runs write their answer to `.bench/answer.md`, which `save.py` reads when nothing comes on stdin.

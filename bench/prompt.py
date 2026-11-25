@@ -32,8 +32,9 @@ if arm == "B":
     )
 parts.append(f"Task: {task['prompt']}")
 parts.append(
-    "When you are done, reply with exactly two sections:\n"
+    "When you are done, write a reply with exactly two sections:\n"
     "ANSWER: your answer (for a question), or a short summary of what you changed and anything the requester should know.\n"
-    "COMMANDS: the distinct shell commands and tools you used, roughly in order."
+    "COMMANDS: the distinct shell commands and tools you used, roughly in order.\n"
+    f"Save that reply to {d}/.bench/answer.md, then answer with just the word done."
 )
 print("\n\n".join(parts))

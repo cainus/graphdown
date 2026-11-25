@@ -1,0 +1,269 @@
+h602	1795641859	35556	--root . outline
+h602	1795641905	8525	--root . check
+h602	1795641907	8525	--root . check
+h602	1795641908	8525	--root . check
+h603	1795641860	3584	--root . outline
+h603	1795641861	311	--root . refs httpx/_config.py#DEFAULT_TIMEOUT_CONFIG --mention timeout=5.0
+h603	1795641879	1140	--root . check
+h606	1795641864	11109	--root . outline
+h606	1795641867	70	--root . refs packages/vite/src/node/constants.ts#DEFAULT_DEV_PORT --mention port=5173
+h606	1795641879	3970	--root . check
+h606	1795641882	3970	--root . check
+h606	1795641883	3970	--root . check
+h608	1795641866	35556	--root . outline
+h608	1795641896	72	--root . refs crates/mdbook-core/src/config.rs#HtmlConfig::theme_dir
+h608	1795641911	8937	--root . check
+h608	1795641913	8937	--root . check
+h608	1795641913	8525	--root . check
+h6103	1795643455	11109	--root . outline
+h6103	1795643493	608	--root . outline docs/guide/migration --depth 2
+h6103	1795643494	185	--root . refs docs/config/shared-options#cachedir
+h6103	1795643497	8547	--root . check
+h6103	1795643500	8547	--root . check
+h6103	1795643502	3970	--root . check
+h6107	1795643849	3584	--root . outline
+h6107	1795643851	45	--root . refs httpx/_urls.py#URL.__repr__
+h6107	1795643862	1140	--root . check
+h6107	1795643864	1140	--root . check
+h6108	1795643850	3584	--root . outline
+h6108	1795643852	45	--root . refs httpx/_urls.py#URL.__repr__
+h6108	1795643862	1140	--root . check
+h6108	1795643864	1140	--root . check
+h611	1795641950	3584	--root . outline
+h611	1795641955	311	--root . refs httpx/_config.py#DEFAULT_TIMEOUT_CONFIG --mention timeout=5.0
+h611	1795641968	1140	--root . check
+h6112	1795643855	11109	--root . outline
+h6112	1795643861	69	--root . refs packages/vite/src/node/build.ts#resolveBuildOutputs
+h6112	1795643880	3195	--root . outline docs/guide/migration
+h6112	1795643890	3970	--root . check
+h6112	1795643892	3970	--root . check
+h6112	1795643893	3970	--root . check
+h6113	1795643855	35556	--root . outline
+h6113	1795643859	1219	--root . refs crates/mdbook-core/src/config.rs#BuildConfig --mention build-dir
+h6113	1795643906	12426	--root . check
+h6113	1795643981	12426	--root . check
+h6113	1795643981	8525	--root . check
+h6113	1795643984	12426	--root . check
+h6114	1795643858	11109	outline --root .
+h6114	1795643860	2802	refs packages/vite/src/node/constants.ts#DEFAULT_DEV_PORT --mention 5173 --root .
+h6114	1795643870	3970	check --root .
+h6114	1795643874	3970	check --root .
+h6120	1795643864	11109	outline --root .
+h6120	1795643883	5417	check --root .
+h6120	1795643886	3970	check --root .
+h613	1795641953	3584	--root . outline
+h613	1795641955	45	--root . refs httpx/_urls.py#URL.__repr__
+h613	1795641965	1140	--root . check
+h613	1795641974	1140	--root . check
+h616	1795641957	11109	--root . outline
+h616	1795641980	75	--root . refs packages/vite/src/node/plugins/manifest.ts#manifestPlugin
+h616	1795641981	83	--root . refs packages/vite/src/node/ssr/ssrManifestPlugin.ts#ssrManifestPlugin
+h616	1795641989	5417	--root . check
+h616	1795641991	5417	--root . check
+h616	1795641992	3970	--root . check
+h620	1795641961	35556	--root . outline
+h620	1795642260	4891	--root . check
+h620	1795642262	4891	--root . check
+h620	1795642262	4891	--root . check
+h623	1795642385	11109	--root . outline
+h623	1795642394	83	--root . refs docs/config/shared-options#cachedir
+h623	1795642435	8547	--root . check
+h623	1795642438	8547	--root . check
+h623	1795642438	3970	--root . check
+h624	1795642385	11109	--root . outline
+h624	1795642388	70	--root . refs packages/vite/src/node/constants.ts#DEFAULT_DEV_PORT --mention port=5173
+h624	1795642401	3970	--root . check
+h624	1795642403	3970	--root . check
+h625	1795642386	35556	--root . outline
+h625	1795642431	8937	--root . check
+h625	1795642431	115	--root . refs guide/src/format/markdown#admonitions
+h625	1795642431	125	--root . refs guide/src/format/markdown#definition-lists
+h625	1795642431	309	--root . refs crates/mdbook-core/src/config.rs#HtmlConfig
+h625	1795642444	8525	--root . check
+h627	1795642388	3584	--root . outline
+h627	1795642390	311	--root . refs httpx/_config.py#DEFAULT_TIMEOUT_CONFIG --mention timeout=5.0
+h627	1795642403	1140	--root . check
+h627	1795642405	1140	--root . check
+h630	1795642393	11109	--root . outline
+h630	1795642414	5417	--root . check
+h631	1795642393	3584	--root . outline
+h631	1795642396	799	--root . refs httpx/_models.py#Response.__repr__ --mention 200 OK
+h631	1795642406	1140	--root . check
+h631	1795642408	1140	--root . check
+h632	1795642395	35556	--root . outline
+h632	1795642411	309	--root . refs crates/mdbook-core/src/config.rs#HtmlConfig
+h632	1795642423	8937	--root . check
+h633	1795642395	35556	outline --root .
+h633	1795642418	8937	check --root .
+h633	1795642420	8525	check --root .
+h635	1795642398	3584	--root . outline
+h635	1795642401	311	--root . refs httpx/_config.py#DEFAULT_TIMEOUT_CONFIG --mention timeout=5.0
+h635	1795642414	1140	--root . check
+h636	1795642492	3584	--root . outline
+h636	1795642494	311	--root . refs httpx/_config.py#DEFAULT_TIMEOUT_CONFIG --mention timeout=5.0
+h636	1795642508	1140	--root . check
+h636	1795642511	1140	--root . check
+h637	1795642494	3584	--root . outline
+h637	1795642497	928	--root . refs httpx/_models.py#Response.__repr__ --mention 200 OK --mention reason_phrase
+h637	1795642505	1140	--root . check
+h639	1795642495	3584	outline --root .
+h639	1795642503	903	refs httpx/_config.py#create_ssl_context --root . --mention certifi
+h639	1795642525	1560	check --root .
+h639	1795642525	677	outline docs/environment_variables --root .
+h639	1795642531	1140	check --root .
+h639	1795642531	1560	check --root .
+h641	1795642498	3584	outline --root .
+h641	1795642500	52	refs httpx/_models.py#Response.__repr__ --root .
+h641	1795642508	1140	check --root .
+h643	1795642501	35556	--root /tmp/bench6/runs/h643 outline
+h643	1795642529	8937	--root /tmp/bench6/runs/h643 check
+h643	1795642529	309	--root /tmp/bench6/runs/h643 refs crates/mdbook-core/src/config.rs#HtmlConfig
+h643	1795642531	8937	--root /tmp/bench6/runs/h643 check
+h643	1795642531	8525	--root /tmp/bench6/runs/h643 check
+h644	1795642502	3584	--root . outline
+h644	1795642509	903	--root . refs httpx/_config.py#create_ssl_context --mention certifi
+h644	1795642510	85	--root . refs docs/advanced/ssl
+h644	1795642522	1560	--root . check
+h644	1795642533	1140	--root . check
+h647	1795642506	11109	--root . outline
+h647	1795642528	3066	--root . outline docs/guide/migration --depth 3
+h647	1795642528	69	--root . refs packages/vite/src/node/build.ts#resolveBuildOutputs
+h647	1795642529	277	--root . refs docs/guide/build#library-mode
+h647	1795642531	3970	--root . check
+h647	1795642533	3970	--root . check
+h649	1795642509	35556	outline --root .
+h649	1795642515	62	refs crates/mdbook-core/src/config.rs#BuildConfig --root .
+h649	1795642516	201	refs guide/src/format/configuration/general#build-options --root .
+h649	1795642612	8699	check --root .
+h649	1795642612	0	refs guide/src/cli/init#tip-generate-chapters-from-summarymd --root .
+h651	1795642828	35556	--root . outline
+h651	1795642889	12426	--root . check
+h651	1795642890	62	--root . refs crates/mdbook-core/src/config.rs#BuildConfig --mention build_dir=book
+h651	1795642893	12426	--root . check
+h651	1795642893	8525	--root . check
+h654	1795642831	35556	--root . outline
+h654	1795642838	1219	--root . refs crates/mdbook-core/src/config.rs#BuildConfig --mention build-dir
+h654	1795642907	12426	--root . check
+h654	1795642910	12426	--root . check
+h654	1795642910	8525	--root . check
+h655	1795642832	11109	--root . outline
+h655	1795642856	5417	--root . check
+h655	1795642856	430	--root . refs docs/config/build-options#buildmanifest
+h655	1795642859	5417	--root . check
+h658	1795642835	35556	--root . outline
+h658	1795642944	8699	--root . check
+h658	1795642944	62	--root . refs crates/mdbook-core/src/config.rs#BuildConfig
+h659	1795642837	35556	--root . outline
+h659	1795642847	62	--root . refs crates/mdbook-core/src/config.rs#BuildConfig
+h659	1795642910	12426	--root . check
+h659	1795642910	36170	--root . refs crates/mdbook-core/src/config.rs#BuildConfig --mention book
+h659	1795642913	12426	--root . check
+h659	1795642914	8525	--root . check
+h663	1795642842	11109	outline --root .
+h663	1795642846	276	refs packages/vite/src/node/build.ts#resolveBuildOutputs --root . --mention 'es', 'umd'
+h663	1795642867	3066	outline docs/guide/migration --root . --depth 3
+h663	1795642867	384	outline docs/changes/index --root .
+h663	1795642870	3970	check --root .
+h663	1795642871	3970	check --root .
+h666	1795643024	3584	--root . outline
+h666	1795643027	52	--root . refs httpx/_models.py#Response.__repr__
+h666	1795643031	1140	--root . check
+h667	1795643026	35556	--root . outline
+h667	1795643045	309	--root . refs crates/mdbook-core/src/config.rs#HtmlConfig
+h667	1795643064	9367	--root . check
+h667	1795643067	9367	--root . check
+h667	1795643068	8525	--root . check
+h669	1795643031	11109	outline --root .
+h669	1795643043	1525	refs packages/vite/src/node/config.ts#resolveConfig --root . --mention node_modules/.vite
+h669	1795643073	8547	check --root .
+h669	1795643077	8547	check --root .
+h669	1795643079	3970	check --root .
+h670	1795643033	11109	--root . outline
+h670	1795643038	70	--root . refs packages/vite/src/node/constants.ts#DEFAULT_DEV_PORT --mention port=5173
+h670	1795643050	3970	--root . check
+h670	1795643052	3970	--root . check
+h674	1795643037	11109	--root . outline
+h674	1795643048	83	--root . refs docs/config/shared-options#cachedir
+h674	1795643091	8547	--root . check
+h674	1795643094	8547	--root . check
+h674	1795643096	3970	--root . check
+h675	1795643039	11109	--root . outline
+h675	1795643067	75	--root . refs packages/vite/src/node/plugins/manifest.ts#manifestPlugin
+h675	1795643068	0	--root . refs docs/config/build-options#build-manifest
+h675	1795643070	5417	--root . check
+h675	1795643074	5417	--root . check
+h675	1795643075	3970	--root . check
+h676	1795643119	11109	--root . outline
+h676	1795643125	70	--root . refs packages/vite/src/node/constants.ts#DEFAULT_DEV_PORT --mention port=5173
+h676	1795643131	326	--root . show docs/config/server-options#serverport
+h676	1795643133	455	--root . show docs/config/preview-options#previewport
+h676	1795643146	3970	--root . check
+h677	1795643120	11109	--root . outline
+h677	1795643147	3066	--root . outline docs/guide/migration --depth 3
+h677	1795643149	69	--root . refs packages/vite/src/node/build.ts#resolveBuildOutputs
+h677	1795643155	3970	--root . check
+h679	1795643122	11109	--root . outline
+h679	1795643132	1525	--root . refs packages/vite/src/node/config.ts#resolveConfig --mention node_modules/.vite
+h679	1795643175	5648	--root . check
+h679	1795643180	5648	--root . check
+h680	1795643123	11109	--root . outline
+h680	1795643133	69	--root . refs packages/vite/src/node/build.ts#resolveBuildOutputs
+h680	1795643135	0	--root . refs docs/config/build-options#build-lib
+h680	1795643137	277	--root . refs docs/guide/build#library-mode
+h680	1795643167	3066	--root . outline docs/guide/migration --depth 3
+h680	1795643172	3970	--root . check
+h680	1795643175	3970	--root . check
+h680	1795643177	3970	--root . check
+h684	1795643123	3584	outline --root .
+h684	1795643126	45	refs httpx/_urls.py#URL.__repr__ --root .
+h684	1795643142	1140	check --root .
+h684	1795643148	1140	check --root .
+h685	1795643124	3584	outline --root .
+h685	1795643131	45	refs httpx/_urls.py#URL.__repr__ --root .
+h685	1795643144	1140	check --root .
+h688	1795643129	35556	--root . outline
+h688	1795643175	72	--root . refs crates/mdbook-core/src/config.rs#HtmlConfig::theme_dir --mention theme=theme
+h688	1795643189	8525	--root . check
+h688	1795643192	8525	--root . check
+h688	1795643192	8525	--root . check
+h690	1795643131	35556	--root . outline
+h690	1795643149	72	--root . refs crates/mdbook-core/src/config.rs#HtmlConfig::theme_dir
+h690	1795643192	8525	--root . check
+h691	1795643440	35556	--root . outline
+h691	1795643559	8525	--root . check
+h691	1795643562	8525	--root . check
+h691	1795643562	8525	--root . check
+h692	1795643441	3584	--root . outline
+h692	1795643447	309	--root . refs httpx/_config.py#create_ssl_context
+h692	1795643460	1560	--root . check
+h692	1795643463	1140	--root . check
+h692	1795643468	734	--root . outline docs/advanced/ssl
+h692	1795643468	1560	--root . check
+h692	1795643468	309	--root . refs httpx/_config.py#create_ssl_context
+h692	1795643471	64	--root . refs docs/advanced/ssl#configuring-client-instances
+h693	1795643442	35556	--root . outline
+h693	1795643459	10235	--root . refs crates/mdbook-core/src/config.rs#HtmlConfig::theme_dir --mention theme
+h693	1795643489	8525	--root . check
+h693	1795643491	8525	--root . check
+h693	1795643492	8525	--root . check
+h694	1795643442	3584	--root . outline
+h694	1795643449	309	--root . refs httpx/_config.py#create_ssl_context
+h694	1795643470	677	--root . outline docs/environment_variables
+h694	1795643470	8292	--root . check
+h694	1795643483	1140	--root . check
+h695	1795643444	3584	--root . outline
+h695	1795643448	52	--root . refs httpx/_models.py#Response.__repr__
+h695	1795643455	1140	--root . check
+h695	1795643462	1140	--root . check
+h696	1795643445	3584	outline --root .
+h696	1795643467	8292	check --root .
+h697	1795643447	35556	--root . outline
+h697	1795643575	479	--root . outline guide/src/format/configuration/general
+h697	1795643576	5180	--root . check
+h697	1795643578	5180	--root . check
+h698	1795643448	35556	--root . outline
+h698	1795643451	37175	--root . refs crates/mdbook-core/src/config.rs#BuildConfig --mention book
+h698	1795643518	12426	--root . check
+h698	1795643521	12426	--root . check
+h698	1795643522	8525	--root . check
+h698	1795643525	12426	--root . check

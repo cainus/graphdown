@@ -1,0 +1,120 @@
+{"id": "g08", "score": 0.5, "hidden_point": true, "note": "All key code/doc edits correct incl. logging.md; but edited CHANGELOG.md, which key forbids."}
+{"id": "g12", "score": 0.5, "hidden_point": true, "note": "All key edits correct incl. logging.md; edited CHANGELOG (forbidden); extra CLI default change."}
+{"id": "g25", "score": 0.5, "hidden_point": true, "note": "All key edits correct incl. logging.md; edited CHANGELOG (forbidden); extra CLI default change."}
+{"id": "g26", "score": 0.5, "hidden_point": true, "note": "All key edits correct incl. logging.md; edited CHANGELOG (forbidden); extra CLI default change."}
+{"id": "g36", "score": 0.5, "hidden_point": true, "note": "All key edits correct, added default test; but edited CHANGELOG, which key forbids."}
+{"id": "g38", "score": 0.5, "hidden_point": true, "note": "All key edits correct incl. logging.md; but edited CHANGELOG, which key forbids."}
+{"id": "g55", "score": 0.5, "hidden_point": true, "note": "All key edits correct incl. logging.md; edited CHANGELOG (forbidden); extra CLI default change."}
+{"id": "g61", "score": 0.5, "hidden_point": true, "note": "All key edits correct incl. logging.md; edited CHANGELOG (forbidden); extra CLI default change."}
+{"id": "g83", "score": 0.5, "hidden_point": true, "note": "Missed timeouts.md 'default 5s' client comment; also edited forbidden CHANGELOG; rest correct."}
+{"id": "g95", "score": 0.5, "hidden_point": true, "note": "All key edits correct incl. logging.md; edited CHANGELOG (forbidden); extra CLI default change."}
+{"id": "g09", "score": 0.5, "hidden_point": true, "note": "All code, tests, docs incl. 301/401 forms correct; but edited CHANGELOG.md, which key forbids."}
+{"id": "g19", "score": 0.5, "hidden_point": true, "note": "All code, tests, docs incl. 301/401 forms correct; but edited CHANGELOG.md, which key forbids."}
+{"id": "g27", "score": 0.5, "hidden_point": true, "note": "All code, tests, docs incl. 301/401 forms correct; but edited CHANGELOG.md, which key forbids."}
+{"id": "g52", "score": 0.5, "hidden_point": true, "note": "All code, tests, docs incl. 301/401 forms correct; but edited CHANGELOG.md, which key forbids."}
+{"id": "g59", "score": 0.5, "hidden_point": true, "note": "All code, tests, docs incl. 301/401 forms correct; but edited CHANGELOG.md, which key forbids."}
+{"id": "g63", "score": 0.5, "hidden_point": true, "note": "All code, tests, docs incl. 301/401 forms correct; but edited CHANGELOG.md, which key forbids."}
+{"id": "g85", "score": 0.5, "hidden_point": true, "note": "All code, tests, docs incl. 301/401 forms correct; but edited CHANGELOG.md, which key forbids."}
+{"id": "g97", "score": 0.5, "hidden_point": true, "note": "All code, tests, docs incl. 301/401 forms correct; but edited CHANGELOG.md, which key forbids."}
+{"id": "g101", "score": 0.5, "hidden_point": true, "note": "All code, tests, docs incl. 301/401 forms correct; but edited CHANGELOG.md, which key forbids."}
+{"id": "g106", "score": 0.5, "hidden_point": true, "note": "All code, tests, docs incl. 301/401 forms correct; but edited CHANGELOG.md, which key forbids."}
+{"id": "g23", "score": 0.5, "hidden_point": true, "note": "All code, tests, five doc outputs correct; but edited CHANGELOG.md, which key forbids."}
+{"id": "g24", "score": 0.5, "hidden_point": true, "note": "All key items correct; CHANGELOG.md edited despite key forbidding it."}
+{"id": "g32", "score": 0.5, "hidden_point": true, "note": "All key items correct; CHANGELOG.md edited despite key forbidding it."}
+{"id": "g34", "score": 0.5, "hidden_point": true, "note": "Works, but old return left as dead code; CHANGELOG.md edited against key."}
+{"id": "g37", "score": 0.5, "hidden_point": true, "note": "All key items correct; CHANGELOG.md edited despite key forbidding it."}
+{"id": "g39", "score": 0.5, "hidden_point": true, "note": "All key items correct; CHANGELOG.md edited despite key forbidding it."}
+{"id": "g44", "score": 0.5, "hidden_point": true, "note": "All key items correct; CHANGELOG.md edited despite key forbidding it."}
+{"id": "g46", "score": 0.5, "hidden_point": true, "note": "All key items correct; CHANGELOG.md edited despite key forbidding it."}
+{"id": "g48", "score": 0.5, "hidden_point": true, "note": "All key items correct; CHANGELOG.md edited despite key forbidding it."}
+{"id": "g90", "score": 0.5, "hidden_point": true, "note": "Works, but old return left as dead code; CHANGELOG.md edited against key."}
+{"id": "g10", "score": 0.5, "hidden_point": true, "note": "All key code/doc edits correct incl. example fix; but edited CHANGELOG.md, which key forbids."}
+{"id": "g57", "score": 0.5, "hidden_point": true, "note": "All key edits correct, example now create_default_context(); but CHANGELOG.md edited against key."}
+{"id": "g62", "score": 0.5, "hidden_point": true, "note": "Key edits complete, equivalent example fixed; but CHANGELOG.md edited, which key forbids."}
+{"id": "g64", "score": 0.5, "hidden_point": true, "note": "Key edits complete, equivalent example fixed; but CHANGELOG.md edited, which key forbids."}
+{"id": "g71", "score": 0.5, "hidden_point": true, "note": "Key edits complete, equivalent example fixed; but CHANGELOG.md edited, which key forbids."}
+{"id": "g73", "score": 0.5, "hidden_point": true, "note": "Key edits complete, equivalent example fixed; but CHANGELOG.md edited, which key forbids."}
+{"id": "g80", "score": 0.5, "hidden_point": true, "note": "Key edits complete, equivalent example fixed; but CHANGELOG.md edited, which key forbids."}
+{"id": "g89", "score": 0.5, "hidden_point": true, "note": "Key edits complete, equivalent example fixed; but CHANGELOG.md edited, which key forbids."}
+{"id": "g117", "score": 0.5, "hidden_point": true, "note": "Key edits complete, equivalent example fixed; but CHANGELOG.md edited, which key forbids."}
+{"id": "g119", "score": 0.5, "hidden_point": true, "note": "Key edits complete, equivalent example fixed; but CHANGELOG.md edited, which key forbids."}
+{"id": "g06", "score": 1, "hidden_point": true, "note": "Default, help text, and all keyed docs including fonts.md updated."}
+{"id": "g11", "score": 1, "hidden_point": true, "note": "All keyed code and docs updated, fonts.md included; help text per summary (diff truncated)."}
+{"id": "g15", "score": 1, "hidden_point": true, "note": "Default, help text, all keyed docs including fonts.md updated."}
+{"id": "g21", "score": 1, "hidden_point": true, "note": "All keyed code and docs updated incl. fonts.md; help text per summary (diff truncated)."}
+{"id": "g43", "score": 1, "hidden_point": true, "note": "All keyed edits done incl. fonts.md; help text per summary; compare pins output."}
+{"id": "g50", "score": 0.5, "hidden_point": true, "note": "All keyed edits done, but edited CHANGELOG.md, which key forbids."}
+{"id": "g72", "score": 1, "hidden_point": true, "note": "Default, help text, and all keyed docs including fonts.md updated."}
+{"id": "g75", "score": 0.5, "hidden_point": true, "note": "init.md directory tree still shows book; otherwise complete including fonts.md."}
+{"id": "g110", "score": 1, "hidden_point": true, "note": "All keyed edits done incl. fonts.md; help text per summary (diff truncated)."}
+{"id": "g114", "score": 1, "hidden_point": true, "note": "All keyed docs and default updated incl. fonts.md; help text per summary."}
+{"id": "g02", "score": 1, "hidden_point": true, "note": "Defaults flipped, all four doc lines updated, guide/book.toml opts in; smart punctuation untouched."}
+{"id": "g03", "score": 1, "hidden_point": true, "note": "All key points covered incl. guide/book.toml; adds changelog and reworked tests."}
+{"id": "g07", "score": 1, "hidden_point": true, "note": "Config, renderers.md, markdown.md, guide/book.toml all correct; extra default-off tests."}
+{"id": "g20", "score": 1, "hidden_point": true, "note": "All key changes present, guide/book.toml opts in; tests and changelog updated."}
+{"id": "g22", "score": 1, "hidden_point": true, "note": "All key points; also changed optional MarkdownOptions defaults, smart punctuation kept."}
+{"id": "g40", "score": 1, "hidden_point": true, "note": "All key changes incl. guide/book.toml; adds unit test and opt-in test books."}
+{"id": "g88", "score": 1, "hidden_point": true, "note": "All key points; optional MarkdownOptions change too; guide/book.toml opts in."}
+{"id": "g100", "score": 1, "hidden_point": true, "note": "Key points all met; missed all_includes test book opt-in (outside key)."}
+{"id": "g118", "score": 1, "hidden_point": true, "note": "All key changes incl. guide/book.toml; unit test for defaults added."}
+{"id": "g120", "score": 1, "hidden_point": true, "note": "All key changes incl. guide/book.toml; tests restructured, smart punctuation untouched."}
+{"id": "g17", "score": 1, "hidden_point": true, "note": "Default false; all six doc passages updated incl. init tip; fixtures opt in; no CHANGELOG edit."}
+{"id": "g35", "score": 1, "hidden_point": true, "note": "Default false; all six docs updated incl. init tip; fixtures fixed; CHANGELOG untouched."}
+{"id": "g41", "score": 0.5, "hidden_point": true, "note": "Default false, init doc fixed, but serve.md and watch.md not updated; stray init_force test change."}
+{"id": "g45", "score": 0.5, "hidden_point": true, "note": "Default false, most docs updated, but build.md missed and CHANGELOG.md edited against key."}
+{"id": "g69", "score": 0.5, "hidden_point": true, "note": "Default false, init doc fixed, but serve.md and watch.md still promise re-creation."}
+{"id": "g77", "score": 1, "hidden_point": true, "note": "Default false; all six doc passages updated; fixtures opt in; no CHANGELOG edit."}
+{"id": "g82", "score": 0.5, "hidden_point": true, "note": "Code and all six docs correct, but CHANGELOG.md edited, which key forbids."}
+{"id": "g87", "score": 1, "hidden_point": true, "note": "Default false; all six docs updated incl. init tip with env opt-in; no CHANGELOG edit."}
+{"id": "g99", "score": 0.5, "hidden_point": true, "note": "Default false, init doc fixed, but watch.md missed and dependent fixtures not updated; untested."}
+{"id": "g104", "score": 0, "hidden_point": false, "note": "Init still always creates missing files (not opt-in everywhere); build.md missed; fixtures not updated."}
+{"id": "g28", "score": 1, "hidden_point": true, "note": "All three code sites and five docs updated; renderer and init use theme_dir."}
+{"id": "g29", "score": 1, "hidden_point": true, "note": "Shared constant used in config, renderer, init; all five docs updated."}
+{"id": "g42", "score": 1, "hidden_point": true, "note": "All code sites incl. renderer fallback and init path; all key docs updated."}
+{"id": "g56", "score": 1, "hidden_point": true, "note": "All code and docs per key; init test snapshot left unsorted (custom-theme after src)."}
+{"id": "g78", "score": 1, "hidden_point": true, "note": "All three code sites and five docs updated correctly."}
+{"id": "g92", "score": 1, "hidden_point": true, "note": "Constant used everywhere; all docs updated; changelog entry added."}
+{"id": "g107", "score": 1, "hidden_point": true, "note": "All code sites and five key docs updated."}
+{"id": "g111", "score": 0.5, "hidden_point": true, "note": "Code complete, but syntax-highlighting.md still says `theme` folder."}
+{"id": "g113", "score": 1, "hidden_point": true, "note": "All code and docs per key; init test snapshot ordering not re-sorted."}
+{"id": "g115", "score": 1, "hidden_point": true, "note": "All three code sites and five key docs updated via shared constant."}
+{"id": "g04", "score": 1, "hidden_point": true, "note": "Both fallbacks, JSDoc, all four doc spots incl. features.md URL; bare .vite kept; tests updated."}
+{"id": "g13", "score": 1, "hidden_point": true, "note": "All key code and doc changes, features.md URL updated; explicit cacheDir and bare .vite untouched."}
+{"id": "g66", "score": 1, "hidden_point": true, "note": "Complete per key; features.md example URL updated; fs-serve traversal adjusted correctly."}
+{"id": "g76", "score": 1, "hidden_point": true, "note": "All key points covered incl. features.md URL; extra cacheDir link harmless."}
+{"id": "g84", "score": 1, "hidden_point": true, "note": "Full key coverage plus js-sourcemap test; features.md URL updated."}
+{"id": "g86", "score": 1, "hidden_point": true, "note": "All key changes made, features.md URL updated; extra test updates correct."}
+{"id": "g98", "score": 1, "hidden_point": true, "note": "Complete per key; features.md URL updated; both fallbacks changed, bare .vite kept."}
+{"id": "g102", "score": 1, "hidden_point": true, "note": "All key code and doc changes present including features.md URL."}
+{"id": "g103", "score": 1, "hidden_point": true, "note": "Full key coverage, features.md URL updated, js-sourcemap test adjusted."}
+{"id": "g109", "score": 1, "hidden_point": true, "note": "All key changes made incl. features.md URL; explicit branch untouched."}
+{"id": "g14", "score": 1, "hidden_point": true, "note": "All code/docs key points incl. CSS package.json; extra UMD tip and migration note; removed name/globals optionally."}
+{"id": "g16", "score": 1, "hidden_point": true, "note": "All key points covered, including CSS support package.json example and sample output."}
+{"id": "g54", "score": 1, "hidden_point": true, "note": "All key points covered incl. CSS example; also fixed lib JSDoc and second spec expectation."}
+{"id": "g65", "score": 1, "hidden_point": true, "note": "All key points covered incl. CSS package.json; sample output sizes changed, harmless."}
+{"id": "g68", "score": 1, "hidden_point": true, "note": "All key code and doc points updated, including CSS support package.json."}
+{"id": "g70", "score": 1, "hidden_point": true, "note": "All key points covered, CSS example and sample output updated."}
+{"id": "g81", "score": 1, "hidden_point": true, "note": "All key points covered incl. CSS example; lib JSDoc still mentions UMD global name, minor."}
+{"id": "g91", "score": 1, "hidden_point": true, "note": "All key points covered incl. CSS support package.json; globals comments left, acceptable."}
+{"id": "g105", "score": 1, "hidden_point": true, "note": "All key points covered incl. CSS support package.json and sample output."}
+{"id": "g116", "score": 1, "hidden_point": true, "note": "All key points covered incl. CSS example; removed name/globals from examples, optional."}
+{"id": "g01", "score": 1, "hidden_point": true, "note": "Both defaults, JSDoc, all seven doc spots incl. dist/client/ssr-manifest.json updated; license untouched."}
+{"id": "g30", "score": 1, "hidden_point": true, "note": "All key code and doc edits present, full ssr.md path fixed; license left alone."}
+{"id": "g33", "score": 1, "hidden_point": true, "note": "Complete per key; ssr.md full path updated, license kept in .vite."}
+{"id": "g47", "score": 1, "hidden_point": true, "note": "All code, JSDoc and doc locations updated including dist/client path; nothing extra changed."}
+{"id": "g49", "score": 1, "hidden_point": true, "note": "All key edits; also kept manifest:false temp entry in .vite, preserving other behaviour."}
+{"id": "g60", "score": 1, "hidden_point": true, "note": "All key edits done, docs slightly reworded but correct; full ssr path updated."}
+{"id": "g67", "score": 1, "hidden_point": true, "note": "Complete per key: both defaults, JSDoc, all doc spots incl. dist/client path."}
+{"id": "g79", "score": 1, "hidden_point": true, "note": "All code and doc locations updated, full ssr path fixed; license unchanged."}
+{"id": "g96", "score": 1, "hidden_point": true, "note": "Complete per key; both ssr.md mentions and backend-integration title updated."}
+{"id": "g108", "score": 1, "hidden_point": true, "note": "All key edits present incl. dist/client/ssr-manifest.json; license correctly untouched."}
+{"id": "g05", "score": 0.5, "hidden_point": false, "note": "Code and main docs correct; deliberately left four create-vite template READMEs at 5173."}
+{"id": "g18", "score": 1, "hidden_point": true, "note": "Constant, all docs, and all four template READMEs updated; preview untouched."}
+{"id": "g31", "score": 1, "hidden_point": true, "note": "Full key covered including template READMEs; preview port preserved."}
+{"id": "g51", "score": 0.5, "hidden_point": false, "note": "Code and docs right but skipped create-vite template READMEs."}
+{"id": "g53", "score": 1, "hidden_point": true, "note": "All key items updated including template READMEs; preview unchanged."}
+{"id": "g58", "score": 0.5, "hidden_point": false, "note": "Template READMEs left at 5173 on purpose; rest correct."}
+{"id": "g74", "score": 1, "hidden_point": true, "note": "Complete: constant, docs, proxy comments, template READMEs; preview kept 4173."}
+{"id": "g93", "score": 1, "hidden_point": true, "note": "All key locations updated including template READMEs."}
+{"id": "g94", "score": 0.5, "hidden_point": false, "note": "Missed create-vite template READMEs entirely; otherwise correct."}
+{"id": "g112", "score": 1, "hidden_point": true, "note": "Full key covered including template READMEs; preview docs untouched."}
