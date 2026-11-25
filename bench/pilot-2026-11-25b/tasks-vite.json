@@ -1,0 +1,64 @@
+[
+  {
+    "id": "q1",
+    "type": "question",
+    "prompt": "We're on Vite 8 with the default build config (no build.target set). Some customers on older Firefox get a broken page. If I add @vitejs/plugin-legacy with no options at all, what is the oldest Firefox version that will be served the modern (non-legacy) chunks, and how does that compare with the oldest Firefox the default build supports without the plugin? Would a Firefox 108 user get the modern or the legacy build once the plugin is added?",
+    "key": "Without the plugin, the default build.target ('baseline-widely-available') supports Firefox >=114 (docs/guide/build.md Browser Compatibility; docs/config/build-options.md build.target lists ['chrome111','edge111','firefox114','safari16.4','ios16.4']; constant ESBUILD_BASELINE_WIDELY_AVAILABLE_TARGET). With plugin-legacy and no modernTargets, the plugin overrides build.target for the modern chunks to its built-in modern targets: 'edge>=105, firefox>=106, chrome>=105, safari>=16.4, chromeAndroid>=105, iOS>=16.4' (packages/plugin-legacy/README.md `modernTargets` default; source sets config.build.target = modernTargetsEsbuild, which contains 'firefox106'). So the minimum Firefox for modern chunks becomes 106 (lower than 114). A Firefox 108 user gets the modern chunks. Answer must give 106 with the plugin and 114 without, and 'modern' for Firefox 108.",
+    "key_sections": [
+      "docs/guide/build.md#browser-compatibility",
+      "docs/config/build-options.md#buildtarget",
+      "packages/plugin-legacy/README.md#moderntargets",
+      "packages/plugin-legacy/src/index.ts#modernTargetsEsbuild"
+    ],
+    "must_touch": []
+  },
+  {
+    "id": "q2",
+    "type": "question",
+    "prompt": "I maintain a Vite plugin that implements handleHotUpdate, checks options.ssr inside its transform hook, and calls server.ssrLoadModule from configureServer. Before the next major I want Vite to warn me about exactly these three usages and nothing else. What exactly do I put in my vite config?",
+    "key": "Use the `future` config option with three keys set to 'warn': `future: { removePluginHookHandleHotUpdate: 'warn', removePluginHookSsrArgument: 'warn', removeSsrLoadModule: 'warn' }`. The three key names come from three different docs: docs/changes/hotupdate-hook.md (future.removePluginHookHandleHotUpdate), docs/changes/this-environment-in-hooks.md (future.removePluginHookSsrArgument), docs/changes/ssr-using-modulerunner.md (future.removeSsrLoadModule); the `future` option itself is in docs/config/shared-options.md#future. Setting `future: 'warn'` is wrong for this question because it enables every future warning (config.ts expands it to all nine keys, including removeServerModuleGraph, removeServerHot, etc.).",
+    "key_sections": [
+      "docs/config/shared-options.md#future",
+      "docs/changes/index.md#planned",
+      "docs/changes/hotupdate-hook.md#hmr-hotupdate-plugin-hook",
+      "docs/changes/this-environment-in-hooks.md#thisenvironment-in-hooks",
+      "docs/changes/ssr-using-modulerunner.md#ssr-using-modulerunner-api"
+    ],
+    "must_touch": []
+  },
+  {
+    "id": "c1",
+    "type": "constrained-change",
+    "prompt": "The dev/preview server code imports the `open` package as soon as the module is loaded, even though it is only needed when a browser actually gets opened (server.open / --open). Change it so the package is only loaded at the point it is actually needed, to help startup time.",
+    "key": "Change packages/vite/src/node/server/openBrowser.ts: remove the top-level value import `import open from 'open'` (the type-only `import type { Options } from 'open'` may stay) and load it lazily inside the async fallback path of startBrowserProcess, right before it is called. Hidden constraint from CONTRIBUTING.md 'Notes on Dependencies' > 'Usage of require()': dependencies are pre-bundled and kept in devDependencies, so a lazy load must NOT use `require('open')` (or createRequire), which is ignored in ESM and would leave the dep out of the bundle; it must use a dynamic import of the form `(await import('open')).default` (equivalent `const { default: open } = await import('open')` is acceptable). `open` must stay in devDependencies of packages/vite/package.json (not moved to dependencies). The returned promise/error handling (logging err.stack via logger.error, not crashing) must be preserved, including errors from the import itself being caught.",
+    "key_sections": [
+      "CONTRIBUTING.md#notes-on-dependencies",
+      "CONTRIBUTING.md#usage-of-require",
+      "CONTRIBUTING.md#think-before-adding-a-dependency",
+      "packages/vite/src/node/server/openBrowser.ts#startBrowserProcess"
+    ],
+    "must_touch": [
+      "packages/vite/src/node/server/openBrowser.ts"
+    ]
+  },
+  {
+    "id": "u1",
+    "type": "change-and-update",
+    "prompt": "Raise Vite's default threshold for inlining small assets as base64 during build from 4 KiB to 8 KiB (8192 bytes). Update the documentation accordingly.",
+    "key": "Code: packages/vite/src/node/constants.ts DEFAULT_ASSETS_INLINE_LIMIT = 8192 (used by build.ts defaults and by asset.ts shouldInline as the fallback when an assetsInlineLimit callback returns undefined). Also update user-visible text that states the default: the JSDoc on assetsInlineLimit in packages/vite/src/node/build.ts ('Default limit is `4096` (4 KiB)' and '@default 4096' -> 8192 / 8 KiB) and the CLI help string for --assetsInlineLimit in packages/vite/src/node/cli.ts ('(default: 4096)' -> 8192). Docs: docs/config/build-options.md build.assetsInlineLimit '**Default:** `4096` (4 KiB)' -> `8192` (8 KiB); docs/guide/cli.md `vite build` options table row for `--assetsInlineLimit <number>` '(default: `4096`)' -> `8192`. docs/guide/assets.md and docs/guide/features.md (WebAssembly, CSP sections) refer to the option by name only and need no change; blog posts/CHANGELOG must not be rewritten. A run that changes only constants.ts, or misses the cli.md table or the cli.ts help text, is incomplete.",
+    "key_sections": [
+      "docs/config/build-options.md#buildassetsinlinelimit",
+      "docs/guide/cli.md#vite-build",
+      "docs/guide/assets.md#importing-asset-as-url",
+      "packages/vite/src/node/constants.ts#DEFAULT_ASSETS_INLINE_LIMIT",
+      "packages/vite/src/node/cli.ts#assetsInlineLimit"
+    ],
+    "must_touch": [
+      "packages/vite/src/node/constants.ts",
+      "packages/vite/src/node/build.ts",
+      "packages/vite/src/node/cli.ts",
+      "docs/config/build-options.md",
+      "docs/guide/cli.md"
+    ]
+  }
+]

@@ -1,0 +1,72 @@
+[
+  {
+    "id": "q1",
+    "type": "question",
+    "prompt": "If I create a plain `httpx.Client()` with no arguments and no environment variables set, what are the effective defaults for: the connect, read, write and pool timeouts; the maximum total connections and maximum keep-alive connections in the pool; how long an idle keep-alive connection is kept; whether a 302 response is followed automatically; and, if I turn redirect following on, how many redirects it will follow before giving up and which exception it raises then?",
+    "key": "Timeouts: 5 seconds for each of connect, read, write and pool (DEFAULT_TIMEOUT_CONFIG = Timeout(timeout=5.0); docs/advanced/timeouts.md intro and docs/quickstart.md#timeouts). Pool: max_connections=100, max_keepalive_connections=20 (docs/advanced/resource-limits.md; DEFAULT_LIMITS in httpx/_config.py). Note a bare httpx.Limits() has None/None, so the 100/20 values come only from the client default DEFAULT_LIMITS. keepalive_expiry: 5 seconds. Redirects: NOT followed by default (follow_redirects=False); the 302 response is returned with response.next_request set (docs/compatibility.md#redirects, docs/quickstart.md#redirection-and-history). With follow_redirects=True the limit is max_redirects=20 (DEFAULT_MAX_REDIRECTS in httpx/_config.py; not stated in the markdown docs), and exceeding it raises httpx.TooManyRedirects (a RequestError subclass, per docs/exceptions.md hierarchy). Full marks need all of: 5s x4, 100, 20, 5s, not followed, 20, TooManyRedirects.",
+    "key_sections": [
+      "docs/advanced/timeouts.md",
+      "docs/quickstart.md#timeouts",
+      "docs/advanced/resource-limits.md",
+      "docs/compatibility.md#redirects",
+      "httpx/_config.py#DEFAULT_LIMITS",
+      "httpx/_config.py#DEFAULT_MAX_REDIRECTS",
+      "httpx/_client.py#Client._send_handling_redirects",
+      "docs/exceptions.md#the-exception-hierarchy"
+    ],
+    "must_touch": []
+  },
+  {
+    "id": "q2",
+    "type": "question",
+    "prompt": "I'm moving an integration from `httpx.Client` to `httpx.AsyncClient`. It currently uses: (a) request and response event hooks written as plain functions, (b) a callback passed via the \"trace\" request extension, (c) a custom `httpx.Auth` subclass that only implements `auth_flow` and does no I/O, (d) a custom transport that subclasses `httpx.BaseTransport`, and (e) a plain generator that yields bytes, passed as `content=` for uploads. For each one, can it be kept as it is, or what has to change?",
+    "key": "(a) Must change: hooks registered on AsyncClient MUST be async functions (docs/advanced/event-hooks.md note; AsyncClient awaits each hook). (b) Must change: the trace handler must be an `async def` function when using async code (docs/advanced/extensions.md, \"trace\" section). (c) Can stay as is: auth classes are designed to do no I/O so they work with both sync and async clients; Auth.async_auth_flow defaults to driving auth_flow (docs/advanced/authentication.md#custom-authentication-schemes; httpx/_auth.py). Only if it needed I/O or locks would it have to override sync_auth_flow/async_auth_flow. (d) Must change: subclass httpx.AsyncBaseTransport and implement handle_async_request instead of handle_request (docs/advanced/transports.md#custom-transports). (e) Must change: use an async bytes generator (async def ... yield) for streaming request bodies with AsyncClient (docs/async.md#streaming-requests). Answer is: a, b, d, e change; c stays.",
+    "key_sections": [
+      "docs/advanced/event-hooks.md",
+      "docs/advanced/extensions.md#trace",
+      "docs/advanced/authentication.md#custom-authentication-schemes",
+      "docs/advanced/transports.md#custom-transports",
+      "docs/async.md#streaming-requests",
+      "httpx/_auth.py#Auth.async_auth_flow"
+    ],
+    "must_touch": []
+  },
+  {
+    "id": "c1",
+    "type": "constrained-change",
+    "prompt": "Let people pass a `pathlib.Path` directly as a file in `files=`, so `httpx.post(url, files={\"upload\": Path(\"report.xls\")})` works, as well as inside the usual tuple form like `(\"report.xls\", Path(\"report.xls\"), \"application/vnd.ms-excel\")`. Right now that fails.",
+    "key": "Hidden constraints from docs the prompt does not mention: (1) docs/compatibility.md#upload-files: HTTPX strictly enforces that upload files are opened in BINARY mode, so the path must be opened with 'rb' (opening in text mode would also hit the existing TypeError in FileField). (2) docs/advanced/clients.md#multipart-file-encoding tip: file uploads are streaming by default, only one chunk in memory at a time, so the implementation must NOT do path.read_bytes()/read the whole file; it must open the file and stream it through the existing chunked render_data (CHUNK_SIZE reads), which also keeps Content-Length computable via peek_filelike_length on the opened file. (3) Same clients.md section: for the bare Path form, filename is the path's name and the MIME type is guessed from it, falling back to application/octet-stream; in tuple form an explicit filename of None means no Content-Type header unless given. A correct change handles Path in httpx/_multipart.py (FileField, for both the bare and tuple forms) and adds Path to the accepted file types in httpx/_types.py (FileContent/FileTypes) so type checks pass. Bonus, not required: a test in tests/test_multipart.py, a mention in docs. Fails the task: reading the whole file into bytes, opening in text mode, or only handling the bare (non-tuple) form.",
+    "key_sections": [
+      "docs/compatibility.md#upload-files",
+      "docs/advanced/clients.md#multipart-file-encoding",
+      "docs/quickstart.md#sending-multipart-file-uploads",
+      "httpx/_multipart.py#FileField",
+      "httpx/_types.py#FileContent"
+    ],
+    "must_touch": [
+      "httpx/_multipart.py",
+      "httpx/_types.py"
+    ]
+  },
+  {
+    "id": "u1",
+    "type": "change-and-update",
+    "prompt": "Raise HTTPX's default timeout from 5 seconds to 10 seconds, both for the library and for the `httpx` command-line client. Update the documentation accordingly.",
+    "key": "Code: httpx/_config.py DEFAULT_TIMEOUT_CONFIG = Timeout(timeout=10.0) (used by Client, AsyncClient and the top-level API functions in _api.py); httpx/_main.py: the --timeout click option default=5.0 -> 10.0 and its help text '[Default: 5.0]', plus the same '[Default: 5.0]' in the hand-written help table in print_help(). Leave Limits keepalive_expiry=5.0 and the explicit 5.0 examples in the Timeout docstring and docs/advanced/extensions.md alone (they are explicit values, not defaults). Docs that state the default and must be updated: (1) docs/advanced/timeouts.md intro: 'raise a TimeoutException after 5 seconds of network inactivity' -> 10 seconds; (2) docs/advanced/timeouts.md#setting-a-default-timeout-on-a-client: comment 'client = httpx.Client()  # Use a default 5s timeout everywhere.' -> 10s; (3) docs/quickstart.md#timeouts: 'The default timeout for network inactivity is five seconds' -> ten seconds; (4) docs/logging.md example debug output shows timeout=5.0 on the connect_tcp.started and start_tls.started lines for a default httpx.get(), which should become timeout=10.0. docs/compatibility.md#timeouts only says 'reasonable timeouts' and needs no change. The docs/img/httpx-help.png screenshot shows the old CLI default but is an image; noting it is fine, editing it is not expected. A CHANGELOG 'Changed' entry under 1.0.0 (Unreleased) is acceptable but not required.",
+    "key_sections": [
+      "httpx/_config.py#DEFAULT_TIMEOUT_CONFIG",
+      "httpx/_main.py#main",
+      "httpx/_main.py#print_help",
+      "docs/advanced/timeouts.md#setting-a-default-timeout-on-a-client",
+      "docs/quickstart.md#timeouts",
+      "docs/logging.md#logging"
+    ],
+    "must_touch": [
+      "httpx/_config.py",
+      "httpx/_main.py",
+      "docs/advanced/timeouts.md",
+      "docs/quickstart.md",
+      "docs/logging.md"
+    ]
+  }
+]

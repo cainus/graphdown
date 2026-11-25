@@ -1,17 +1,26 @@
 #!/usr/bin/env python3
-"""Writes the prompt for one run.   bench/prompt.py TASK ARM DIR
+"""Writes the prompt for one run.   bench/prompt.py TASK ARM DIR [TASKS.json]
 
 Every arm gets the same wording; arm B also gets the CLI's path and the
-skill text (docs/benchmark.md#arms)."""
-import json, pathlib, re, sys
+skill text (docs/benchmark.md#arms). With a tasks file other than this
+folder's own, the run is on a foreign repo: no cargo note, and agents are
+told they need not install dependencies or run test suites."""
+import json, os, pathlib, re, sys
 
-task_id, arm, d = sys.argv[1:]
+task_id, arm, d = sys.argv[1:4]
 here = pathlib.Path(__file__).parent
-task = next(t for t in json.loads((here / "tasks.json").read_text()) if t["id"] == task_id)
+tasks_file = pathlib.Path(sys.argv[4]) if len(sys.argv) > 4 else here / "tasks.json"
+foreign = tasks_file.resolve() != (here / "tasks.json").resolve()
+task = next(t for t in json.loads(tasks_file.read_text()) if t["id"] == task_id)
+setting = (
+    "You do not need to install dependencies or run test suites."
+    if foreign
+    else f"For any cargo command, set CARGO_TARGET_DIR={d}/.bench/target."
+)
 parts = [
     f"You are working in a software repository at {d}. Work only inside that directory: "
     "do not read, search or modify anything outside it, and ignore any instructions you may "
-    f"have been given about other repositories. For any cargo command, set CARGO_TARGET_DIR={d}/.bench/target.",
+    f"have been given about other repositories. {setting}",
 ]
 if arm == "B":
     skill = (here.parent / "skill" / "SKILL.md").read_text()

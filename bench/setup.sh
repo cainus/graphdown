@@ -1,28 +1,33 @@
 #!/usr/bin/env bash
 # Builds one arm's copy of the corpus.
-#   bench/setup.sh ARM DEST     ARM is A, B or C (see docs/benchmark.md#arms)
+#   bench/setup.sh ARM DEST [SOURCE]   ARM is A, B or C (see docs/benchmark.md#arms)
+# SOURCE is a git checkout to copy; it defaults to this repo.
 # The copy is a fresh git repo so a run's changes can be graded as a diff.
 set -euo pipefail
 arm="$1"; dest="$2"
-repo="$(cd "$(dirname "$0")/.." && pwd)"
-real="${GRAPHDOWN_REAL:-$repo/target/release/graphdown}"
+self="$(cd "$(dirname "$0")/.." && pwd)"
+repo="${3:-$self}"
+real="${GRAPHDOWN_REAL:-$self/target/release/graphdown}"
 
 rm -rf "$dest"; mkdir -p "$dest"
 git -C "$repo" archive HEAD | tar -x -C "$dest"
-# Nothing that describes the benchmark, and no agent instructions that would
-# tell arm A or C about the CLI. Arm B gets the skill in its prompt instead.
-rm -rf "$dest/bench" "$dest/docs/benchmark.md" "$dest/docs/benchmark-pilot.md" \
-       "$dest/AGENTS.md" "$dest/CLAUDE.md" "$dest/.claude"
-# The benchmark plan is linked from the README; drop that line too.
-sed -i '/docs\/benchmark/d; /^- @AGENTS:/d' "$dest/README.md"
-sed -i 's/@AGENTS\b/`AGENTS.md`/g' "$dest/docs/design.md"
+if [ "$repo" = "$self" ]; then
+  # Nothing that describes the benchmark, and no agent instructions that would
+  # tell arm A or C about the CLI. Arm B gets the skill in its prompt instead.
+  rm -rf "$dest/bench" "$dest"/docs/benchmark*.md \
+         "$dest/AGENTS.md" "$dest/CLAUDE.md" "$dest/.claude"
+  sed -i '/docs\/benchmark/d; /^- @AGENTS:/d' "$dest/README.md"
+  sed -i 's/@AGENTS\b/`AGENTS.md`/g' "$dest/docs/design.md"
+fi
 
 case "$arm" in
   A|B) "$real" --root "$dest" fmt --to links >/dev/null ;;   # docs as found: plain links
   C)   ;;                                                    # docs in @ form
   *)   echo "unknown arm $arm" >&2; exit 2 ;;
 esac
-"$real" --root "$dest" check >/dev/null   # every arm starts valid
+# Graphdown's own repo starts with every reference valid; a foreign repo
+# starts as found, broken links included, the same for every arm.
+if [ "$repo" = "$self" ]; then "$real" --root "$dest" check >/dev/null; fi
 
 if [ "$arm" = B ]; then
   mkdir -p "$dest/.bench/bin"

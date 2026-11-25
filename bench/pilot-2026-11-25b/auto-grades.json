@@ -1,0 +1,264 @@
+{
+ "s01": {
+  "changed": [
+   "docs/config/build-options.md",
+   "docs/guide/cli.md",
+   "packages/vite/src/node/build.ts",
+   "packages/vite/src/node/cli.ts",
+   "packages/vite/src/node/constants.ts"
+  ],
+  "broken_after": 18,
+  "touch_recall": 1.0,
+  "missed": []
+ },
+ "s02": {
+  "changed": [],
+  "broken_after": 18
+ },
+ "s03": {
+  "changed": [],
+  "broken_after": 18
+ },
+ "s04": {
+  "changed": [
+   "CHANGELOG.md",
+   "docs/advanced/timeouts.md",
+   "docs/quickstart.md",
+   "httpx/_config.py",
+   "httpx/_main.py"
+  ],
+  "broken_after": 7,
+  "touch_recall": 0.8,
+  "missed": [
+   "docs/logging.md"
+  ]
+ },
+ "s05": {
+  "changed": [],
+  "broken_after": 7
+ },
+ "s06": {
+  "changed": [
+   "CHANGELOG.md",
+   "docs/advanced/timeouts.md",
+   "docs/quickstart.md",
+   "httpx/_config.py",
+   "httpx/_main.py"
+  ],
+  "broken_after": 7,
+  "touch_recall": 0.8,
+  "missed": [
+   "docs/logging.md"
+  ]
+ },
+ "s07": {
+  "changed": [],
+  "broken_after": 18
+ },
+ "s08": {
+  "changed": [],
+  "broken_after": 7
+ },
+ "s09": {
+  "changed": [],
+  "broken_after": 18
+ },
+ "s10": {
+  "changed": [],
+  "broken_after": 7
+ },
+ "s11": {
+  "changed": [
+   "CHANGELOG.md",
+   "docs/quickstart.md",
+   "httpx/_multipart.py",
+   "httpx/_types.py",
+   "tests/test_multipart.py"
+  ],
+  "broken_after": 7,
+  "touch_recall": 1.0,
+  "missed": [],
+  "binary_mode": true,
+  "reads_whole_file": false
+ },
+ "s12": {
+  "changed": [
+   "CHANGELOG.md",
+   "docs/quickstart.md",
+   "httpx/_multipart.py",
+   "httpx/_types.py",
+   "tests/test_multipart.py"
+  ],
+  "broken_after": 7,
+  "touch_recall": 1.0,
+  "missed": [],
+  "binary_mode": true,
+  "reads_whole_file": false
+ },
+ "s13": {
+  "changed": [
+   "CHANGELOG.md",
+   "docs/quickstart.md",
+   "httpx/_multipart.py",
+   "httpx/_types.py",
+   "tests/test_multipart.py"
+  ],
+  "broken_after": 7,
+  "touch_recall": 1.0,
+  "missed": [],
+  "binary_mode": true,
+  "reads_whole_file": false
+ },
+ "s14": {
+  "changed": [],
+  "broken_after": 7
+ },
+ "s15": {
+  "changed": [],
+  "broken_after": 7
+ },
+ "s16": {
+  "changed": [
+   "CHANGELOG.md",
+   "docs/quickstart.md",
+   "httpx/_multipart.py",
+   "httpx/_types.py",
+   "tests/test_multipart.py"
+  ],
+  "broken_after": 7,
+  "touch_recall": 1.0,
+  "missed": [],
+  "binary_mode": true,
+  "reads_whole_file": false
+ },
+ "s17": {
+  "changed": [
+   "packages/vite/src/node/server/openBrowser.ts"
+  ],
+  "broken_after": 18,
+  "touch_recall": 1.0,
+  "missed": [],
+  "dynamic_import": true,
+  "uses_require": false
+ },
+ "s18": {
+  "changed": [],
+  "broken_after": 7
+ },
+ "s19": {
+  "changed": [],
+  "broken_after": 18
+ },
+ "s20": {
+  "changed": [
+   "CHANGELOG.md",
+   "docs/advanced/timeouts.md",
+   "docs/logging.md",
+   "docs/quickstart.md",
+   "httpx/_config.py",
+   "httpx/_main.py"
+  ],
+  "broken_after": 7,
+  "touch_recall": 1.0,
+  "missed": []
+ },
+ "s21": {
+  "changed": [
+   "docs/config/build-options.md",
+   "docs/guide/cli.md",
+   "packages/vite/src/node/build.ts",
+   "packages/vite/src/node/cli.ts",
+   "packages/vite/src/node/constants.ts"
+  ],
+  "broken_after": 18,
+  "touch_recall": 1.0,
+  "missed": []
+ },
+ "s22": {
+  "changed": [],
+  "broken_after": 7
+ },
+ "s23": {
+  "changed": [],
+  "broken_after": 7
+ },
+ "s24": {
+  "changed": [],
+  "broken_after": 18
+ },
+ "s25": {
+  "changed": [],
+  "broken_after": 18
+ },
+ "s26": {
+  "changed": [
+   "packages/vite/src/node/server/openBrowser.ts"
+  ],
+  "broken_after": 18,
+  "touch_recall": 1.0,
+  "missed": [],
+  "dynamic_import": true,
+  "uses_require": false
+ },
+ "s27": {
+  "changed": [
+   "CHANGELOG.md",
+   "docs/advanced/timeouts.md",
+   "docs/logging.md",
+   "docs/quickstart.md",
+   "httpx/_config.py",
+   "httpx/_main.py"
+  ],
+  "broken_after": 7,
+  "touch_recall": 1.0,
+  "missed": []
+ },
+ "s28": {
+  "changed": [
+   "packages/vite/src/node/server/openBrowser.ts"
+  ],
+  "broken_after": 18,
+  "touch_recall": 1.0,
+  "missed": [],
+  "dynamic_import": true,
+  "uses_require": false
+ },
+ "s29": {
+  "changed": [
+   "docs/config/build-options.md",
+   "docs/guide/cli.md",
+   "packages/vite/src/node/build.ts",
+   "packages/vite/src/node/cli.ts",
+   "packages/vite/src/node/constants.ts"
+  ],
+  "broken_after": 18,
+  "touch_recall": 1.0,
+  "missed": []
+ },
+ "s30": {
+  "changed": [],
+  "broken_after": 18
+ },
+ "s31": {
+  "changed": [
+   "packages/vite/src/node/server/openBrowser.ts"
+  ],
+  "broken_after": 18,
+  "touch_recall": 1.0,
+  "missed": [],
+  "dynamic_import": true,
+  "uses_require": false
+ },
+ "s32": {
+  "changed": [
+   "docs/config/build-options.md",
+   "docs/guide/cli.md",
+   "packages/vite/src/node/build.ts",
+   "packages/vite/src/node/cli.ts",
+   "packages/vite/src/node/constants.ts"
+  ],
+  "broken_after": 18,
+  "touch_recall": 1.0,
+  "missed": []
+ }
+}

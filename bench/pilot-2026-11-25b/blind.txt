@@ -1,0 +1,1524 @@
+You are grading coding-agent runs blind. For each ITEM you get the task, the grading key, the agent's final summary, and for change tasks the actual diff it produced. Judge the work, not the writing.
+Output one JSON object per line and nothing else: {"id": "gNN", "score": 0|0.5|1, "hidden_point": true|false|null, "note": "<=20 words"}.
+score 1 = fully correct per the key; 0.5 = mostly right with a real omission or error; 0 = wrong or missing the main point. For questions, judge the answer's facts. For changes, judge the diff (the summary only explains it).
+hidden_point: for c1, did the change respect the hidden constraint in the key; for u1, did it update every doc the key lists as needing a change (ignore docs the key says to leave); for questions, null.
+
+=== ITEM g01 (httpx q2, question)
+TASK: I'm moving an integration from `httpx.Client` to `httpx.AsyncClient`. It currently uses: (a) request and response event hooks written as plain functions, (b) a callback passed via the "trace" request extension, (c) a custom `httpx.Auth` subclass that only implements `auth_flow` and does no I/O, (d) a custom transport that subclasses `httpx.BaseTransport`, and (e) a plain generator that yields bytes, passed as `content=` for uploads. For each one, can it be kept as it is, or what has to change?
+KEY: (a) Must change: hooks registered on AsyncClient MUST be async functions (docs/advanced/event-hooks.md note; AsyncClient awaits each hook). (b) Must change: the trace handler must be an `async def` function when using async code (docs/advanced/extensions.md, "trace" section). (c) Can stay as is: auth classes are designed to do no I/O so they work with both sync and async clients; Auth.async_auth_flow defaults to driving auth_flow (docs/advanced/authentication.md#custom-authentication-schemes; httpx/_auth.py). Only if it needed I/O or locks would it have to override sync_auth_flow/async_auth_flow. (d) Must change: subclass httpx.AsyncBaseTransport and implement handle_async_request instead of handle_request (docs/advanced/transports.md#custom-transports). (e) Must change: use an async bytes generator (async def ... yield) for streaming request bodies with AsyncClient (docs/async.md#streaming-requests). Answer is: a, b, d, e change; c stays.
+SUMMARY: (a) Event hooks must change: AsyncClient awaits every hook, so async def (docs/advanced/event-hooks.md). (b) Trace callback must change: async def with AsyncClient (docs/advanced/extensions.md). (c) Custom Auth with only auth_flow: keep; Auth.async_auth_flow runs auth_flow by default; only split if it does I/O. (d) BaseTransport subclass must change: AsyncClient needs AsyncBaseTransport with async handle_async_request returning AsyncByteStream. (e) Plain generator content must change: make it an async generator; sync stream fails with 'Attempted to send a sync request with an AsyncClient instance' (docs/async.md Streaming requests).
+
+=== ITEM g02 (httpx c1, constrained-change)
+TASK: Let people pass a `pathlib.Path` directly as a file in `files=`, so `httpx.post(url, files={"upload": Path("report.xls")})` works, as well as inside the usual tuple form like `("report.xls", Path("report.xls"), "application/vnd.ms-excel")`. Right now that fails.
+KEY: Hidden constraints from docs the prompt does not mention: (1) docs/compatibility.md#upload-files: HTTPX strictly enforces that upload files are opened in BINARY mode, so the path must be opened with 'rb' (opening in text mode would also hit the existing TypeError in FileField). (2) docs/advanced/clients.md#multipart-file-encoding tip: file uploads are streaming by default, only one chunk in memory at a time, so the implementation must NOT do path.read_bytes()/read the whole file; it must open the file and stream it through the existing chunked render_data (CHUNK_SIZE reads), which also keeps Content-Length computable via peek_filelike_length on the opened file. (3) Same clients.md section: for the bare Path form, filename is the path's name and the MIME type is guessed from it, falling back to application/octet-stream; in tuple form an explicit filename of None means no Content-Type header unless given. A correct change handles Path in httpx/_multipart.py (FileField, for both the bare and tuple forms) and adds Path to the accepted file types in httpx/_types.py (FileContent/FileTypes) so type checks pass. Bonus, not required: a test in tests/test_multipart.py, a mention in docs. Fails the task: reading the whole file into bytes, opening in text mode, or only handling the bare (non-tuple) form.
+SUMMARY: Path / os.PathLike accepted alone and in tuples. FileField stores a Path and opens it only when the body is sent, in binary mode, streamed in 64 KiB pieces and closed; Content-Length from size on disk; filename from path and content type guessed. httpx/_types.py FileContent includes os.PathLike[str]. Two tests; docs/quickstart.md section; CHANGELOG entry. Missing file errors at send time. str still means content.
+DIFF:
+diff --git a/CHANGELOG.md b/CHANGELOG.md
+index a3fa798..d0455af 100644
+--- a/CHANGELOG.md
++++ b/CHANGELOG.md
+@@ -11,6 +11,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
+ ### Added
+ 
+ * Expose `FunctionAuth` from the public API. (#3699)
++* Multipart `files=` accepts a `pathlib.Path` (or any `os.PathLike`) as the file, either directly or inside the tuple forms. The file is opened and streamed when the request body is sent.
+ 
+ ## 0.28.1 (6th December, 2024)
+ 
+diff --git a/docs/quickstart.md b/docs/quickstart.md
+index e140b53..66b0deb 100644
+--- a/docs/quickstart.md
++++ b/docs/quickstart.md
+@@ -204,6 +204,16 @@ of items for the file value:
+ }
+ ```
+ 
++You can also pass a `pathlib.Path` instead of an open file, either on its own
++or in place of the file object in the tuple form. HTTPX opens the file in binary
++mode when the request is sent, and closes it afterwards:
++
++```pycon
++>>> from pathlib import Path
++>>> files = {'upload-file': Path('report.xls')}
++>>> r = httpx.post("https://httpbin.org/post", files=files)
++```
++
+ If you need to include non-file data fields in the multipart form, use the `data=...` parameter:
+ 
+ ```pycon
+diff --git a/httpx/_multipart.py b/httpx/_multipart.py
+index b4761af..1b2eac6 100644
+--- a/httpx/_multipart.py
++++ b/httpx/_multipart.py
+@@ -155,6 +155,10 @@ class FileField:
+             # the opposite (it overwrites the headerwith the 3rd tuple element)
+             headers["Content-Type"] = content_type
+ 
++        if isinstance(fileobj, os.PathLike):
++            # A path is opened lazily, each time the body is rendered.
++            fileobj = Path(fileobj)
++
+         if isinstance(fileobj, io.StringIO):
+             raise TypeError(
+                 "Multipart file uploads require 'io.BytesIO', not 'io.StringIO'."
+@@ -174,6 +178,9 @@ class FileField:
+         if isinstance(self.file, (str, bytes)):
+             return len(headers) + len(to_bytes(self.file))
+ 
++        if isinstance(self.file, Path):
++            return len(headers) + self.file.stat().st_size
++
+         file_length = peek_filelike_length(self.file)
+ 
+         # If we can't determine the filesize without reading it into memory,
+@@ -205,6 +212,14 @@ class FileField:
+             yield to_bytes(self.file)
+             return
+ 
++        if isinstance(self.file, Path):
++            with self.file.open("rb") as fileobj:
++                chunk = fileobj.read(self.CHUNK_SIZE)
++                while chunk:
++                    yield chunk
++                    chunk = fileobj.read(self.CHUNK_SIZE)
++            return
++
+         if hasattr(self.file, "seek"):
+             try:
+                 self.file.seek(0)
+diff --git a/httpx/_types.py b/httpx/_types.py
+index 704dfdf..ff744f2 100644
+--- a/httpx/_types.py
++++ b/httpx/_types.py
+@@ -2,6 +2,7 @@
+ Type definitions for type checking purposes.
+ """
+ 
++import os
+ from http.cookiejar import CookieJar
+ from typing import (
+     IO,
+@@ -71,7 +72,7 @@ ResponseExtensions = Mapping[str, Any]
+ 
+ RequestData = Mapping[str, Any]
+ 
+-FileContent = Union[IO[bytes], bytes, str]
++FileContent = Union[IO[bytes], bytes, str, "os.PathLike[str]"]
+ FileTypes = Union[
+     # file (or bytes)
+     FileContent,
+diff --git a/tests/test_multipart.py b/tests/test_multipart.py
+index 764f85a..e8ecd4d 100644
+--- a/tests/test_multipart.py
++++ b/tests/test_multipart.py
+@@ -3,6 +3,7 @@ from __future__ import annotations
+ import io
+ import tempfile
+ import typing
++from pathlib import Path
+ 
+ import pytest
+ 
+@@ -439,6 +440,48 @@ def test_multipart_rewinds_files():
+         assert b"\r\nHello, world!\r\n" in response.content
+ 
+ 
++def test_multipart_encode_files_allows_path(tmp_path: Path) -> None:
++    path = tmp_path / "report.txt"
++    path.write_bytes(b"<file content>")
++
++    url = "https://www.example.com/"
++    headers = {"Content-Type": "multipart/form-data; boundary=BOUNDARY"}
++    files = {"upload": path}
++
++    request = httpx.Request("POST", url, headers=headers, files=files)
++    request.read()
++
++    expected = (
++        b'--BOUNDARY\r\nContent-Disposition: form-data; name="upload";'
++        b' filename="report.txt"\r\n'
++        b"Content-Type: text/plain\r\n\r\n<file content>\r\n"
++        b"--BOUNDARY--\r\n"
++    )
++    assert request.headers["Content-Length"] == str(len(expected))
++    assert request.content == expected
++
++
++def test_multipart_encode_files_allows_path_in_tuple(tmp_path: Path) -> None:
++    path = tmp_path / "report.xls"
++    path.write_bytes(b"<file content>")
++
++    url = "https://www.example.com/"
++    headers = {"Content-Type": "multipart/form-data; boundary=BOUNDARY"}
++    files = {"upload": ("renamed.xls", path, "application/vnd.ms-excel")}
++
++    request = httpx.Request("POST", url, headers=headers, files=files)
++    request.read()
++
++    expected = (
++        b'--BOUNDARY\r\nContent-Disposition: form-data; name="upload";'
++        b' filename="renamed.xls"\r\n'
++        b"Content-Type: application/vnd.ms-excel\r\n\r\n<file content>\r\n"
++        b"--BOUNDARY--\r\n"
++    )
++    assert request.headers["Content-Length"] == str(len(expected))
++    assert request.content == expected
++
++
+ class TestHeaderParamHTML5Formatting:
+     def test_unicode(self):
+         filename = "n\u00e4me"
+
+=== ITEM g03 (vite q1, question)
+TASK: We're on Vite 8 with the default build config (no build.target set). Some customers on older Firefox get a broken page. If I add @vitejs/plugin-legacy with no options at all, what is the oldest Firefox version that will be served the modern (non-legacy) chunks, and how does that compare with the oldest Firefox the default build supports without the plugin? Would a Firefox 108 user get the modern or the legacy build once the plugin is added?
+KEY: Without the plugin, the default build.target ('baseline-widely-available') supports Firefox >=114 (docs/guide/build.md Browser Compatibility; docs/config/build-options.md build.target lists ['chrome111','edge111','firefox114','safari16.4','ios16.4']; constant ESBUILD_BASELINE_WIDELY_AVAILABLE_TARGET). With plugin-legacy and no modernTargets, the plugin overrides build.target for the modern chunks to its built-in modern targets: 'edge>=105, firefox>=106, chrome>=105, safari>=16.4, chromeAndroid>=105, iOS>=16.4' (packages/plugin-legacy/README.md `modernTargets` default; source sets config.build.target = modernTargetsEsbuild, which contains 'firefox106'). So the minimum Firefox for modern chunks becomes 106 (lower than 114). A Firefox 108 user gets the modern chunks. Answer must give 106 with the plugin and 114 without, and 'modern' for Firefox 108.
+SUMMARY: With plugin-legacy and no options, Firefox 106 is the oldest for modern chunks; without the plugin, Firefox 114+ (ESBUILD_BASELINE_WIDELY_AVAILABLE_TARGET chrome111, edge111, firefox114, safari16.4, ios16.4; docs/guide/build.md, docs/config/build-options.md). Plugin replaces build.target with modernTargetsEsbuild es2020, edge105, firefox106, chrome105, safari16.4, ios16.4. Firefox 108 gets the modern build. Notes stale JSDoc in types.ts.
+
+=== ITEM g04 (vite q2, question)
+TASK: I maintain a Vite plugin that implements handleHotUpdate, checks options.ssr inside its transform hook, and calls server.ssrLoadModule from configureServer. Before the next major I want Vite to warn me about exactly these three usages and nothing else. What exactly do I put in my vite config?
+KEY: Use the `future` config option with three keys set to 'warn': `future: { removePluginHookHandleHotUpdate: 'warn', removePluginHookSsrArgument: 'warn', removeSsrLoadModule: 'warn' }`. The three key names come from three different docs: docs/changes/hotupdate-hook.md (future.removePluginHookHandleHotUpdate), docs/changes/this-environment-in-hooks.md (future.removePluginHookSsrArgument), docs/changes/ssr-using-modulerunner.md (future.removeSsrLoadModule); the `future` option itself is in docs/config/shared-options.md#future. Setting `future: 'warn'` is wrong for this question because it enables every future warning (config.ts expands it to all nine keys, including removeServerModuleGraph, removeServerHot, etc.).
+SUMMARY: Set three keys in `future`, not the `future: 'warn'` shorthand: future: { removePluginHookHandleHotUpdate: 'warn', removePluginHookSsrArgument: 'warn', removeSsrLoadModule: 'warn' }. `future: 'warn'` would turn on all nine future deprecations (config.ts), adding removeServerModuleGraph, removeServerReloadModule, removeServerPluginContainer, removeServerHot, removeServerTransformRequest, removeServerWarmupRequest. Keys left out stay off; 'warn' is the only value. Caveats: removePluginHookSsrArgument also covers resolveId/load; removeSsrLoadModule also warns on ssrFixStacktrace/ssrRewriteStacktrace. Docs: docs/changes/hotupdate-hook.md, this-environment-in-hooks.md, ssr-using-modulerunner.md.
+
+=== ITEM g05 (vite u1, change-and-update)
+TASK: Raise Vite's default threshold for inlining small assets as base64 during build from 4 KiB to 8 KiB (8192 bytes). Update the documentation accordingly.
+KEY: Code: packages/vite/src/node/constants.ts DEFAULT_ASSETS_INLINE_LIMIT = 8192 (used by build.ts defaults and by asset.ts shouldInline as the fallback when an assetsInlineLimit callback returns undefined). Also update user-visible text that states the default: the JSDoc on assetsInlineLimit in packages/vite/src/node/build.ts ('Default limit is `4096` (4 KiB)' and '@default 4096' -> 8192 / 8 KiB) and the CLI help string for --assetsInlineLimit in packages/vite/src/node/cli.ts ('(default: 4096)' -> 8192). Docs: docs/config/build-options.md build.assetsInlineLimit '**Default:** `4096` (4 KiB)' -> `8192` (8 KiB); docs/guide/cli.md `vite build` options table row for `--assetsInlineLimit <number>` '(default: `4096`)' -> `8192`. docs/guide/assets.md and docs/guide/features.md (WebAssembly, CSP sections) refer to the option by name only and need no change; blog posts/CHANGELOG must not be rewritten. A run that changes only constants.ts, or misses the cli.md table or the cli.ts help text, is incomplete.
+SUMMARY: DEFAULT_ASSETS_INLINE_LIMIT = 8192 in constants.ts (asset.ts fallback and build.ts default use it); build.ts JSDoc 'Default limit is 8192 (8 KiB)' and @default 8192; cli.ts '(default: 8192)'; docs/config/build-options.md default 8192 (8 KiB); docs/guide/cli.md row. assets.md and features.md give no number; blog posts historical.
+DIFF:
+diff --git a/docs/config/build-options.md b/docs/config/build-options.md
+index f1eb571..47947b4 100644
+--- a/docs/config/build-options.md
++++ b/docs/config/build-options.md
+@@ -91,7 +91,7 @@ Specify the directory to nest generated assets under (relative to `build.outDir`
+ ## build.assetsInlineLimit
+ 
+ - **Type:** `number` | `((filePath: string, content: Buffer) => boolean | undefined)`
+-- **Default:** `4096` (4 KiB)
++- **Default:** `8192` (8 KiB)
+ 
+ Imported or referenced assets that are smaller than this threshold will be inlined as base64 URLs to avoid extra http requests. Set to `0` to disable inlining altogether.
+ 
+diff --git a/docs/guide/cli.md b/docs/guide/cli.md
+index f9e1edb..80852c3 100644
+--- a/docs/guide/cli.md
++++ b/docs/guide/cli.md
+@@ -59,7 +59,7 @@ vite build [root]
+ | `--target <target>`            | Transpile target (default: `"baseline-widely-available"`) (`string`)                                                                                                                  |
+ | `--outDir <dir>`               | Output directory (default: `dist`) (`string`)                                                                                                                                         |
+ | `--assetsDir <dir>`            | Directory under outDir to place assets in (default: `"assets"`) (`string`)                                                                                                            |
+-| `--assetsInlineLimit <number>` | Static asset base64 inline threshold in bytes (default: `4096`) (`number`)                                                                                                            |
++| `--assetsInlineLimit <number>` | Static asset base64 inline threshold in bytes (default: `8192`) (`number`)                                                                                                            |
+ | `--ssr [entry]`                | Build specified entry for server-side rendering (`string`)                                                                                                                            |
+ | `--sourcemap [output]`         | Output source maps for build (default: `false`) (`boolean \| "inline" \| "hidden"`)                                                                                                   |
+ | `--minify [minifier]`          | Enable/disable minification, or specify minifier to use (default: `"oxc"`) (`boolean \| "oxc" \| "terser" \| "esbuild"`)                                                              |
+diff --git a/packages/vite/src/node/build.ts b/packages/vite/src/node/build.ts
+index 214cff3..12d815e 100644
+--- a/packages/vite/src/node/build.ts
++++ b/packages/vite/src/node/build.ts
+@@ -137,8 +137,8 @@ export interface BuildEnvironmentOptions {
+    * base64 strings. If a callback is passed, a boolean can be returned to opt-in
+    * or opt-out of inlining. If nothing is returned the default logic applies.
+    *
+-   * Default limit is `4096` (4 KiB). Set to `0` to disable.
+-   * @default 4096
++   * Default limit is `8192` (8 KiB). Set to `0` to disable.
++   * @default 8192
+    */
+   assetsInlineLimit?:
+     | number
+diff --git a/packages/vite/src/node/cli.ts b/packages/vite/src/node/cli.ts
+index ffa19b6..3320466 100644
+--- a/packages/vite/src/node/cli.ts
++++ b/packages/vite/src/node/cli.ts
+@@ -330,7 +330,7 @@ cli
+   )
+   .option(
+     '--assetsInlineLimit <number>',
+-    `[number] static asset base64 inline threshold in bytes (default: 4096)`,
++    `[number] static asset base64 inline threshold in bytes (default: 8192)`,
+   )
+   .option(
+     '--ssr [entry]',
+diff --git a/packages/vite/src/node/constants.ts b/packages/vite/src/node/constants.ts
+index 2e34e42..513f8c0 100644
+--- a/packages/vite/src/node/constants.ts
++++ b/packages/vite/src/node/constants.ts
+@@ -213,7 +213,7 @@ export const DEFAULT_DEV_PORT = 5173
+ 
+ export const DEFAULT_PREVIEW_PORT = 4173
+ 
+-export const DEFAULT_ASSETS_INLINE_LIMIT = 4096
++export const DEFAULT_ASSETS_INLINE_LIMIT = 8192
+ 
+ // the regex to allow loopback address origins:
+ // - localhost domains (which will always resolve to the loopback address by RFC 6761 section 6.3)
+
+=== ITEM g06 (httpx c1, constrained-change)
+TASK: Let people pass a `pathlib.Path` directly as a file in `files=`, so `httpx.post(url, files={"upload": Path("report.xls")})` works, as well as inside the usual tuple form like `("report.xls", Path("report.xls"), "application/vnd.ms-excel")`. Right now that fails.
+KEY: Hidden constraints from docs the prompt does not mention: (1) docs/compatibility.md#upload-files: HTTPX strictly enforces that upload files are opened in BINARY mode, so the path must be opened with 'rb' (opening in text mode would also hit the existing TypeError in FileField). (2) docs/advanced/clients.md#multipart-file-encoding tip: file uploads are streaming by default, only one chunk in memory at a time, so the implementation must NOT do path.read_bytes()/read the whole file; it must open the file and stream it through the existing chunked render_data (CHUNK_SIZE reads), which also keeps Content-Length computable via peek_filelike_length on the opened file. (3) Same clients.md section: for the bare Path form, filename is the path's name and the MIME type is guessed from it, falling back to application/octet-stream; in tuple form an explicit filename of None means no Content-Type header unless given. A correct change handles Path in httpx/_multipart.py (FileField, for both the bare and tuple forms) and adds Path to the accepted file types in httpx/_types.py (FileContent/FileTypes) so type checks pass. Bonus, not required: a test in tests/test_multipart.py, a mention in docs. Fails the task: reading the whole file into bytes, opening in text mode, or only handling the bare (non-tuple) form.
+SUMMARY: pathlib.Path accepted in files= alone or in tuple forms. Changes in httpx/_multipart.py and FileContent alias in httpx/_types.py. Bare Path uses its file name; content type guessed; file opened in binary mode only when the body is produced and streamed in chunks, never read into memory at once; httpx opens and closes the file itself and reopens per send; Content-Length from file size; FileNotFoundError if missing. No docs, changelog or tests.
+DIFF:
+diff --git a/CHANGELOG.md b/CHANGELOG.md
+index a3fa798..a4131b6 100644
+--- a/CHANGELOG.md
++++ b/CHANGELOG.md
+@@ -11,6 +11,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
+ ### Added
+ 
+ * Expose `FunctionAuth` from the public API. (#3699)
++* Allow `pathlib.Path` (or any `os.PathLike`) as a file in `files=...`, on its own or inside the tuple form.
+ 
+ ## 0.28.1 (6th December, 2024)
+ 
+diff --git a/docs/quickstart.md b/docs/quickstart.md
+index e140b53..81caa5f 100644
+--- a/docs/quickstart.md
++++ b/docs/quickstart.md
+@@ -204,6 +204,17 @@ of items for the file value:
+ }
+ ```
+ 
++You can also pass a `pathlib.Path` instead of an open file, either on its own
++or in place of the file in the tuple form. The file is opened, read and closed
++for you each time the request body is sent, and its filename and content type
++are taken from the path unless you give them:
++
++```pycon
++>>> from pathlib import Path
++>>> files = {'upload-file': Path('report.xls')}
++>>> r = httpx.post("https://httpbin.org/post", files=files)
++```
++
+ If you need to include non-file data fields in the multipart form, use the `data=...` parameter:
+ 
+ ```pycon
+diff --git a/httpx/_multipart.py b/httpx/_multipart.py
+index b4761af..988a302 100644
+--- a/httpx/_multipart.py
++++ b/httpx/_multipart.py
+@@ -141,6 +141,9 @@ class FileField:
+             else:
+                 # all 4 parameters included
+                 filename, fileobj, content_type, headers = value  # type: ignore
++        elif isinstance(value, os.PathLike):
++            filename = Path(value).name
++            fileobj = value
+         else:
+             filename = Path(str(getattr(value, "name", "upload"))).name
+             fileobj = value
+@@ -174,6 +177,9 @@ class FileField:
+         if isinstance(self.file, (str, bytes)):
+             return len(headers) + len(to_bytes(self.file))
+ 
++        if isinstance(self.file, os.PathLike):
++            return len(headers) + os.path.getsize(self.file)
++
+         file_length = peek_filelike_length(self.file)
+ 
+         # If we can't determine the filesize without reading it into memory,
+@@ -205,6 +211,16 @@ class FileField:
+             yield to_bytes(self.file)
+             return
+ 
++        if isinstance(self.file, os.PathLike):
++            # Paths are opened lazily, each time the body is rendered, so no
++            # file handle is held open between requests or left unclosed.
++            with open(self.file, "rb") as file:
++                chunk = file.read(self.CHUNK_SIZE)
++                while chunk:
++                    yield chunk
++                    chunk = file.read(self.CHUNK_SIZE)
++            return
++
+         if hasattr(self.file, "seek"):
+             try:
+                 self.file.seek(0)
+diff --git a/httpx/_types.py b/httpx/_types.py
+index 704dfdf..7e06dc3 100644
+--- a/httpx/_types.py
++++ b/httpx/_types.py
+@@ -2,6 +2,7 @@
+ Type definitions for type checking purposes.
+ """
+ 
++import os
+ from http.cookiejar import CookieJar
+ from typing import (
+     IO,
+@@ -71,9 +72,9 @@ ResponseExtensions = Mapping[str, Any]
+ 
+ RequestData = Mapping[str, Any]
+ 
+-FileContent = Union[IO[bytes], bytes, str]
++FileContent = Union[IO[bytes], bytes, str, "os.PathLike[str]"]
+ FileTypes = Union[
+-    # file (or bytes)
++    # file (or bytes, or a path to a file)
+     FileContent,
+     # (filename, file (or bytes))
+     Tuple[Optional[str], FileContent],
+diff --git a/tests/test_multipart.py b/tests/test_multipart.py
+index 764f85a..6bd6bf4 100644
+--- a/tests/test_multipart.py
++++ b/tests/test_multipart.py
+@@ -320,6 +320,46 @@ def test_multipart_encode_files_guesses_correct_content_type(
+     )
+ 
+ 
++def test_multipart_encode_files_allows_path(tmp_path: typing.Any) -> None:
++    path = tmp_path / "report.txt"
++    path.write_bytes(b"<file content>")
++
++    url = "https://www.example.com/"
++    headers = {"Content-Type": "multipart/form-data; boundary=BOUNDARY"}
++    files = {"file": path}
++
++    request = httpx.Request("POST", url, headers=headers, files=files)
++    request.read()
++
++    assert request.headers["Content-Length"] == str(len(request.content))
++    assert request.content == (
++        b'--BOUNDARY\r\nContent-Disposition: form-data; name="file"; '
++        b'filename="report.txt"\r\n'
++        b"Content-Type: text/plain\r\n\r\n<file content>\r\n"
++        b"--BOUNDARY--\r\n"
++    )
++
++
++def test_multipart_encode_files_allows_path_in_tuple(tmp_path: typing.Any) -> None:
++    path = tmp_path / "report.xls"
++    path.write_bytes(b"<file content>")
++
++    url = "https://www.example.com/"
++    headers = {"Content-Type": "multipart/form-data; boundary=BOUNDARY"}
++    files = {"file": ("upload.xls", path, "application/vnd.ms-excel")}
++
++    request = httpx.Request("POST", url, headers=headers, files=files)
++    request.read()
++
++    assert request.headers["Content-Length"] == str(len(request.content))
++    assert request.content == (
++        b'--BOUNDARY\r\nContent-Disposition: form-data; name="file"; '
++        b'filename="upload.xls"\r\n'
++        b"Content-Type: application/vnd.ms-excel\r\n\r\n<file content>\r\n"
++        b"--BOUNDARY--\r\n"
++    )
++
++
+ def test_multipart_encode_files_allows_bytes_content() -> None:
+     url = "https://www.example.com/"
+     headers = {"Content-Type": "multipart/form-data; boundary=BOUNDARY"}
+
+=== ITEM g07 (vite q2, question)
+TASK: I maintain a Vite plugin that implements handleHotUpdate, checks options.ssr inside its transform hook, and calls server.ssrLoadModule from configureServer. Before the next major I want Vite to warn me about exactly these three usages and nothing else. What exactly do I put in my vite config?
+KEY: Use the `future` config option with three keys set to 'warn': `future: { removePluginHookHandleHotUpdate: 'warn', removePluginHookSsrArgument: 'warn', removeSsrLoadModule: 'warn' }`. The three key names come from three different docs: docs/changes/hotupdate-hook.md (future.removePluginHookHandleHotUpdate), docs/changes/this-environment-in-hooks.md (future.removePluginHookSsrArgument), docs/changes/ssr-using-modulerunner.md (future.removeSsrLoadModule); the `future` option itself is in docs/config/shared-options.md#future. Setting `future: 'warn'` is wrong for this question because it enables every future warning (config.ts expands it to all nine keys, including removeServerModuleGraph, removeServerHot, etc.).
+SUMMARY: future: { removePluginHookHandleHotUpdate: 'warn', removePluginHookSsrArgument: 'warn', removeSsrLoadModule: 'warn' }. Don't use future: 'warn' (turns on all nine). Type future?: FutureOptions | 'warn', each key only 'warn'; other six removeServer* keys stay off. Notes when each fires; removeSsrLoadModule also fires for ssrFixStacktrace/ssrRewriteStacktrace; removePluginHookSsrArgument also checked during build.
+
+=== ITEM g08 (vite c1, constrained-change)
+TASK: The dev/preview server code imports the `open` package as soon as the module is loaded, even though it is only needed when a browser actually gets opened (server.open / --open). Change it so the package is only loaded at the point it is actually needed, to help startup time.
+KEY: Change packages/vite/src/node/server/openBrowser.ts: remove the top-level value import `import open from 'open'` (the type-only `import type { Options } from 'open'` may stay) and load it lazily inside the async fallback path of startBrowserProcess, right before it is called. Hidden constraint from CONTRIBUTING.md 'Notes on Dependencies' > 'Usage of require()': dependencies are pre-bundled and kept in devDependencies, so a lazy load must NOT use `require('open')` (or createRequire), which is ignored in ESM and would leave the dep out of the bundle; it must use a dynamic import of the form `(await import('open')).default` (equivalent `const { default: open } = await import('open')` is acceptable). `open` must stay in devDependencies of packages/vite/package.json (not moved to dependencies). The returned promise/error handling (logging err.stack via logger.error, not crashing) must be preserved, including errors from the import itself being caught.
+SUMMARY: Removed top-level `import open from 'open'` in openBrowser.ts, kept `import type { Options } from 'open'`. Fallback in startBrowserProcess runs `import('open').then(({ default: open }) => open(url, options))`. Signature unchanged; errors still logged. Notes open is in package.json; bundler should put dynamic import in a separate chunk.
+DIFF:
+diff --git a/packages/vite/src/node/server/openBrowser.ts b/packages/vite/src/node/server/openBrowser.ts
+index 618d3f9..72f7888 100644
+--- a/packages/vite/src/node/server/openBrowser.ts
++++ b/packages/vite/src/node/server/openBrowser.ts
+@@ -11,7 +11,6 @@
+ import { exec } from 'node:child_process'
+ import type { ExecOptions } from 'node:child_process'
+ import { join } from 'node:path'
+-import open from 'open'
+ import type { Options } from 'open'
+ import colors from 'picocolors'
+ import { x } from 'tinyexec'
+@@ -120,7 +119,9 @@ async function startBrowserProcess(
+       : {}
+ 
+     new Promise((_, reject) => {
+-      open(url, options)
++      // Load `open` lazily: it's only needed when a browser is actually opened
++      import('open')
++        .then(({ default: open }) => open(url, options))
+         .then((subprocess) => {
+           subprocess.on('error', reject)
+         })
+
+=== ITEM g09 (httpx q2, question)
+TASK: I'm moving an integration from `httpx.Client` to `httpx.AsyncClient`. It currently uses: (a) request and response event hooks written as plain functions, (b) a callback passed via the "trace" request extension, (c) a custom `httpx.Auth` subclass that only implements `auth_flow` and does no I/O, (d) a custom transport that subclasses `httpx.BaseTransport`, and (e) a plain generator that yields bytes, passed as `content=` for uploads. For each one, can it be kept as it is, or what has to change?
+KEY: (a) Must change: hooks registered on AsyncClient MUST be async functions (docs/advanced/event-hooks.md note; AsyncClient awaits each hook). (b) Must change: the trace handler must be an `async def` function when using async code (docs/advanced/extensions.md, "trace" section). (c) Can stay as is: auth classes are designed to do no I/O so they work with both sync and async clients; Auth.async_auth_flow defaults to driving auth_flow (docs/advanced/authentication.md#custom-authentication-schemes; httpx/_auth.py). Only if it needed I/O or locks would it have to override sync_auth_flow/async_auth_flow. (d) Must change: subclass httpx.AsyncBaseTransport and implement handle_async_request instead of handle_request (docs/advanced/transports.md#custom-transports). (e) Must change: use an async bytes generator (async def ... yield) for streaming request bodies with AsyncClient (docs/async.md#streaming-requests). Answer is: a, b, d, e change; c stays.
+SUMMARY: Only (c) can stay. (a) hooks must be async def (client awaits; docs/advanced/event-hooks.md), use await response.aread(). (b) trace must be async def (docs/advanced/extensions.md). (c) Auth with only auth_flow keeps: default async_auth_flow calls auth_flow. (d) Transport must subclass AsyncBaseTransport with async handle_async_request, aclose, async stream; wrap AsyncHTTPTransport. (e) Plain generator must become async generator; sync stream raises 'Attempted to send a sync request with an AsyncClient instance.' (docs/async.md).
+
+=== ITEM g10 (httpx q1, question)
+TASK: If I create a plain `httpx.Client()` with no arguments and no environment variables set, what are the effective defaults for: the connect, read, write and pool timeouts; the maximum total connections and maximum keep-alive connections in the pool; how long an idle keep-alive connection is kept; whether a 302 response is followed automatically; and, if I turn redirect following on, how many redirects it will follow before giving up and which exception it raises then?
+KEY: Timeouts: 5 seconds for each of connect, read, write and pool (DEFAULT_TIMEOUT_CONFIG = Timeout(timeout=5.0); docs/advanced/timeouts.md intro and docs/quickstart.md#timeouts). Pool: max_connections=100, max_keepalive_connections=20 (docs/advanced/resource-limits.md; DEFAULT_LIMITS in httpx/_config.py). Note a bare httpx.Limits() has None/None, so the 100/20 values come only from the client default DEFAULT_LIMITS. keepalive_expiry: 5 seconds. Redirects: NOT followed by default (follow_redirects=False); the 302 response is returned with response.next_request set (docs/compatibility.md#redirects, docs/quickstart.md#redirection-and-history). With follow_redirects=True the limit is max_redirects=20 (DEFAULT_MAX_REDIRECTS in httpx/_config.py; not stated in the markdown docs), and exceeding it raises httpx.TooManyRedirects (a RequestError subclass, per docs/exceptions.md hierarchy). Full marks need all of: 5s x4, 100, 20, 5s, not followed, 20, TooManyRedirects.
+SUMMARY: Timeouts: connect/read/write/pool each 5.0s (DEFAULT_TIMEOUT_CONFIG = Timeout(timeout=5.0)). Pool: max_connections=100, max_keepalive_connections=20 (DEFAULT_LIMITS). Keep-alive expiry 5.0s. 302 not followed (follow_redirects=False), response.next_request available. With follow_redirects=True: max_redirects 20 (DEFAULT_MAX_REDIRECTS); raises httpx.TooManyRedirects ('Exceeded maximum allowed redirects.'), subclass of RequestError, when a 21st comes back.
+
+=== ITEM g11 (httpx u1, change-and-update)
+TASK: Raise HTTPX's default timeout from 5 seconds to 10 seconds, both for the library and for the `httpx` command-line client. Update the documentation accordingly.
+KEY: Code: httpx/_config.py DEFAULT_TIMEOUT_CONFIG = Timeout(timeout=10.0) (used by Client, AsyncClient and the top-level API functions in _api.py); httpx/_main.py: the --timeout click option default=5.0 -> 10.0 and its help text '[Default: 5.0]', plus the same '[Default: 5.0]' in the hand-written help table in print_help(). Leave Limits keepalive_expiry=5.0 and the explicit 5.0 examples in the Timeout docstring and docs/advanced/extensions.md alone (they are explicit values, not defaults). Docs that state the default and must be updated: (1) docs/advanced/timeouts.md intro: 'raise a TimeoutException after 5 seconds of network inactivity' -> 10 seconds; (2) docs/advanced/timeouts.md#setting-a-default-timeout-on-a-client: comment 'client = httpx.Client()  # Use a default 5s timeout everywhere.' -> 10s; (3) docs/quickstart.md#timeouts: 'The default timeout for network inactivity is five seconds' -> ten seconds; (4) docs/logging.md example debug output shows timeout=5.0 on the connect_tcp.started and start_tls.started lines for a default httpx.get(), which should become timeout=10.0. docs/compatibility.md#timeouts only says 'reasonable timeouts' and needs no change. The docs/img/httpx-help.png screenshot shows the old CLI default but is an image; noting it is fine, editing it is not expected. A CHANGELOG 'Changed' entry under 1.0.0 (Unreleased) is acceptable but not required.
+SUMMARY: Default timeout 5 -> 10s. httpx/_config.py DEFAULT_TIMEOUT_CONFIG = Timeout(timeout=10.0); httpx/_main.py --timeout default 10.0 and both help texts. Docs: docs/advanced/timeouts.md 'after 10 seconds' and 'default 10s timeout', custom example changed to 20.0; docs/quickstart.md 'ten seconds'; docs/logging.md sample output now timeout=10.0; CHANGELOG entry. Left: Timeout docstring examples, extensions docs, tests.
+DIFF:
+diff --git a/CHANGELOG.md b/CHANGELOG.md
+index a3fa798..30bf0b6 100644
+--- a/CHANGELOG.md
++++ b/CHANGELOG.md
+@@ -7,6 +7,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
+ ## 1.0.0 (Unreleased)
+ 
+ * Minimum supported Python version is now 3.10
++* The default timeout is now 10 seconds, up from 5 seconds, for both the library and the `httpx` command-line client.
+ 
+ ### Added
+ 
+diff --git a/docs/advanced/timeouts.md b/docs/advanced/timeouts.md
+index aedcfb6..32f9693 100644
+--- a/docs/advanced/timeouts.md
++++ b/docs/advanced/timeouts.md
+@@ -1,6 +1,6 @@
+ HTTPX is careful to enforce timeouts everywhere by default.
+ 
+-The default behavior is to raise a `TimeoutException` after 5 seconds of
++The default behavior is to raise a `TimeoutException` after 10 seconds of
+ network inactivity.
+ 
+ ## Setting and disabling timeouts
+@@ -33,8 +33,8 @@ You can set a timeout on a client instance, which results in the given
+ `timeout` being used as the default for requests made with this client:
+ 
+ ```python
+-client = httpx.Client()              # Use a default 5s timeout everywhere.
+-client = httpx.Client(timeout=10.0)  # Use a default 10s timeout everywhere.
++client = httpx.Client()              # Use a default 10s timeout everywhere.
++client = httpx.Client(timeout=20.0)  # Use a default 20s timeout everywhere.
+ client = httpx.Client(timeout=None)  # Disable all timeouts by default.
+ ```
+ 
+diff --git a/docs/logging.md b/docs/logging.md
+index b3c5781..4ba1af2 100644
+--- a/docs/logging.md
++++ b/docs/logging.md
+@@ -20,9 +20,9 @@ httpx.get("https://www.example.com")
+ Will send debug level output to the console, or wherever `stdout` is directed too...
+ 
+ ```
+-DEBUG [2024-09-28 17:27:40] httpcore.connection - connect_tcp.started host='www.example.com' port=443 local_address=None timeout=5.0 socket_options=None
++DEBUG [2024-09-28 17:27:40] httpcore.connection - connect_tcp.started host='www.example.com' port=443 local_address=None timeout=10.0 socket_options=None
+ DEBUG [2024-09-28 17:27:41] httpcore.connection - connect_tcp.complete return_value=<httpcore._backends.sync.SyncStream object at 0x101f1e8e0>
+-DEBUG [2024-09-28 17:27:41] httpcore.connection - start_tls.started ssl_context=SSLContext(verify=True) server_hostname='www.example.com' timeout=5.0
++DEBUG [2024-09-28 17:27:41] httpcore.connection - start_tls.started ssl_context=SSLContext(verify=True) server_hostname='www.example.com' timeout=10.0
+ DEBUG [2024-09-28 17:27:41] httpcore.connection - start_tls.complete return_value=<httpcore._backends.sync.SyncStream object at 0x1020f49a0>
+ DEBUG [2024-09-28 17:27:41] httpcore.http11 - send_request_headers.started request=<Request [b'GET']>
+ DEBUG [2024-09-28 17:27:41] httpcore.http11 - send_request_headers.complete
+diff --git a/docs/quickstart.md b/docs/quickstart.md
+index e140b53..cd7011c 100644
+--- a/docs/quickstart.md
++++ b/docs/quickstart.md
+@@ -454,7 +454,7 @@ HTTPX defaults to including reasonable timeouts for all network operations,
+ meaning that if a connection is not properly established then it should always
+ raise an error rather than hanging indefinitely.
+ 
+-The default timeout for network inactivity is five seconds. You can modify the
++The default timeout for network inactivity is ten seconds. You can modify the
+ value to be more or less strict:
+ 
+ ```pycon
+diff --git a/httpx/_config.py b/httpx/_config.py
+index 467a6c9..d10b32a 100644
+--- a/httpx/_config.py
++++ b/httpx/_config.py
+@@ -243,6 +243,6 @@ class Proxy:
+         return f"Proxy({url_str}{auth_str}{headers_str})"
+ 
+ 
+-DEFAULT_TIMEOUT_CONFIG = Timeout(timeout=5.0)
++DEFAULT_TIMEOUT_CONFIG = Timeout(timeout=10.0)
+ DEFAULT_LIMITS = Limits(max_connections=100, max_keepalive_connections=20)
+ DEFAULT_MAX_REDIRECTS = 20
+diff --git a/httpx/_main.py b/httpx/_main.py
+index cffa4bb..480bc52 100644
+--- a/httpx/_main.py
++++ b/httpx/_main.py
+@@ -81,7 +81,7 @@ def print_help() -> None:
+     table.add_row(
+         "--timeout [cyan]FLOAT",
+         "Timeout value to use for network operations, such as establishing the"
+-        " connection, reading some data, etc... [Default: 5.0]",
++        " connection, reading some data, etc... [Default: 10.0]",
+     )
+ 
+     table.add_row("--follow-redirects", "Automatically follow redirects.")
+@@ -400,10 +400,10 @@ def handle_help(
+     "--timeout",
+     "timeout",
+     type=float,
+-    default=5.0,
++    default=10.0,
+     help=(
+         "Timeout value to use for network operations, such as establishing the "
+-        "connection, reading some data, etc... [Default: 5.0]"
++        "connection, reading some data, etc... [Default: 10.0]"
+     ),
+ )
+ @click.option(
+
+=== ITEM g12 (vite q2, question)
+TASK: I maintain a Vite plugin that implements handleHotUpdate, checks options.ssr inside its transform hook, and calls server.ssrLoadModule from configureServer. Before the next major I want Vite to warn me about exactly these three usages and nothing else. What exactly do I put in my vite config?
+KEY: Use the `future` config option with three keys set to 'warn': `future: { removePluginHookHandleHotUpdate: 'warn', removePluginHookSsrArgument: 'warn', removeSsrLoadModule: 'warn' }`. The three key names come from three different docs: docs/changes/hotupdate-hook.md (future.removePluginHookHandleHotUpdate), docs/changes/this-environment-in-hooks.md (future.removePluginHookSsrArgument), docs/changes/ssr-using-modulerunner.md (future.removeSsrLoadModule); the `future` option itself is in docs/config/shared-options.md#future. Setting `future: 'warn'` is wrong for this question because it enables every future warning (config.ts expands it to all nine keys, including removeServerModuleGraph, removeServerHot, etc.).
+SUMMARY: future: { removePluginHookHandleHotUpdate: 'warn', removePluginHookSsrArgument: 'warn', removeSsrLoadModule: 'warn' }. Keys from docs/changes hotupdate-hook, this-environment-in-hooks, ssr-using-modulerunner; declared in FutureOptions. Don't use future: 'warn' shorthand: turns on all nine, adding six removeServer* warnings. Keys left out stay undefined. Notes experimental status.
+
+=== ITEM g13 (vite q2, question)
+TASK: I maintain a Vite plugin that implements handleHotUpdate, checks options.ssr inside its transform hook, and calls server.ssrLoadModule from configureServer. Before the next major I want Vite to warn me about exactly these three usages and nothing else. What exactly do I put in my vite config?
+KEY: Use the `future` config option with three keys set to 'warn': `future: { removePluginHookHandleHotUpdate: 'warn', removePluginHookSsrArgument: 'warn', removeSsrLoadModule: 'warn' }`. The three key names come from three different docs: docs/changes/hotupdate-hook.md (future.removePluginHookHandleHotUpdate), docs/changes/this-environment-in-hooks.md (future.removePluginHookSsrArgument), docs/changes/ssr-using-modulerunner.md (future.removeSsrLoadModule); the `future` option itself is in docs/config/shared-options.md#future. Setting `future: 'warn'` is wrong for this question because it enables every future warning (config.ts expands it to all nine keys, including removeServerModuleGraph, removeServerHot, etc.).
+SUMMARY: future: { removePluginHookHandleHotUpdate: 'warn', removePluginHookSsrArgument: 'warn', removeSsrLoadModule: 'warn' }. Names from the Future Deprecation notes in docs/changes/hotupdate-hook.md, this-environment-in-hooks.md, ssr-using-modulerunner.md; option type in docs/config/shared-options.md#future; every flag undefined by default. Leave out removeServer* flags; avoid any shorthand that turns all flags on (config.ts seems to set all to 'warn' together).
+
+=== ITEM g14 (httpx q1, question)
+TASK: If I create a plain `httpx.Client()` with no arguments and no environment variables set, what are the effective defaults for: the connect, read, write and pool timeouts; the maximum total connections and maximum keep-alive connections in the pool; how long an idle keep-alive connection is kept; whether a 302 response is followed automatically; and, if I turn redirect following on, how many redirects it will follow before giving up and which exception it raises then?
+KEY: Timeouts: 5 seconds for each of connect, read, write and pool (DEFAULT_TIMEOUT_CONFIG = Timeout(timeout=5.0); docs/advanced/timeouts.md intro and docs/quickstart.md#timeouts). Pool: max_connections=100, max_keepalive_connections=20 (docs/advanced/resource-limits.md; DEFAULT_LIMITS in httpx/_config.py). Note a bare httpx.Limits() has None/None, so the 100/20 values come only from the client default DEFAULT_LIMITS. keepalive_expiry: 5 seconds. Redirects: NOT followed by default (follow_redirects=False); the 302 response is returned with response.next_request set (docs/compatibility.md#redirects, docs/quickstart.md#redirection-and-history). With follow_redirects=True the limit is max_redirects=20 (DEFAULT_MAX_REDIRECTS in httpx/_config.py; not stated in the markdown docs), and exceeding it raises httpx.TooManyRedirects (a RequestError subclass, per docs/exceptions.md hierarchy). Full marks need all of: 5s x4, 100, 20, 5s, not followed, 20, TooManyRedirects.
+SUMMARY: Timeouts all 5.0s (DEFAULT_TIMEOUT_CONFIG). Max total connections 100, keep-alive 20 (DEFAULT_LIMITS). Idle keep-alive expiry 5.0s. 302 not followed (follow_redirects=False), next_request holds it. With follow_redirects=True: max_redirects 20; on the 21st raises httpx.TooManyRedirects 'Exceeded maximum allowed redirects.', subclass of RequestError, which sits under TransportError/HTTPError.
+
+=== ITEM g15 (httpx q1, question)
+TASK: If I create a plain `httpx.Client()` with no arguments and no environment variables set, what are the effective defaults for: the connect, read, write and pool timeouts; the maximum total connections and maximum keep-alive connections in the pool; how long an idle keep-alive connection is kept; whether a 302 response is followed automatically; and, if I turn redirect following on, how many redirects it will follow before giving up and which exception it raises then?
+KEY: Timeouts: 5 seconds for each of connect, read, write and pool (DEFAULT_TIMEOUT_CONFIG = Timeout(timeout=5.0); docs/advanced/timeouts.md intro and docs/quickstart.md#timeouts). Pool: max_connections=100, max_keepalive_connections=20 (docs/advanced/resource-limits.md; DEFAULT_LIMITS in httpx/_config.py). Note a bare httpx.Limits() has None/None, so the 100/20 values come only from the client default DEFAULT_LIMITS. keepalive_expiry: 5 seconds. Redirects: NOT followed by default (follow_redirects=False); the 302 response is returned with response.next_request set (docs/compatibility.md#redirects, docs/quickstart.md#redirection-and-history). With follow_redirects=True the limit is max_redirects=20 (DEFAULT_MAX_REDIRECTS in httpx/_config.py; not stated in the markdown docs), and exceeding it raises httpx.TooManyRedirects (a RequestError subclass, per docs/exceptions.md hierarchy). Full marks need all of: 5s x4, 100, 20, 5s, not followed, 20, TooManyRedirects.
+SUMMARY: Timeouts each 5.0s (DEFAULT_TIMEOUT_CONFIG). Pool: 100 total, 20 keep-alive (DEFAULT_LIMITS). keepalive_expiry 5.0s from Limits default. 302 not followed (follow_redirects=False). With following on: max_redirects 20 (DEFAULT_MAX_REDIRECTS); raises httpx.TooManyRedirects ('Exceeded maximum allowed redirects.'), subclass of RequestError.
+
+=== ITEM g16 (httpx c1, constrained-change)
+TASK: Let people pass a `pathlib.Path` directly as a file in `files=`, so `httpx.post(url, files={"upload": Path("report.xls")})` works, as well as inside the usual tuple form like `("report.xls", Path("report.xls"), "application/vnd.ms-excel")`. Right now that fails.
+KEY: Hidden constraints from docs the prompt does not mention: (1) docs/compatibility.md#upload-files: HTTPX strictly enforces that upload files are opened in BINARY mode, so the path must be opened with 'rb' (opening in text mode would also hit the existing TypeError in FileField). (2) docs/advanced/clients.md#multipart-file-encoding tip: file uploads are streaming by default, only one chunk in memory at a time, so the implementation must NOT do path.read_bytes()/read the whole file; it must open the file and stream it through the existing chunked render_data (CHUNK_SIZE reads), which also keeps Content-Length computable via peek_filelike_length on the opened file. (3) Same clients.md section: for the bare Path form, filename is the path's name and the MIME type is guessed from it, falling back to application/octet-stream; in tuple form an explicit filename of None means no Content-Type header unless given. A correct change handles Path in httpx/_multipart.py (FileField, for both the bare and tuple forms) and adds Path to the accepted file types in httpx/_types.py (FileContent/FileTypes) so type checks pass. Bonus, not required: a test in tests/test_multipart.py, a mention in docs. Fails the task: reading the whole file into bytes, opening in text mode, or only handling the bare (non-tuple) form.
+SUMMARY: files= accepts pathlib.Path / os.PathLike, bare and in tuples. httpx/_types.py FileContent includes os.PathLike[str]. httpx/_multipart.py FileField: name from path, content type guessed, length from size on disk, opened in binary mode when body is written and read in 64 KiB chunks then closed, reopened on resend, FileNotFoundError if missing. Tests added. Docs and CHANGELOG not updated.
+DIFF:
+diff --git a/CHANGELOG.md b/CHANGELOG.md
+index a3fa798..4fe1a3c 100644
+--- a/CHANGELOG.md
++++ b/CHANGELOG.md
+@@ -11,6 +11,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
+ ### Added
+ 
+ * Expose `FunctionAuth` from the public API. (#3699)
++* Allow `pathlib.Path` values in `files=...`, either directly or inside the tuple form.
+ 
+ ## 0.28.1 (6th December, 2024)
+ 
+diff --git a/docs/quickstart.md b/docs/quickstart.md
+index e140b53..d06549d 100644
+--- a/docs/quickstart.md
++++ b/docs/quickstart.md
+@@ -204,6 +204,17 @@ of items for the file value:
+ }
+ ```
+ 
++You can also pass a `pathlib.Path`, either directly or in place of the file
++object in the tuple form. The file is opened and read when the request is sent:
++
++```pycon
++>>> from pathlib import Path
++>>> files = {'upload-file': Path('report.xls')}
++>>> r = httpx.post("https://httpbin.org/post", files=files)
++>>> files = {'upload-file': ('report.xls', Path('report.xls'), 'application/vnd.ms-excel')}
++>>> r = httpx.post("https://httpbin.org/post", files=files)
++```
++
+ If you need to include non-file data fields in the multipart form, use the `data=...` parameter:
+ 
+ ```pycon
+diff --git a/httpx/_multipart.py b/httpx/_multipart.py
+index b4761af..69dbe14 100644
+--- a/httpx/_multipart.py
++++ b/httpx/_multipart.py
+@@ -164,6 +164,15 @@ class FileField:
+                 "Multipart file uploads must be opened in binary mode, not text mode."
+             )
+ 
++        if isinstance(fileobj, Path):
++            # A path is opened lazily when the body is rendered, so no file
++            # handle is held open between building and sending the request.
++            if not fileobj.is_file():
++                raise FileNotFoundError(
++                    f"Multipart file upload path does not exist or is not a file:"
++                    f" {str(fileobj)!r}"
++                )
++
+         self.filename = filename
+         self.file = fileobj
+         self.headers = headers
+@@ -174,6 +183,9 @@ class FileField:
+         if isinstance(self.file, (str, bytes)):
+             return len(headers) + len(to_bytes(self.file))
+ 
++        if isinstance(self.file, Path):
++            return len(headers) + self.file.stat().st_size
++
+         file_length = peek_filelike_length(self.file)
+ 
+         # If we can't determine the filesize without reading it into memory,
+@@ -205,6 +217,14 @@ class FileField:
+             yield to_bytes(self.file)
+             return
+ 
++        if isinstance(self.file, Path):
++            with self.file.open("rb") as fileobj:
++                chunk = fileobj.read(self.CHUNK_SIZE)
++                while chunk:
++                    yield chunk
++                    chunk = fileobj.read(self.CHUNK_SIZE)
++            return
++
+         if hasattr(self.file, "seek"):
+             try:
+                 self.file.seek(0)
+diff --git a/httpx/_types.py b/httpx/_types.py
+index 704dfdf..2c4c75f 100644
+--- a/httpx/_types.py
++++ b/httpx/_types.py
+@@ -3,6 +3,7 @@ Type definitions for type checking purposes.
+ """
+ 
+ from http.cookiejar import CookieJar
++from pathlib import Path
+ from typing import (
+     IO,
+     TYPE_CHECKING,
+@@ -71,7 +72,7 @@ ResponseExtensions = Mapping[str, Any]
+ 
+ RequestData = Mapping[str, Any]
+ 
+-FileContent = Union[IO[bytes], bytes, str]
++FileContent = Union[IO[bytes], bytes, str, Path]
+ FileTypes = Union[
+     # file (or bytes)
+     FileContent,
+diff --git a/tests/test_multipart.py b/tests/test_multipart.py
+index 764f85a..a6f4e6a 100644
+--- a/tests/test_multipart.py
++++ b/tests/test_multipart.py
+@@ -1,6 +1,7 @@
+ from __future__ import annotations
+ 
+ import io
++import pathlib
+ import tempfile
+ import typing
+ 
+@@ -364,6 +365,63 @@ def test_multipart_encode_files_allows_str_content() -> None:
+     )
+ 
+ 
++def test_multipart_encode_files_allows_path(tmp_path: typing.Any) -> None:
++    path = tmp_path / "report.txt"
++    path.write_bytes(b"<file content>")
++
++    url = "https://www.example.com/"
++    headers = {"Content-Type": "multipart/form-data; boundary=BOUNDARY"}
++    files = {"file": pathlib.Path(path)}
++
++    request = httpx.Request("POST", url, headers=headers, files=files)
++    request.read()
++
++    assert request.headers == {
++        "Host": "www.example.com",
++        "Content-Type": "multipart/form-data; boundary=BOUNDARY",
++        "Content-Length": str(len(request.content)),
++    }
++    assert request.content == (
++        '--BOUNDARY\r\nContent-Disposition: form-data; name="file"; '
++        'filename="report.txt"\r\n'
++        "Content-Type: text/plain\r\n\r\n<file content>\r\n"
++        "--BOUNDARY--\r\n"
++        "".encode("ascii")
++    )
++
++
++def test_multipart_encode_files_allows_path_in_tuple(tmp_path: typing.Any) -> None:
++    path = tmp_path / "data.bin"
++    path.write_bytes(b"<file content>")
++
++    url = "https://www.example.com/"
++    headers = {"Content-Type": "multipart/form-data; boundary=BOUNDARY"}
++    files = {"file": ("report.xls", path, "application/vnd.ms-excel")}
++
++    request = httpx.Request("POST", url, headers=headers, files=files)
++    request.read()
++
++    assert request.headers["Content-Length"] == str(len(request.content))
++    assert request.content == (
++        '--BOUNDARY\r\nContent-Disposition: form-data; name="file"; '
++        'filename="report.xls"\r\n'
++        "Content-Type: application/vnd.ms-excel\r\n\r\n<file content>\r\n"
++        "--BOUNDARY--\r\n"
++        "".encode("ascii")
++    )
++    # The path is reopened on each render, so the body can be produced again.
++    assert b"".join(request.stream) == request.content  # type: ignore
++
++
++def test_multipart_encode_files_raises_exception_with_missing_path(
++    tmp_path: typing.Any,
++) -> None:
++    url = "https://www.example.com"
++    files = {"file": tmp_path / "missing.txt"}
++    with pytest.raises(FileNotFoundError):
++        httpx.Request("POST", url, files=files)
++
++
+ def test_multipart_encode_files_raises_exception_with_StringIO_content() -> None:
+     url = "https://www.example.com"
+     files = {"file": ("test.txt", io.StringIO("content"), "text/plain")}
+
+=== ITEM g17 (vite q1, question)
+TASK: We're on Vite 8 with the default build config (no build.target set). Some customers on older Firefox get a broken page. If I add @vitejs/plugin-legacy with no options at all, what is the oldest Firefox version that will be served the modern (non-legacy) chunks, and how does that compare with the oldest Firefox the default build supports without the plugin? Would a Firefox 108 user get the modern or the legacy build once the plugin is added?
+KEY: Without the plugin, the default build.target ('baseline-widely-available') supports Firefox >=114 (docs/guide/build.md Browser Compatibility; docs/config/build-options.md build.target lists ['chrome111','edge111','firefox114','safari16.4','ios16.4']; constant ESBUILD_BASELINE_WIDELY_AVAILABLE_TARGET). With plugin-legacy and no modernTargets, the plugin overrides build.target for the modern chunks to its built-in modern targets: 'edge>=105, firefox>=106, chrome>=105, safari>=16.4, chromeAndroid>=105, iOS>=16.4' (packages/plugin-legacy/README.md `modernTargets` default; source sets config.build.target = modernTargetsEsbuild, which contains 'firefox106'). So the minimum Firefox for modern chunks becomes 106 (lower than 114). A Firefox 108 user gets the modern chunks. Answer must give 106 with the plugin and 114 without, and 'modern' for Firefox 108.
+SUMMARY: With plugin-legacy and no options, Firefox 106 is the oldest for modern chunks; default build without the plugin supports Firefox 114+ (ESBUILD_BASELINE_WIDELY_AVAILABLE_TARGET; docs/guide/build.md, docs/config/build-options.md). Plugin replaces build.target with modernTargetsEsbuild (es2020, edge105, firefox106, chrome105, safari16.4, ios16.4). Firefox 108 gets the modern build. Notes stale types.ts comment.
+
+=== ITEM g18 (httpx u1, change-and-update)
+TASK: Raise HTTPX's default timeout from 5 seconds to 10 seconds, both for the library and for the `httpx` command-line client. Update the documentation accordingly.
+KEY: Code: httpx/_config.py DEFAULT_TIMEOUT_CONFIG = Timeout(timeout=10.0) (used by Client, AsyncClient and the top-level API functions in _api.py); httpx/_main.py: the --timeout click option default=5.0 -> 10.0 and its help text '[Default: 5.0]', plus the same '[Default: 5.0]' in the hand-written help table in print_help(). Leave Limits keepalive_expiry=5.0 and the explicit 5.0 examples in the Timeout docstring and docs/advanced/extensions.md alone (they are explicit values, not defaults). Docs that state the default and must be updated: (1) docs/advanced/timeouts.md intro: 'raise a TimeoutException after 5 seconds of network inactivity' -> 10 seconds; (2) docs/advanced/timeouts.md#setting-a-default-timeout-on-a-client: comment 'client = httpx.Client()  # Use a default 5s timeout everywhere.' -> 10s; (3) docs/quickstart.md#timeouts: 'The default timeout for network inactivity is five seconds' -> ten seconds; (4) docs/logging.md example debug output shows timeout=5.0 on the connect_tcp.started and start_tls.started lines for a default httpx.get(), which should become timeout=10.0. docs/compatibility.md#timeouts only says 'reasonable timeouts' and needs no change. The docs/img/httpx-help.png screenshot shows the old CLI default but is an image; noting it is fine, editing it is not expected. A CHANGELOG 'Changed' entry under 1.0.0 (Unreleased) is acceptable but not required.
+SUMMARY: Raised default timeout 5s -> 10s. httpx/_config.py DEFAULT_TIMEOUT_CONFIG = Timeout(timeout=10.0); httpx/_main.py --timeout default 10.0 and both help texts; docs/advanced/timeouts.md 'after 10 seconds'; docs/quickstart.md 'ten seconds'; CHANGELOG.md entry. Left alone: extensions.md explicit 5.0 examples, Timeout docstring examples, docs/logging.md sample log output, explicit tests.
+DIFF:
+diff --git a/CHANGELOG.md b/CHANGELOG.md
+index a3fa798..90cb1c5 100644
+--- a/CHANGELOG.md
++++ b/CHANGELOG.md
+@@ -12,6 +12,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
+ 
+ * Expose `FunctionAuth` from the public API. (#3699)
+ 
++### Changed
++
++* The default timeout is now 10 seconds, up from 5 seconds. This applies to both the library and the `httpx` command-line client.
++
+ ## 0.28.1 (6th December, 2024)
+ 
+ * Fix SSL case where `verify=False` together with client side certificates.
+diff --git a/docs/advanced/timeouts.md b/docs/advanced/timeouts.md
+index aedcfb6..06c7e77 100644
+--- a/docs/advanced/timeouts.md
++++ b/docs/advanced/timeouts.md
+@@ -1,6 +1,6 @@
+ HTTPX is careful to enforce timeouts everywhere by default.
+ 
+-The default behavior is to raise a `TimeoutException` after 5 seconds of
++The default behavior is to raise a `TimeoutException` after 10 seconds of
+ network inactivity.
+ 
+ ## Setting and disabling timeouts
+diff --git a/docs/quickstart.md b/docs/quickstart.md
+index e140b53..cd7011c 100644
+--- a/docs/quickstart.md
++++ b/docs/quickstart.md
+@@ -454,7 +454,7 @@ HTTPX defaults to including reasonable timeouts for all network operations,
+ meaning that if a connection is not properly established then it should always
+ raise an error rather than hanging indefinitely.
+ 
+-The default timeout for network inactivity is five seconds. You can modify the
++The default timeout for network inactivity is ten seconds. You can modify the
+ value to be more or less strict:
+ 
+ ```pycon
+diff --git a/httpx/_config.py b/httpx/_config.py
+index 467a6c9..d10b32a 100644
+--- a/httpx/_config.py
++++ b/httpx/_config.py
+@@ -243,6 +243,6 @@ class Proxy:
+         return f"Proxy({url_str}{auth_str}{headers_str})"
+ 
+ 
+-DEFAULT_TIMEOUT_CONFIG = Timeout(timeout=5.0)
++DEFAULT_TIMEOUT_CONFIG = Timeout(timeout=10.0)
+ DEFAULT_LIMITS = Limits(max_connections=100, max_keepalive_connections=20)
+ DEFAULT_MAX_REDIRECTS = 20
+diff --git a/httpx/_main.py b/httpx/_main.py
+index cffa4bb..480bc52 100644
+--- a/httpx/_main.py
++++ b/httpx/_main.py
+@@ -81,7 +81,7 @@ def print_help() -> None:
+     table.add_row(
+         "--timeout [cyan]FLOAT",
+         "Timeout value to use for network operations, such as establishing the"
+-        " connection, reading some data, etc... [Default: 5.0]",
++        " connection, reading some data, etc... [Default: 10.0]",
+     )
+ 
+     table.add_row("--follow-redirects", "Automatically follow redirects.")
+@@ -400,10 +400,10 @@ def handle_help(
+     "--timeout",
+     "timeout",
+     type=float,
+-    default=5.0,
++    default=10.0,
+     help=(
+         "Timeout value to use for network operations, such as establishing the "
+-        "connection, reading some data, etc... [Default: 5.0]"
++        "connection, reading some data, etc... [Default: 10.0]"
+     ),
+ )
+ @click.option(
+
+=== ITEM g19 (httpx u1, change-and-update)
+TASK: Raise HTTPX's default timeout from 5 seconds to 10 seconds, both for the library and for the `httpx` command-line client. Update the documentation accordingly.
+KEY: Code: httpx/_config.py DEFAULT_TIMEOUT_CONFIG = Timeout(timeout=10.0) (used by Client, AsyncClient and the top-level API functions in _api.py); httpx/_main.py: the --timeout click option default=5.0 -> 10.0 and its help text '[Default: 5.0]', plus the same '[Default: 5.0]' in the hand-written help table in print_help(). Leave Limits keepalive_expiry=5.0 and the explicit 5.0 examples in the Timeout docstring and docs/advanced/extensions.md alone (they are explicit values, not defaults). Docs that state the default and must be updated: (1) docs/advanced/timeouts.md intro: 'raise a TimeoutException after 5 seconds of network inactivity' -> 10 seconds; (2) docs/advanced/timeouts.md#setting-a-default-timeout-on-a-client: comment 'client = httpx.Client()  # Use a default 5s timeout everywhere.' -> 10s; (3) docs/quickstart.md#timeouts: 'The default timeout for network inactivity is five seconds' -> ten seconds; (4) docs/logging.md example debug output shows timeout=5.0 on the connect_tcp.started and start_tls.started lines for a default httpx.get(), which should become timeout=10.0. docs/compatibility.md#timeouts only says 'reasonable timeouts' and needs no change. The docs/img/httpx-help.png screenshot shows the old CLI default but is an image; noting it is fine, editing it is not expected. A CHANGELOG 'Changed' entry under 1.0.0 (Unreleased) is acceptable but not required.
+SUMMARY: Default timeout now 10s for library and CLI. _config.py DEFAULT_TIMEOUT_CONFIG = Timeout(timeout=10.0); _main.py --timeout default 10.0 and both help texts; docs/quickstart.md 'ten seconds'; docs/advanced/timeouts.md intro and comment 'default 10s', changed the non-default example from 10.0 to 20.0; CHANGELOG.md entry. Left: Timeout docstring 5.0 examples, docs/logging.md and extensions.md explicit 5.0 values, explicit tests.
+DIFF:
+diff --git a/CHANGELOG.md b/CHANGELOG.md
+index a3fa798..82b2e09 100644
+--- a/CHANGELOG.md
++++ b/CHANGELOG.md
+@@ -8,6 +8,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
+ 
+ * Minimum supported Python version is now 3.10
+ 
++### Changed
++
++* The default timeout is now 10 seconds, raised from 5 seconds. This applies to both the library and the `httpx` command-line client.
++
+ ### Added
+ 
+ * Expose `FunctionAuth` from the public API. (#3699)
+diff --git a/docs/advanced/timeouts.md b/docs/advanced/timeouts.md
+index aedcfb6..32f9693 100644
+--- a/docs/advanced/timeouts.md
++++ b/docs/advanced/timeouts.md
+@@ -1,6 +1,6 @@
+ HTTPX is careful to enforce timeouts everywhere by default.
+ 
+-The default behavior is to raise a `TimeoutException` after 5 seconds of
++The default behavior is to raise a `TimeoutException` after 10 seconds of
+ network inactivity.
+ 
+ ## Setting and disabling timeouts
+@@ -33,8 +33,8 @@ You can set a timeout on a client instance, which results in the given
+ `timeout` being used as the default for requests made with this client:
+ 
+ ```python
+-client = httpx.Client()              # Use a default 5s timeout everywhere.
+-client = httpx.Client(timeout=10.0)  # Use a default 10s timeout everywhere.
++client = httpx.Client()              # Use a default 10s timeout everywhere.
++client = httpx.Client(timeout=20.0)  # Use a default 20s timeout everywhere.
+ client = httpx.Client(timeout=None)  # Disable all timeouts by default.
+ ```
+ 
+diff --git a/docs/quickstart.md b/docs/quickstart.md
+index e140b53..cd7011c 100644
+--- a/docs/quickstart.md
++++ b/docs/quickstart.md
+@@ -454,7 +454,7 @@ HTTPX defaults to including reasonable timeouts for all network operations,
+ meaning that if a connection is not properly established then it should always
+ raise an error rather than hanging indefinitely.
+ 
+-The default timeout for network inactivity is five seconds. You can modify the
++The default timeout for network inactivity is ten seconds. You can modify the
+ value to be more or less strict:
+ 
+ ```pycon
+diff --git a/httpx/_config.py b/httpx/_config.py
+index 467a6c9..d10b32a 100644
+--- a/httpx/_config.py
++++ b/httpx/_config.py
+@@ -243,6 +243,6 @@ class Proxy:
+         return f"Proxy({url_str}{auth_str}{headers_str})"
+ 
+ 
+-DEFAULT_TIMEOUT_CONFIG = Timeout(timeout=5.0)
++DEFAULT_TIMEOUT_CONFIG = Timeout(timeout=10.0)
+ DEFAULT_LIMITS = Limits(max_connections=100, max_keepalive_connections=20)
+ DEFAULT_MAX_REDIRECTS = 20
+diff --git a/httpx/_main.py b/httpx/_main.py
+index cffa4bb..480bc52 100644
+--- a/httpx/_main.py
++++ b/httpx/_main.py
+@@ -81,7 +81,7 @@ def print_help() -> None:
+     table.add_row(
+         "--timeout [cyan]FLOAT",
+         "Timeout value to use for network operations, such as establishing the"
+-        " connection, reading some data, etc... [Default: 5.0]",
++        " connection, reading some data, etc... [Default: 10.0]",
+     )
+ 
+     table.add_row("--follow-redirects", "Automatically follow redirects.")
+@@ -400,10 +400,10 @@ def handle_help(
+     "--timeout",
+     "timeout",
+     type=float,
+-    default=5.0,
++    default=10.0,
+     help=(
+         "Timeout value to use for network operations, such as establishing the "
+-        "connection, reading some data, etc... [Default: 5.0]"
++        "connection, reading some data, etc... [Default: 10.0]"
+     ),
+ )
+ @click.option(
+
+=== ITEM g20 (vite q1, question)
+TASK: We're on Vite 8 with the default build config (no build.target set). Some customers on older Firefox get a broken page. If I add @vitejs/plugin-legacy with no options at all, what is the oldest Firefox version that will be served the modern (non-legacy) chunks, and how does that compare with the oldest Firefox the default build supports without the plugin? Would a Firefox 108 user get the modern or the legacy build once the plugin is added?
+KEY: Without the plugin, the default build.target ('baseline-widely-available') supports Firefox >=114 (docs/guide/build.md Browser Compatibility; docs/config/build-options.md build.target lists ['chrome111','edge111','firefox114','safari16.4','ios16.4']; constant ESBUILD_BASELINE_WIDELY_AVAILABLE_TARGET). With plugin-legacy and no modernTargets, the plugin overrides build.target for the modern chunks to its built-in modern targets: 'edge>=105, firefox>=106, chrome>=105, safari>=16.4, chromeAndroid>=105, iOS>=16.4' (packages/plugin-legacy/README.md `modernTargets` default; source sets config.build.target = modernTargetsEsbuild, which contains 'firefox106'). So the minimum Firefox for modern chunks becomes 106 (lower than 114). A Firefox 108 user gets the modern chunks. Answer must give 106 with the plugin and 114 without, and 'modern' for Firefox 108.
+SUMMARY: With plugin-legacy and no options, oldest Firefox for modern chunks is 106 (modernTargetsEsbuild: es2020, edge105, firefox106, chrome105, safari16.4, ios16.4; README modernTargets default). Without plugin, default build.target 'baseline-widely-available' = chrome111, edge111, firefox114, safari16.4, ios16.4, so Firefox 114+. Plugin lowers modern floor from 114 to 106; older gets legacy. Firefox 108 gets the modern build. Notes stale JSDoc in types.ts.
+
+=== ITEM g21 (httpx q2, question)
+TASK: I'm moving an integration from `httpx.Client` to `httpx.AsyncClient`. It currently uses: (a) request and response event hooks written as plain functions, (b) a callback passed via the "trace" request extension, (c) a custom `httpx.Auth` subclass that only implements `auth_flow` and does no I/O, (d) a custom transport that subclasses `httpx.BaseTransport`, and (e) a plain generator that yields bytes, passed as `content=` for uploads. For each one, can it be kept as it is, or what has to change?
+KEY: (a) Must change: hooks registered on AsyncClient MUST be async functions (docs/advanced/event-hooks.md note; AsyncClient awaits each hook). (b) Must change: the trace handler must be an `async def` function when using async code (docs/advanced/extensions.md, "trace" section). (c) Can stay as is: auth classes are designed to do no I/O so they work with both sync and async clients; Auth.async_auth_flow defaults to driving auth_flow (docs/advanced/authentication.md#custom-authentication-schemes; httpx/_auth.py). Only if it needed I/O or locks would it have to override sync_auth_flow/async_auth_flow. (d) Must change: subclass httpx.AsyncBaseTransport and implement handle_async_request instead of handle_request (docs/advanced/transports.md#custom-transports). (e) Must change: use an async bytes generator (async def ... yield) for streaming request bodies with AsyncClient (docs/async.md#streaming-requests). Answer is: a, b, d, e change; c stays.
+SUMMARY: (a) Event hooks must change: async def, client awaits hooks; use await response.aread(). (b) Trace callback must change: async def trace(event_name, info) per docs. (c) Auth subclass with only auth_flow can stay; default async_auth_flow drives it. (d) BaseTransport must change: AsyncBaseTransport with async handle_async_request, aclose, async stream. (e) Plain generator content must change: async generator; sync IteratorByteStream raises 'Attempted to send a sync request with an AsyncClient instance' (docs/async.md Streaming requests).
+
+=== ITEM g22 (httpx q1, question)
+TASK: If I create a plain `httpx.Client()` with no arguments and no environment variables set, what are the effective defaults for: the connect, read, write and pool timeouts; the maximum total connections and maximum keep-alive connections in the pool; how long an idle keep-alive connection is kept; whether a 302 response is followed automatically; and, if I turn redirect following on, how many redirects it will follow before giving up and which exception it raises then?
+KEY: Timeouts: 5 seconds for each of connect, read, write and pool (DEFAULT_TIMEOUT_CONFIG = Timeout(timeout=5.0); docs/advanced/timeouts.md intro and docs/quickstart.md#timeouts). Pool: max_connections=100, max_keepalive_connections=20 (docs/advanced/resource-limits.md; DEFAULT_LIMITS in httpx/_config.py). Note a bare httpx.Limits() has None/None, so the 100/20 values come only from the client default DEFAULT_LIMITS. keepalive_expiry: 5 seconds. Redirects: NOT followed by default (follow_redirects=False); the 302 response is returned with response.next_request set (docs/compatibility.md#redirects, docs/quickstart.md#redirection-and-history). With follow_redirects=True the limit is max_redirects=20 (DEFAULT_MAX_REDIRECTS in httpx/_config.py; not stated in the markdown docs), and exceeding it raises httpx.TooManyRedirects (a RequestError subclass, per docs/exceptions.md hierarchy). Full marks need all of: 5s x4, 100, 20, 5s, not followed, 20, TooManyRedirects.
+SUMMARY: Timeouts all 5.0s (DEFAULT_TIMEOUT_CONFIG). Pool 100 total, 20 keep-alive (DEFAULT_LIMITS). keepalive_expiry 5.0s. 302 not followed (follow_redirects=False), next_request holds it. With follow_redirects=True: up to 20 (DEFAULT_MAX_REDIRECTS), gives up on the 21st, raises httpx.TooManyRedirects, subclass of RequestError.
+
+=== ITEM g23 (vite u1, change-and-update)
+TASK: Raise Vite's default threshold for inlining small assets as base64 during build from 4 KiB to 8 KiB (8192 bytes). Update the documentation accordingly.
+KEY: Code: packages/vite/src/node/constants.ts DEFAULT_ASSETS_INLINE_LIMIT = 8192 (used by build.ts defaults and by asset.ts shouldInline as the fallback when an assetsInlineLimit callback returns undefined). Also update user-visible text that states the default: the JSDoc on assetsInlineLimit in packages/vite/src/node/build.ts ('Default limit is `4096` (4 KiB)' and '@default 4096' -> 8192 / 8 KiB) and the CLI help string for --assetsInlineLimit in packages/vite/src/node/cli.ts ('(default: 4096)' -> 8192). Docs: docs/config/build-options.md build.assetsInlineLimit '**Default:** `4096` (4 KiB)' -> `8192` (8 KiB); docs/guide/cli.md `vite build` options table row for `--assetsInlineLimit <number>` '(default: `4096`)' -> `8192`. docs/guide/assets.md and docs/guide/features.md (WebAssembly, CSP sections) refer to the option by name only and need no change; blog posts/CHANGELOG must not be rewritten. A run that changes only constants.ts, or misses the cli.md table or the cli.ts help text, is incomplete.
+SUMMARY: DEFAULT_ASSETS_INLINE_LIMIT = 8192 in constants.ts (build defaults and asset.ts fallback use it); build.ts JSDoc 'Default limit is 8192 (8 KiB)' and @default 8192; cli.ts help '(default: 8192)'; docs/config/build-options.md default 8192 (8 KiB); docs/guide/cli.md table row. assets.md and features.md mention it without a number. Notes: no changelog/migration note added; playground tests relying on default may change.
+DIFF:
+diff --git a/docs/config/build-options.md b/docs/config/build-options.md
+index f1eb571..47947b4 100644
+--- a/docs/config/build-options.md
++++ b/docs/config/build-options.md
+@@ -91,7 +91,7 @@ Specify the directory to nest generated assets under (relative to `build.outDir`
+ ## build.assetsInlineLimit
+ 
+ - **Type:** `number` | `((filePath: string, content: Buffer) => boolean | undefined)`
+-- **Default:** `4096` (4 KiB)
++- **Default:** `8192` (8 KiB)
+ 
+ Imported or referenced assets that are smaller than this threshold will be inlined as base64 URLs to avoid extra http requests. Set to `0` to disable inlining altogether.
+ 
+diff --git a/docs/guide/cli.md b/docs/guide/cli.md
+index f9e1edb..80852c3 100644
+--- a/docs/guide/cli.md
++++ b/docs/guide/cli.md
+@@ -59,7 +59,7 @@ vite build [root]
+ | `--target <target>`            | Transpile target (default: `"baseline-widely-available"`) (`string`)                                                                                                                  |
+ | `--outDir <dir>`               | Output directory (default: `dist`) (`string`)                                                                                                                                         |
+ | `--assetsDir <dir>`            | Directory under outDir to place assets in (default: `"assets"`) (`string`)                                                                                                            |
+-| `--assetsInlineLimit <number>` | Static asset base64 inline threshold in bytes (default: `4096`) (`number`)                                                                                                            |
++| `--assetsInlineLimit <number>` | Static asset base64 inline threshold in bytes (default: `8192`) (`number`)                                                                                                            |
+ | `--ssr [entry]`                | Build specified entry for server-side rendering (`string`)                                                                                                                            |
+ | `--sourcemap [output]`         | Output source maps for build (default: `false`) (`boolean \| "inline" \| "hidden"`)                                                                                                   |
+ | `--minify [minifier]`          | Enable/disable minification, or specify minifier to use (default: `"oxc"`) (`boolean \| "oxc" \| "terser" \| "esbuild"`)                                                              |
+diff --git a/packages/vite/src/node/build.ts b/packages/vite/src/node/build.ts
+index 214cff3..12d815e 100644
+--- a/packages/vite/src/node/build.ts
++++ b/packages/vite/src/node/build.ts
+@@ -137,8 +137,8 @@ export interface BuildEnvironmentOptions {
+    * base64 strings. If a callback is passed, a boolean can be returned to opt-in
+    * or opt-out of inlining. If nothing is returned the default logic applies.
+    *
+-   * Default limit is `4096` (4 KiB). Set to `0` to disable.
+-   * @default 4096
++   * Default limit is `8192` (8 KiB). Set to `0` to disable.
++   * @default 8192
+    */
+   assetsInlineLimit?:
+     | number
+diff --git a/packages/vite/src/node/cli.ts b/packages/vite/src/node/cli.ts
+index ffa19b6..3320466 100644
+--- a/packages/vite/src/node/cli.ts
++++ b/packages/vite/src/node/cli.ts
+@@ -330,7 +330,7 @@ cli
+   )
+   .option(
+     '--assetsInlineLimit <number>',
+-    `[number] static asset base64 inline threshold in bytes (default: 4096)`,
++    `[number] static asset base64 inline threshold in bytes (default: 8192)`,
+   )
+   .option(
+     '--ssr [entry]',
+diff --git a/packages/vite/src/node/constants.ts b/packages/vite/src/node/constants.ts
+index 2e34e42..513f8c0 100644
+--- a/packages/vite/src/node/constants.ts
++++ b/packages/vite/src/node/constants.ts
+@@ -213,7 +213,7 @@ export const DEFAULT_DEV_PORT = 5173
+ 
+ export const DEFAULT_PREVIEW_PORT = 4173
+ 
+-export const DEFAULT_ASSETS_INLINE_LIMIT = 4096
++export const DEFAULT_ASSETS_INLINE_LIMIT = 8192
+ 
+ // the regex to allow loopback address origins:
+ // - localhost domains (which will always resolve to the loopback address by RFC 6761 section 6.3)
+
+=== ITEM g24 (vite u1, change-and-update)
+TASK: Raise Vite's default threshold for inlining small assets as base64 during build from 4 KiB to 8 KiB (8192 bytes). Update the documentation accordingly.
+KEY: Code: packages/vite/src/node/constants.ts DEFAULT_ASSETS_INLINE_LIMIT = 8192 (used by build.ts defaults and by asset.ts shouldInline as the fallback when an assetsInlineLimit callback returns undefined). Also update user-visible text that states the default: the JSDoc on assetsInlineLimit in packages/vite/src/node/build.ts ('Default limit is `4096` (4 KiB)' and '@default 4096' -> 8192 / 8 KiB) and the CLI help string for --assetsInlineLimit in packages/vite/src/node/cli.ts ('(default: 4096)' -> 8192). Docs: docs/config/build-options.md build.assetsInlineLimit '**Default:** `4096` (4 KiB)' -> `8192` (8 KiB); docs/guide/cli.md `vite build` options table row for `--assetsInlineLimit <number>` '(default: `4096`)' -> `8192`. docs/guide/assets.md and docs/guide/features.md (WebAssembly, CSP sections) refer to the option by name only and need no change; blog posts/CHANGELOG must not be rewritten. A run that changes only constants.ts, or misses the cli.md table or the cli.ts help text, is incomplete.
+SUMMARY: DEFAULT_ASSETS_INLINE_LIMIT 4096 -> 8192 in constants.ts (build.ts and plugins/asset.ts read it); build.ts JSDoc 'Default limit is 8192 (8 KiB)' and @default 8192; cli.ts '(default: 8192)'; docs/config/build-options.md 8192 (8 KiB); docs/guide/cli.md table. Tests/playgrounds set their own values. No changelog.
+DIFF:
+diff --git a/docs/config/build-options.md b/docs/config/build-options.md
+index f1eb571..47947b4 100644
+--- a/docs/config/build-options.md
++++ b/docs/config/build-options.md
+@@ -91,7 +91,7 @@ Specify the directory to nest generated assets under (relative to `build.outDir`
+ ## build.assetsInlineLimit
+ 
+ - **Type:** `number` | `((filePath: string, content: Buffer) => boolean | undefined)`
+-- **Default:** `4096` (4 KiB)
++- **Default:** `8192` (8 KiB)
+ 
+ Imported or referenced assets that are smaller than this threshold will be inlined as base64 URLs to avoid extra http requests. Set to `0` to disable inlining altogether.
+ 
+diff --git a/docs/guide/cli.md b/docs/guide/cli.md
+index f9e1edb..80852c3 100644
+--- a/docs/guide/cli.md
++++ b/docs/guide/cli.md
+@@ -59,7 +59,7 @@ vite build [root]
+ | `--target <target>`            | Transpile target (default: `"baseline-widely-available"`) (`string`)                                                                                                                  |
+ | `--outDir <dir>`               | Output directory (default: `dist`) (`string`)                                                                                                                                         |
+ | `--assetsDir <dir>`            | Directory under outDir to place assets in (default: `"assets"`) (`string`)                                                                                                            |
+-| `--assetsInlineLimit <number>` | Static asset base64 inline threshold in bytes (default: `4096`) (`number`)                                                                                                            |
++| `--assetsInlineLimit <number>` | Static asset base64 inline threshold in bytes (default: `8192`) (`number`)                                                                                                            |
+ | `--ssr [entry]`                | Build specified entry for server-side rendering (`string`)                                                                                                                            |
+ | `--sourcemap [output]`         | Output source maps for build (default: `false`) (`boolean \| "inline" \| "hidden"`)                                                                                                   |
+ | `--minify [minifier]`          | Enable/disable minification, or specify minifier to use (default: `"oxc"`) (`boolean \| "oxc" \| "terser" \| "esbuild"`)                                                              |
+diff --git a/packages/vite/src/node/build.ts b/packages/vite/src/node/build.ts
+index 214cff3..12d815e 100644
+--- a/packages/vite/src/node/build.ts
++++ b/packages/vite/src/node/build.ts
+@@ -137,8 +137,8 @@ export interface BuildEnvironmentOptions {
+    * base64 strings. If a callback is passed, a boolean can be returned to opt-in
+    * or opt-out of inlining. If nothing is returned the default logic applies.
+    *
+-   * Default limit is `4096` (4 KiB). Set to `0` to disable.
+-   * @default 4096
++   * Default limit is `8192` (8 KiB). Set to `0` to disable.
++   * @default 8192
+    */
+   assetsInlineLimit?:
+     | number
+diff --git a/packages/vite/src/node/cli.ts b/packages/vite/src/node/cli.ts
+index ffa19b6..3320466 100644
+--- a/packages/vite/src/node/cli.ts
++++ b/packages/vite/src/node/cli.ts
+@@ -330,7 +330,7 @@ cli
+   )
+   .option(
+     '--assetsInlineLimit <number>',
+-    `[number] static asset base64 inline threshold in bytes (default: 4096)`,
++    `[number] static asset base64 inline threshold in bytes (default: 8192)`,
+   )
+   .option(
+     '--ssr [entry]',
+diff --git a/packages/vite/src/node/constants.ts b/packages/vite/src/node/constants.ts
+index 2e34e42..513f8c0 100644
+--- a/packages/vite/src/node/constants.ts
++++ b/packages/vite/src/node/constants.ts
+@@ -213,7 +213,7 @@ export const DEFAULT_DEV_PORT = 5173
+ 
+ export const DEFAULT_PREVIEW_PORT = 4173
+ 
+-export const DEFAULT_ASSETS_INLINE_LIMIT = 4096
++export const DEFAULT_ASSETS_INLINE_LIMIT = 8192
+ 
+ // the regex to allow loopback address origins:
+ // - localhost domains (which will always resolve to the loopback address by RFC 6761 section 6.3)
+
+=== ITEM g25 (vite u1, change-and-update)
+TASK: Raise Vite's default threshold for inlining small assets as base64 during build from 4 KiB to 8 KiB (8192 bytes). Update the documentation accordingly.
+KEY: Code: packages/vite/src/node/constants.ts DEFAULT_ASSETS_INLINE_LIMIT = 8192 (used by build.ts defaults and by asset.ts shouldInline as the fallback when an assetsInlineLimit callback returns undefined). Also update user-visible text that states the default: the JSDoc on assetsInlineLimit in packages/vite/src/node/build.ts ('Default limit is `4096` (4 KiB)' and '@default 4096' -> 8192 / 8 KiB) and the CLI help string for --assetsInlineLimit in packages/vite/src/node/cli.ts ('(default: 4096)' -> 8192). Docs: docs/config/build-options.md build.assetsInlineLimit '**Default:** `4096` (4 KiB)' -> `8192` (8 KiB); docs/guide/cli.md `vite build` options table row for `--assetsInlineLimit <number>` '(default: `4096`)' -> `8192`. docs/guide/assets.md and docs/guide/features.md (WebAssembly, CSP sections) refer to the option by name only and need no change; blog posts/CHANGELOG must not be rewritten. A run that changes only constants.ts, or misses the cli.md table or the cli.ts help text, is incomplete.
+SUMMARY: DEFAULT_ASSETS_INLINE_LIMIT = 8192 in constants.ts; build.ts comment 'Default limit is 8192 (8 KiB)' and @default 8192; cli.ts '--assetsInlineLimit' help 'default: 8192'. Docs: docs/config/build-options.md Default 8192 (8 KiB); docs/guide/cli.md table row. guide/assets.md, features.md, blog don't state the number. No changelog entry.
+DIFF:
+diff --git a/docs/config/build-options.md b/docs/config/build-options.md
+index f1eb571..47947b4 100644
+--- a/docs/config/build-options.md
++++ b/docs/config/build-options.md
+@@ -91,7 +91,7 @@ Specify the directory to nest generated assets under (relative to `build.outDir`
+ ## build.assetsInlineLimit
+ 
+ - **Type:** `number` | `((filePath: string, content: Buffer) => boolean | undefined)`
+-- **Default:** `4096` (4 KiB)
++- **Default:** `8192` (8 KiB)
+ 
+ Imported or referenced assets that are smaller than this threshold will be inlined as base64 URLs to avoid extra http requests. Set to `0` to disable inlining altogether.
+ 
+diff --git a/docs/guide/cli.md b/docs/guide/cli.md
+index f9e1edb..80852c3 100644
+--- a/docs/guide/cli.md
++++ b/docs/guide/cli.md
+@@ -59,7 +59,7 @@ vite build [root]
+ | `--target <target>`            | Transpile target (default: `"baseline-widely-available"`) (`string`)                                                                                                                  |
+ | `--outDir <dir>`               | Output directory (default: `dist`) (`string`)                                                                                                                                         |
+ | `--assetsDir <dir>`            | Directory under outDir to place assets in (default: `"assets"`) (`string`)                                                                                                            |
+-| `--assetsInlineLimit <number>` | Static asset base64 inline threshold in bytes (default: `4096`) (`number`)                                                                                                            |
++| `--assetsInlineLimit <number>` | Static asset base64 inline threshold in bytes (default: `8192`) (`number`)                                                                                                            |
+ | `--ssr [entry]`                | Build specified entry for server-side rendering (`string`)                                                                                                                            |
+ | `--sourcemap [output]`         | Output source maps for build (default: `false`) (`boolean \| "inline" \| "hidden"`)                                                                                                   |
+ | `--minify [minifier]`          | Enable/disable minification, or specify minifier to use (default: `"oxc"`) (`boolean \| "oxc" \| "terser" \| "esbuild"`)                                                              |
+diff --git a/packages/vite/src/node/build.ts b/packages/vite/src/node/build.ts
+index 214cff3..12d815e 100644
+--- a/packages/vite/src/node/build.ts
++++ b/packages/vite/src/node/build.ts
+@@ -137,8 +137,8 @@ export interface BuildEnvironmentOptions {
+    * base64 strings. If a callback is passed, a boolean can be returned to opt-in
+    * or opt-out of inlining. If nothing is returned the default logic applies.
+    *
+-   * Default limit is `4096` (4 KiB). Set to `0` to disable.
+-   * @default 4096
++   * Default limit is `8192` (8 KiB). Set to `0` to disable.
++   * @default 8192
+    */
+   assetsInlineLimit?:
+     | number
+diff --git a/packages/vite/src/node/cli.ts b/packages/vite/src/node/cli.ts
+index ffa19b6..3320466 100644
+--- a/packages/vite/src/node/cli.ts
++++ b/packages/vite/src/node/cli.ts
+@@ -330,7 +330,7 @@ cli
+   )
+   .option(
+     '--assetsInlineLimit <number>',
+-    `[number] static asset base64 inline threshold in bytes (default: 4096)`,
++    `[number] static asset base64 inline threshold in bytes (default: 8192)`,
+   )
+   .option(
+     '--ssr [entry]',
+diff --git a/packages/vite/src/node/constants.ts b/packages/vite/src/node/constants.ts
+index 2e34e42..513f8c0 100644
+--- a/packages/vite/src/node/constants.ts
++++ b/packages/vite/src/node/constants.ts
+@@ -213,7 +213,7 @@ export const DEFAULT_DEV_PORT = 5173
+ 
+ export const DEFAULT_PREVIEW_PORT = 4173
+ 
+-export const DEFAULT_ASSETS_INLINE_LIMIT = 4096
++export const DEFAULT_ASSETS_INLINE_LIMIT = 8192
+ 
+ // the regex to allow loopback address origins:
+ // - localhost domains (which will always resolve to the loopback address by RFC 6761 section 6.3)
+
+=== ITEM g26 (vite c1, constrained-change)
+TASK: The dev/preview server code imports the `open` package as soon as the module is loaded, even though it is only needed when a browser actually gets opened (server.open / --open). Change it so the package is only loaded at the point it is actually needed, to help startup time.
+KEY: Change packages/vite/src/node/server/openBrowser.ts: remove the top-level value import `import open from 'open'` (the type-only `import type { Options } from 'open'` may stay) and load it lazily inside the async fallback path of startBrowserProcess, right before it is called. Hidden constraint from CONTRIBUTING.md 'Notes on Dependencies' > 'Usage of require()': dependencies are pre-bundled and kept in devDependencies, so a lazy load must NOT use `require('open')` (or createRequire), which is ignored in ESM and would leave the dep out of the bundle; it must use a dynamic import of the form `(await import('open')).default` (equivalent `const { default: open } = await import('open')` is acceptable). `open` must stay in devDependencies of packages/vite/package.json (not moved to dependencies). The returned promise/error handling (logging err.stack via logger.error, not crashing) must be preserved, including errors from the import itself being caught.
+SUMMARY: Removed top-level `import open from 'open'` in openBrowser.ts; fallback in startBrowserProcess loads `import('open').then(({ default: open }) => open(url, options))` with a comment. Errors logged as before; type-only import stays. Callers unchanged. No docs reference the file.
+DIFF:
+diff --git a/packages/vite/src/node/server/openBrowser.ts b/packages/vite/src/node/server/openBrowser.ts
+index 618d3f9..fc5b349 100644
+--- a/packages/vite/src/node/server/openBrowser.ts
++++ b/packages/vite/src/node/server/openBrowser.ts
+@@ -11,7 +11,6 @@
+ import { exec } from 'node:child_process'
+ import type { ExecOptions } from 'node:child_process'
+ import { join } from 'node:path'
+-import open from 'open'
+ import type { Options } from 'open'
+ import colors from 'picocolors'
+ import { x } from 'tinyexec'
+@@ -119,8 +118,10 @@ async function startBrowserProcess(
+       ? { app: { name: browser, arguments: browserArgs } }
+       : {}
+ 
++    // `open` is imported lazily so it is only loaded when a browser is opened
+     new Promise((_, reject) => {
+-      open(url, options)
++      import('open')
++        .then(({ default: open }) => open(url, options))
+         .then((subprocess) => {
+           subprocess.on('error', reject)
+         })
+
+=== ITEM g27 (httpx u1, change-and-update)
+TASK: Raise HTTPX's default timeout from 5 seconds to 10 seconds, both for the library and for the `httpx` command-line client. Update the documentation accordingly.
+KEY: Code: httpx/_config.py DEFAULT_TIMEOUT_CONFIG = Timeout(timeout=10.0) (used by Client, AsyncClient and the top-level API functions in _api.py); httpx/_main.py: the --timeout click option default=5.0 -> 10.0 and its help text '[Default: 5.0]', plus the same '[Default: 5.0]' in the hand-written help table in print_help(). Leave Limits keepalive_expiry=5.0 and the explicit 5.0 examples in the Timeout docstring and docs/advanced/extensions.md alone (they are explicit values, not defaults). Docs that state the default and must be updated: (1) docs/advanced/timeouts.md intro: 'raise a TimeoutException after 5 seconds of network inactivity' -> 10 seconds; (2) docs/advanced/timeouts.md#setting-a-default-timeout-on-a-client: comment 'client = httpx.Client()  # Use a default 5s timeout everywhere.' -> 10s; (3) docs/quickstart.md#timeouts: 'The default timeout for network inactivity is five seconds' -> ten seconds; (4) docs/logging.md example debug output shows timeout=5.0 on the connect_tcp.started and start_tls.started lines for a default httpx.get(), which should become timeout=10.0. docs/compatibility.md#timeouts only says 'reasonable timeouts' and needs no change. The docs/img/httpx-help.png screenshot shows the old CLI default but is an image; noting it is fine, editing it is not expected. A CHANGELOG 'Changed' entry under 1.0.0 (Unreleased) is acceptable but not required.
+SUMMARY: Default timeout 5 -> 10s. _config.py DEFAULT_TIMEOUT_CONFIG = Timeout(timeout=10.0); _main.py --timeout default 10.0 and both help texts [Default: 10.0]. Docs: docs/advanced/timeouts.md 10 seconds, custom example changed to 20.0; docs/quickstart.md 'ten seconds'; docs/logging.md sample now timeout=10.0; CHANGELOG entry. Explicit 5.0 examples left.
+DIFF:
+diff --git a/CHANGELOG.md b/CHANGELOG.md
+index a3fa798..30bf0b6 100644
+--- a/CHANGELOG.md
++++ b/CHANGELOG.md
+@@ -7,6 +7,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
+ ## 1.0.0 (Unreleased)
+ 
+ * Minimum supported Python version is now 3.10
++* The default timeout is now 10 seconds, up from 5 seconds, for both the library and the `httpx` command-line client.
+ 
+ ### Added
+ 
+diff --git a/docs/advanced/timeouts.md b/docs/advanced/timeouts.md
+index aedcfb6..32f9693 100644
+--- a/docs/advanced/timeouts.md
++++ b/docs/advanced/timeouts.md
+@@ -1,6 +1,6 @@
+ HTTPX is careful to enforce timeouts everywhere by default.
+ 
+-The default behavior is to raise a `TimeoutException` after 5 seconds of
++The default behavior is to raise a `TimeoutException` after 10 seconds of
+ network inactivity.
+ 
+ ## Setting and disabling timeouts
+@@ -33,8 +33,8 @@ You can set a timeout on a client instance, which results in the given
+ `timeout` being used as the default for requests made with this client:
+ 
+ ```python
+-client = httpx.Client()              # Use a default 5s timeout everywhere.
+-client = httpx.Client(timeout=10.0)  # Use a default 10s timeout everywhere.
++client = httpx.Client()              # Use a default 10s timeout everywhere.
++client = httpx.Client(timeout=20.0)  # Use a default 20s timeout everywhere.
+ client = httpx.Client(timeout=None)  # Disable all timeouts by default.
+ ```
+ 
+diff --git a/docs/logging.md b/docs/logging.md
+index b3c5781..4ba1af2 100644
+--- a/docs/logging.md
++++ b/docs/logging.md
+@@ -20,9 +20,9 @@ httpx.get("https://www.example.com")
+ Will send debug level output to the console, or wherever `stdout` is directed too...
+ 
+ ```
+-DEBUG [2024-09-28 17:27:40] httpcore.connection - connect_tcp.started host='www.example.com' port=443 local_address=None timeout=5.0 socket_options=None
++DEBUG [2024-09-28 17:27:40] httpcore.connection - connect_tcp.started host='www.example.com' port=443 local_address=None timeout=10.0 socket_options=None
+ DEBUG [2024-09-28 17:27:41] httpcore.connection - connect_tcp.complete return_value=<httpcore._backends.sync.SyncStream object at 0x101f1e8e0>
+-DEBUG [2024-09-28 17:27:41] httpcore.connection - start_tls.started ssl_context=SSLContext(verify=True) server_hostname='www.example.com' timeout=5.0
++DEBUG [2024-09-28 17:27:41] httpcore.connection - start_tls.started ssl_context=SSLContext(verify=True) server_hostname='www.example.com' timeout=10.0
+ DEBUG [2024-09-28 17:27:41] httpcore.connection - start_tls.complete return_value=<httpcore._backends.sync.SyncStream object at 0x1020f49a0>
+ DEBUG [2024-09-28 17:27:41] httpcore.http11 - send_request_headers.started request=<Request [b'GET']>
+ DEBUG [2024-09-28 17:27:41] httpcore.http11 - send_request_headers.complete
+diff --git a/docs/quickstart.md b/docs/quickstart.md
+index e140b53..cd7011c 100644
+--- a/docs/quickstart.md
++++ b/docs/quickstart.md
+@@ -454,7 +454,7 @@ HTTPX defaults to including reasonable timeouts for all network operations,
+ meaning that if a connection is not properly established then it should always
+ raise an error rather than hanging indefinitely.
+ 
+-The default timeout for network inactivity is five seconds. You can modify the
++The default timeout for network inactivity is ten seconds. You can modify the
+ value to be more or less strict:
+ 
+ ```pycon
+diff --git a/httpx/_config.py b/httpx/_config.py
+index 467a6c9..d10b32a 100644
+--- a/httpx/_config.py
++++ b/httpx/_config.py
+@@ -243,6 +243,6 @@ class Proxy:
+         return f"Proxy({url_str}{auth_str}{headers_str})"
+ 
+ 
+-DEFAULT_TIMEOUT_CONFIG = Timeout(timeout=5.0)
++DEFAULT_TIMEOUT_CONFIG = Timeout(timeout=10.0)
+ DEFAULT_LIMITS = Limits(max_connections=100, max_keepalive_connections=20)
+ DEFAULT_MAX_REDIRECTS = 20
+diff --git a/httpx/_main.py b/httpx/_main.py
+index cffa4bb..480bc52 100644
+--- a/httpx/_main.py
++++ b/httpx/_main.py
+@@ -81,7 +81,7 @@ def print_help() -> None:
+     table.add_row(
+         "--timeout [cyan]FLOAT",
+         "Timeout value to use for network operations, such as establishing the"
+-        " connection, reading some data, etc... [Default: 5.0]",
++        " connection, reading some data, etc... [Default: 10.0]",
+     )
+ 
+     table.add_row("--follow-redirects", "Automatically follow redirects.")
+@@ -400,10 +400,10 @@ def handle_help(
+     "--timeout",
+     "timeout",
+     type=float,
+-    default=5.0,
++    default=10.0,
+     help=(
+         "Timeout value to use for network operations, such as establishing the "
+-        "connection, reading some data, etc... [Default: 5.0]"
++        "connection, reading some data, etc... [Default: 10.0]"
+     ),
+ )
+ @click.option(
+
+=== ITEM g28 (httpx q2, question)
+TASK: I'm moving an integration from `httpx.Client` to `httpx.AsyncClient`. It currently uses: (a) request and response event hooks written as plain functions, (b) a callback passed via the "trace" request extension, (c) a custom `httpx.Auth` subclass that only implements `auth_flow` and does no I/O, (d) a custom transport that subclasses `httpx.BaseTransport`, and (e) a plain generator that yields bytes, passed as `content=` for uploads. For each one, can it be kept as it is, or what has to change?
+KEY: (a) Must change: hooks registered on AsyncClient MUST be async functions (docs/advanced/event-hooks.md note; AsyncClient awaits each hook). (b) Must change: the trace handler must be an `async def` function when using async code (docs/advanced/extensions.md, "trace" section). (c) Can stay as is: auth classes are designed to do no I/O so they work with both sync and async clients; Auth.async_auth_flow defaults to driving auth_flow (docs/advanced/authentication.md#custom-authentication-schemes; httpx/_auth.py). Only if it needed I/O or locks would it have to override sync_auth_flow/async_auth_flow. (d) Must change: subclass httpx.AsyncBaseTransport and implement handle_async_request instead of handle_request (docs/advanced/transports.md#custom-transports). (e) Must change: use an async bytes generator (async def ... yield) for streaming request bodies with AsyncClient (docs/async.md#streaming-requests). Answer is: a, b, d, e change; c stays.
+SUMMARY: Only (c) works unchanged. (a) hooks must be async def (docs/advanced/event-hooks), await response.aread(). (b) trace callback must be async def (docs/advanced/extensions#trace). (c) Auth with only auth_flow keeps; async_auth_flow drives it. (d) Subclass AsyncBaseTransport, async handle_async_request, aclose, async stream, async inner transport. (e) Plain generator must become async generator; RuntimeError 'Attempted to send a sync request with an AsyncClient instance.' (docs/async#streaming-requests).
+
+=== ITEM g29 (vite c1, constrained-change)
+TASK: The dev/preview server code imports the `open` package as soon as the module is loaded, even though it is only needed when a browser actually gets opened (server.open / --open). Change it so the package is only loaded at the point it is actually needed, to help startup time.
+KEY: Change packages/vite/src/node/server/openBrowser.ts: remove the top-level value import `import open from 'open'` (the type-only `import type { Options } from 'open'` may stay) and load it lazily inside the async fallback path of startBrowserProcess, right before it is called. Hidden constraint from CONTRIBUTING.md 'Notes on Dependencies' > 'Usage of require()': dependencies are pre-bundled and kept in devDependencies, so a lazy load must NOT use `require('open')` (or createRequire), which is ignored in ESM and would leave the dep out of the bundle; it must use a dynamic import of the form `(await import('open')).default` (equivalent `const { default: open } = await import('open')` is acceptable). `open` must stay in devDependencies of packages/vite/package.json (not moved to dependencies). The returned promise/error handling (logging err.stack via logger.error, not crashing) must be preserved, including errors from the import itself being caught.
+SUMMARY: Removed top-level `import open from 'open'` in packages/vite/src/node/server/openBrowser.ts; fallback in startBrowserProcess now calls `import('open').then(({ default: open }) => open(url, options))`. Kept `import type { Options } from 'open'`. Errors still logged. Callers unchanged. No docs reference the file.
+DIFF:
+diff --git a/packages/vite/src/node/server/openBrowser.ts b/packages/vite/src/node/server/openBrowser.ts
+index 618d3f9..2873b34 100644
+--- a/packages/vite/src/node/server/openBrowser.ts
++++ b/packages/vite/src/node/server/openBrowser.ts
+@@ -11,7 +11,6 @@
+ import { exec } from 'node:child_process'
+ import type { ExecOptions } from 'node:child_process'
+ import { join } from 'node:path'
+-import open from 'open'
+ import type { Options } from 'open'
+ import colors from 'picocolors'
+ import { x } from 'tinyexec'
+@@ -119,8 +118,11 @@ async function startBrowserProcess(
+       ? { app: { name: browser, arguments: browserArgs } }
+       : {}
+ 
++    // `open` is only needed here, so load it lazily to keep it off the
++    // startup path of the dev and preview servers.
+     new Promise((_, reject) => {
+-      open(url, options)
++      import('open')
++        .then(({ default: open }) => open(url, options))
+         .then((subprocess) => {
+           subprocess.on('error', reject)
+         })
+
+=== ITEM g30 (httpx c1, constrained-change)
+TASK: Let people pass a `pathlib.Path` directly as a file in `files=`, so `httpx.post(url, files={"upload": Path("report.xls")})` works, as well as inside the usual tuple form like `("report.xls", Path("report.xls"), "application/vnd.ms-excel")`. Right now that fails.
+KEY: Hidden constraints from docs the prompt does not mention: (1) docs/compatibility.md#upload-files: HTTPX strictly enforces that upload files are opened in BINARY mode, so the path must be opened with 'rb' (opening in text mode would also hit the existing TypeError in FileField). (2) docs/advanced/clients.md#multipart-file-encoding tip: file uploads are streaming by default, only one chunk in memory at a time, so the implementation must NOT do path.read_bytes()/read the whole file; it must open the file and stream it through the existing chunked render_data (CHUNK_SIZE reads), which also keeps Content-Length computable via peek_filelike_length on the opened file. (3) Same clients.md section: for the bare Path form, filename is the path's name and the MIME type is guessed from it, falling back to application/octet-stream; in tuple form an explicit filename of None means no Content-Type header unless given. A correct change handles Path in httpx/_multipart.py (FileField, for both the bare and tuple forms) and adds Path to the accepted file types in httpx/_types.py (FileContent/FileTypes) so type checks pass. Bonus, not required: a test in tests/test_multipart.py, a mention in docs. Fails the task: reading the whole file into bytes, opening in text mode, or only handling the bare (non-tuple) form.
+SUMMARY: pathlib.Path / os.PathLike accepted alone and in 2-,3-,4-tuples. httpx/_multipart.py FileField: name from path, content type guessed, length via os.path.getsize, opened in binary mode and streamed in chunks each render then closed, re-read on resend. httpx/_types.py FileContent includes PathLike[str]. Test added; docs/quickstart.md Sending Multipart File Uploads paragraph; CHANGELOG entry. Plain str still means content. Notes 7 pre-existing broken links.
+DIFF:
+diff --git a/CHANGELOG.md b/CHANGELOG.md
+index a3fa798..b998598 100644
+--- a/CHANGELOG.md
++++ b/CHANGELOG.md
+@@ -11,6 +11,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
+ ### Added
+ 
+ * Expose `FunctionAuth` from the public API. (#3699)
++* Multipart `files=...` values may now be a `pathlib.Path` (or any `os.PathLike`), either directly or as the file in a tuple. The file is opened and streamed when the request body is sent.
+ 
+ ## 0.28.1 (6th December, 2024)
+ 
+diff --git a/docs/quickstart.md b/docs/quickstart.md
+index e140b53..90a6dcf 100644
+--- a/docs/quickstart.md
++++ b/docs/quickstart.md
+@@ -204,6 +204,18 @@ of items for the file value:
+ }
+ ```
+ 
++You can also pass a `pathlib.Path` instead of an open file, either on its own or
++as the file in a tuple. HTTPX opens the file when the request is sent and closes it
++afterwards, and uses the path's name as the filename:
++
++```pycon
++>>> from pathlib import Path
++>>> files = {'upload-file': Path('report.xls')}
++>>> r = httpx.post("https://httpbin.org/post", files=files)
++>>> files = {'upload-file': ('report.xls', Path('report.xls'), 'application/vnd.ms-excel')}
++>>> r = httpx.post("https://httpbin.org/post", files=files)
++```
++
+ If you need to include non-file data fields in the multipart form, use the `data=...` parameter:
+ 
+ ```pycon
+diff --git a/httpx/_multipart.py b/httpx/_multipart.py
+index b4761af..49700d4 100644
+--- a/httpx/_multipart.py
++++ b/httpx/_multipart.py
+@@ -141,6 +141,9 @@ class FileField:
+             else:
+                 # all 4 parameters included
+                 filename, fileobj, content_type, headers = value  # type: ignore
++        elif isinstance(value, os.PathLike):
++            filename = Path(value).name
++            fileobj = value
+         else:
+             filename = Path(str(getattr(value, "name", "upload"))).name
+             fileobj = value
+@@ -174,6 +177,9 @@ class FileField:
+         if isinstance(self.file, (str, bytes)):
+             return len(headers) + len(to_bytes(self.file))
+ 
++        if isinstance(self.file, os.PathLike):
++            return len(headers) + os.path.getsize(self.file)
++
+         file_length = peek_filelike_length(self.file)
+ 
+         # If we can't determine the filesize without reading it into memory,
+@@ -205,6 +211,16 @@ class FileField:
+             yield to_bytes(self.file)
+             return
+ 
++        if isinstance(self.file, os.PathLike):
++            # Paths are opened lazily, each time the body is rendered, so the
++            # file is never left open and the request can be replayed.
++            with open(self.file, "rb") as file:
++                chunk = file.read(self.CHUNK_SIZE)
++                while chunk:
++                    yield chunk
++                    chunk = file.read(self.CHUNK_SIZE)
++            return
++
+         if hasattr(self.file, "seek"):
+             try:
+                 self.file.seek(0)
+diff --git a/httpx/_types.py b/httpx/_types.py
+index 704dfdf..2a2ee86 100644
+--- a/httpx/_types.py
++++ b/httpx/_types.py
+@@ -3,6 +3,7 @@ Type definitions for type checking purposes.
+ """
+ 
+ from http.cookiejar import CookieJar
++from os import PathLike
+ from typing import (
+     IO,
+     TYPE_CHECKING,
+@@ -71,7 +72,7 @@ ResponseExtensions = Mapping[str, Any]
+ 
+ RequestData = Mapping[str, Any]
+ 
+-FileContent = Union[IO[bytes], bytes, str]
++FileContent = Union[IO[bytes], bytes, str, "PathLike[str]"]
+ FileTypes = Union[
+     # file (or bytes)
+     FileContent,
+diff --git a/tests/test_multipart.py b/tests/test_multipart.py
+index 764f85a..a2de5f6 100644
+--- a/tests/test_multipart.py
++++ b/tests/test_multipart.py
+@@ -342,6 +342,27 @@ def test_multipart_encode_files_allows_bytes_content() -> None:
+     )
+ 
+ 
++def test_multipart_encode_files_allows_path(tmp_path: typing.Any) -> None:
++    path = tmp_path / "report.txt"
++    path.write_bytes(b"<file content>")
++    url = "https://www.example.com/"
++    headers = {"Content-Type": "multipart/form-data; boundary=BOUNDARY"}
++    expected = (
++        b'--BOUNDARY\r\nContent-Disposition: form-data; name="file"; '
++        b'filename="report.txt"\r\n'
++        b"Content-Type: text/plain\r\n\r\n<file content>\r\n"
++        b"--BOUNDARY--\r\n"
++    )
++
++    for value in (path, ("report.txt", path, "text/plain")):
++        files = {"file": value}
++        request = httpx.Request("POST", url, headers=headers, files=files)
++        request.read()
++
++        assert request.headers["Content-Length"] == str(len(expected))
++        assert request.content == expected
++
++
+ def test_multipart_encode_files_allows_str_content() -> None:
+     url = "https://www.example.com/"
+     headers = {"Content-Type": "multipart/form-data; boundary=BOUNDARY"}
+
+=== ITEM g31 (vite q1, question)
+TASK: We're on Vite 8 with the default build config (no build.target set). Some customers on older Firefox get a broken page. If I add @vitejs/plugin-legacy with no options at all, what is the oldest Firefox version that will be served the modern (non-legacy) chunks, and how does that compare with the oldest Firefox the default build supports without the plugin? Would a Firefox 108 user get the modern or the legacy build once the plugin is added?
+KEY: Without the plugin, the default build.target ('baseline-widely-available') supports Firefox >=114 (docs/guide/build.md Browser Compatibility; docs/config/build-options.md build.target lists ['chrome111','edge111','firefox114','safari16.4','ios16.4']; constant ESBUILD_BASELINE_WIDELY_AVAILABLE_TARGET). With plugin-legacy and no modernTargets, the plugin overrides build.target for the modern chunks to its built-in modern targets: 'edge>=105, firefox>=106, chrome>=105, safari>=16.4, chromeAndroid>=105, iOS>=16.4' (packages/plugin-legacy/README.md `modernTargets` default; source sets config.build.target = modernTargetsEsbuild, which contains 'firefox106'). So the minimum Firefox for modern chunks becomes 106 (lower than 114). A Firefox 108 user gets the modern chunks. Answer must give 106 with the plugin and 114 without, and 'modern' for Firefox 108.
+SUMMARY: With plugin-legacy and no options, oldest Firefox for modern chunks is 106; without plugin default build supports Firefox 114 (baseline-widely-available = chrome111, edge111, firefox114, safari16.4, ios16.4). Plugin replaces build.target with modernTargetsEsbuild (es2020, edge105, firefox106, chrome105, safari16.4, ios16.4), README modernTargets firefox>=106. Firefox 108 gets the modern build.
+
+=== ITEM g32 (vite c1, constrained-change)
+TASK: The dev/preview server code imports the `open` package as soon as the module is loaded, even though it is only needed when a browser actually gets opened (server.open / --open). Change it so the package is only loaded at the point it is actually needed, to help startup time.
+KEY: Change packages/vite/src/node/server/openBrowser.ts: remove the top-level value import `import open from 'open'` (the type-only `import type { Options } from 'open'` may stay) and load it lazily inside the async fallback path of startBrowserProcess, right before it is called. Hidden constraint from CONTRIBUTING.md 'Notes on Dependencies' > 'Usage of require()': dependencies are pre-bundled and kept in devDependencies, so a lazy load must NOT use `require('open')` (or createRequire), which is ignored in ESM and would leave the dep out of the bundle; it must use a dynamic import of the form `(await import('open')).default` (equivalent `const { default: open } = await import('open')` is acceptable). `open` must stay in devDependencies of packages/vite/package.json (not moved to dependencies). The returned promise/error handling (logging err.stack via logger.error, not crashing) must be preserved, including errors from the import itself being caught.
+SUMMARY: Removed top-level `import open from 'open'` in packages/vite/src/node/server/openBrowser.ts; package now loaded with `import('open')` inside startBrowserProcess at the fallback step that calls open(url, options). Errors logged via logger.error as before. `import type { Options } from 'open'` stays. No build or tests.
+DIFF:
+diff --git a/packages/vite/src/node/server/openBrowser.ts b/packages/vite/src/node/server/openBrowser.ts
+index 618d3f9..ade33b1 100644
+--- a/packages/vite/src/node/server/openBrowser.ts
++++ b/packages/vite/src/node/server/openBrowser.ts
+@@ -11,7 +11,6 @@
+ import { exec } from 'node:child_process'
+ import type { ExecOptions } from 'node:child_process'
+ import { join } from 'node:path'
+-import open from 'open'
+ import type { Options } from 'open'
+ import colors from 'picocolors'
+ import { x } from 'tinyexec'
+@@ -120,7 +119,9 @@ async function startBrowserProcess(
+       : {}
+ 
+     new Promise((_, reject) => {
+-      open(url, options)
++      // Load `open` lazily: it is only needed when a browser is actually opened
++      import('open')
++        .then(({ default: open }) => open(url, options))
+         .then((subprocess) => {
+           subprocess.on('error', reject)
+         })

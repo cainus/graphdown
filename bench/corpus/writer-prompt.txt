@@ -1,0 +1,22 @@
+You are writing evaluation tasks for coding agents. The repository is at REPO (a fresh clone; read-only for you: do not modify it). Write exactly 4 tasks that can only be done well by finding and using the repository's markdown documentation, especially information that is spread across more than one doc file or that sits in a doc the task does not mention.
+
+The 4 tasks:
+1. "q1" and "q2": questions. Each answer must need facts from at least two different markdown files (or a doc plus source code). Avoid anything answerable from a single obvious page or from general knowledge of the project. Each must have one clear, checkable answer.
+2. "c1": a small code change in the repository's source, where a rule or constraint that governs the correct implementation is written in a doc that the task text does not point to. A careless agent would miss it.
+3. "u1": a small behaviour change to the code, where several doc sections describe that behaviour and must be updated to stay true. The task should say "update the documentation accordingly" without naming the files.
+
+Rules:
+- Use only what is really in this checkout. Verify every fact in your keys by reading the files.
+- Tasks must be doable without installing dependencies or running test suites.
+- Do not mention any particular tool to use.
+- Write the task text as a user would: plain, no hints about where to look.
+
+Write the result as JSON to OUT, a list of 4 objects with these fields:
+  "id": "q1" | "q2" | "c1" | "u1"
+  "type": "question" | "constrained-change" | "change-and-update"
+  "prompt": the task text given to the agent
+  "key": what a correct answer or change contains, including the hidden constraint or the full list of doc updates, specific enough for a grader who has not read the repo
+  "key_sections": list of "path/to/file.md#heading-slug" or "path/to/file.py#symbol" that a good run must have read (heading slugs: lowercase, spaces to hyphens, punctuation dropped)
+  "must_touch": for c1 and u1, the list of file paths a correct change must modify; [] for questions
+
+Then reply with just the word done.

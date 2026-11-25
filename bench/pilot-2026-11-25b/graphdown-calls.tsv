@@ -1,0 +1,89 @@
+s02	1795630865	166061	--root . outline
+s02	1795630869	166061	--root . outline
+s02	1795630874	1407	--root . show docs/config/build-options#buildtarget
+s02	1795630874	965	--root . show packages/plugin-legacy/README#moderntargets
+s02	1795630875	844	--root . show packages/plugin-legacy/README#browsers-that-supports-esm-but-does-not-support-widely-available-features
+s02	1795630875	827	--root . show packages/plugin-legacy/README#targets
+s07	1795630926	166061	--root /tmp/bench2/runs/s07 outline
+s07	1795630930	166061	--root . outline
+s07	1795630931	166061	--root . outline
+s07	1795630935	166061	--root . outline
+s07	1795630936	1574	--root . show docs/changes/index
+s07	1795630936	456	--root . show docs/config/shared-options#future
+s07	1795630940	2472	--root . show docs/changes/this-environment-in-hooks
+s07	1795630941	3605	--root . show docs/changes/hotupdate-hook
+s07	1795630941	1355	--root . show docs/changes/ssr-using-modulerunner
+s07	1795630942	2342	--root . show docs/changes/per-environment-apis
+s07	1795630942	2348	--root . show docs/changes/shared-plugins-during-build
+s08	1795630929	28827	--root /tmp/bench2/runs/s08 outline
+s08	1795630933	28827	--root /tmp/bench2/runs/s08 outline
+s08	1795630936	2490	--root /tmp/bench2/runs/s08 show docs/advanced/event-hooks
+s08	1795630936	3192	--root /tmp/bench2/runs/s08 show docs/advanced/extensions#trace
+s08	1795630936	6459	--root /tmp/bench2/runs/s08 show docs/async
+s08	1795630940	5640	--root /tmp/bench2/runs/s08 show docs/advanced/authentication#custom-authentication-schemes
+s08	1795630940	3036	--root /tmp/bench2/runs/s08 show docs/advanced/transports#custom-transports
+s08	1795630943	1097	--root /tmp/bench2/runs/s08 outline httpx/_transports/base.py
+s09	1795630930	166061	outline --root .
+s09	1795630934	456	show docs/config/shared-options#future --root .
+s09	1795630934	384	outline docs/changes/index --root .
+s09	1795630935	1574	show docs/changes/index --root .
+s09	1795630939	2472	show docs/changes/this-environment-in-hooks --root .
+s09	1795630940	3605	show docs/changes/hotupdate-hook --root .
+s09	1795630940	1355	show docs/changes/ssr-using-modulerunner --root .
+s09	1795630940	2342	show docs/changes/per-environment-apis --root .
+s11	1795630931	28827	--root /tmp/bench2/runs/s11 outline
+s11	1795630932	2192	--root /tmp/bench2/runs/s11 outline httpx/_multipart.py
+s11	1795630936	56	--root /tmp/bench2/runs/s11 refs httpx/_multipart.py#FileField.__init__
+s11	1795630936	47	--root /tmp/bench2/runs/s11 refs httpx/_multipart.py#FileField
+s11	1795630981	1140	--root /tmp/bench2/runs/s11 check
+s12	1795630930	28827	--root . outline
+s12	1795630934	2192	--root . outline httpx/_multipart.py
+s12	1795630934	1512	--root . outline httpx/_types.py
+s12	1795630937	3969	--root . show httpx/_multipart.py#FileField
+s12	1795630937	104	--root . show httpx/_types.py#FileContent
+s12	1795630937	424	--root . show httpx/_types.py#FileTypes
+s12	1795630937	1325	--root . show docs/quickstart#sending-multipart-file-uploads
+s12	1795630937	47	--root . refs httpx/_multipart.py#FileField
+s12	1795630942	645	--root . show httpx/_multipart.py#MultipartStream._iter_fields
+s12	1795630973	1140	--root . check
+s12	1795630975	1140	--root . check
+s15	1795631002	28827	--root /tmp/bench2/runs/s15 outline
+s18	1795631005	28827	--root . outline
+s18	1795631009	122	--root . show httpx/_config.py#DEFAULT_TIMEOUT_CONFIG
+s18	1795631010	143	--root . show httpx/_config.py#DEFAULT_LIMITS
+s18	1795631010	102	--root . show httpx/_config.py#DEFAULT_MAX_REDIRECTS
+s18	1795631010	1558	--root . show httpx/_config.py#Limits
+s20	1795631054	28827	outline --root .
+s20	1795631061	57	refs httpx/_config.py#DEFAULT_TIMEOUT_CONFIG --root .
+s20	1795631074	1140	check --root .
+s21	1795631056	166061	--root . outline
+s21	1795631068	3970	--root . check
+s21	1795631073	3970	--root . check
+s23	1795631057	28827	--root /tmp/bench2/runs/s23 outline
+s23	1795631061	0	--root . outline docs
+s23	1795631063	28827	--root . outline
+s23	1795631065	2490	--root . show docs/advanced/event-hooks
+s23	1795631066	3192	--root . show docs/advanced/extensions#trace
+s23	1795631066	346	--root . show docs/async#streaming-requests
+s23	1795631066	376	--root . show docs/async#explicit-transport-instances
+s23	1795631069	5640	--root . show docs/advanced/authentication#custom-authentication-schemes
+s23	1795631069	3036	--root . show docs/advanced/transports#custom-transports
+s24	1795631059	166061	--root . outline
+s24	1795631060	166061	--root . outline
+s24	1795631064	965	--root . show packages/plugin-legacy/README#moderntargets
+s24	1795631065	844	--root . show packages/plugin-legacy/README#browsers-that-supports-esm-but-does-not-support-widely-available-features
+s24	1795631065	1407	--root . show docs/config/build-options#buildtarget
+s24	1795631066	166061	--root . outline
+s24	1795631070	1626	--root . show docs/guide/build#browser-compatibility
+s26	1795631120	166061	--root . outline
+s26	1795631123	62	--root . refs packages/vite/src/node/server/openBrowser.ts
+s26	1795631129	3970	--root . check
+s27	1795631121	28827	--root . outline
+s27	1795631147	1140	--root . check
+s29	1795631125	166061	--root . outline
+s29	1795631129	846	--root . show docs/config/build-options#buildassetsinlinelimit
+s29	1795631136	3970	--root . check
+s29	1795631140	3970	--root . check
+s31	1795631175	166061	--root . outline
+s31	1795631179	62	--root . refs packages/vite/src/node/server/openBrowser.ts
+s31	1795631185	3970	--root . check
