@@ -282,3 +282,77 @@ fn fmt_leaves_claude_md_imports_alone() {
     assert_eq!(p.read("CLAUDE.md"), "@AGENTS.md\n");
     assert_eq!(p.read("AGENTS.md"), "# Agents\n\nSee [CLAUDE](CLAUDE.md)\n");
 }
+
+const SPEC: &str = "# Auth
+
+## Token refresh
+
+Swap tokens on a 401.
+";
+
+const REFRESH_RS: &str = "pub struct Session;
+
+impl Session {
+    /// Spec: @docs/auth#token-refresh
+    pub fn refresh(&mut self) {
+        let _not_a_ref = \"@docs/nowhere#x\";
+    }
+}
+";
+
+const CLIENT_TS: &str = "/**
+ * Retries a request.
+ * @param attempts how many times, see @docs/auth#token-refresh
+ * @returns the response
+ */
+export function retry(attempts: number) {}
+";
+
+const WORKER_PY: &str = "def run():
+    # see @docs/auth#missing-section
+    pass
+";
+
+fn backlinked() -> Project {
+    Project::new(&[
+        ("docs/auth.md", SPEC),
+        ("src/session.rs", REFRESH_RS),
+        ("web/client.ts", CLIENT_TS),
+        ("worker.py", WORKER_PY),
+    ])
+}
+
+#[test]
+fn check_covers_references_in_code_comments() {
+    let (code, out) = backlinked().run(&["check"]);
+    assert_eq!(code, 1, "{out}");
+    // Only the Python reference is broken; JSDoc tags and string literals are ignored.
+    assert!(
+        out.contains("worker.py:2:11: @docs/auth#missing-section: no heading `#missing-section`"),
+        "{out}"
+    );
+    assert!(
+        out.contains("1 broken: 3 refs across 1 docs and 3 source files"),
+        "{out}"
+    );
+}
+
+#[test]
+fn refs_lists_code_that_points_at_a_section() {
+    let (_, out) = backlinked().run(&["refs", "docs/auth#token-refresh"]);
+    assert!(
+        out.contains("src/session.rs:4 (#Session::refresh)  @docs/auth#token-refresh"),
+        "{out}"
+    );
+    assert!(out.contains("web/client.ts:3 (#retry)"), "{out}");
+}
+
+#[test]
+fn slice_from_code_follows_its_comments() {
+    let (code, out) = backlinked().run(&["slice", "src/session.rs#Session::refresh"]);
+    assert_eq!(code, 0, "{out}");
+    assert!(
+        out.contains("<!-- @docs/auth#token-refresh  docs/auth.md L3-5 -->"),
+        "{out}"
+    );
+}

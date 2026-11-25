@@ -56,8 +56,22 @@ impl Lang {
     }
 }
 
+/// A parsed source file: its definitions, and where its comments are.
+pub struct Parsed {
+    pub symbols: Vec<Symbol>,
+    /// Byte ranges of every comment, in file order.
+    pub comments: Vec<std::ops::Range<usize>>,
+}
+
 /// Lists the named definitions in `source`, in file order.
 pub fn symbols(lang: Lang, source: &str) -> Result<Vec<Symbol>, String> {
+    parse(lang, source).map(|p| p.symbols)
+}
+
+/// Parses `source` once for both definitions and comments.
+///
+/// Spec: @docs/syntax#code-fragments
+pub fn parse(lang: Lang, source: &str) -> Result<Parsed, String> {
     let mut parser = Parser::new();
     parser
         .set_language(&lang.language())
@@ -77,7 +91,29 @@ pub fn symbols(lang: Lang, source: &str) -> Result<Vec<Symbol>, String> {
         _ => w.script_block(root, ""),
     }
     w.out.sort_by_key(|s| s.start_line);
-    Ok(w.out)
+    Ok(Parsed {
+        symbols: w.out,
+        comments: comment_ranges(root),
+    })
+}
+
+/// Every comment node in the tree, found by walking it depth first.
+fn comment_ranges(root: Node) -> Vec<std::ops::Range<usize>> {
+    let mut out = Vec::new();
+    let mut cursor = root.walk();
+    loop {
+        let node = cursor.node();
+        if node.kind().contains("comment") {
+            out.push(node.byte_range());
+        } else if cursor.goto_first_child() {
+            continue;
+        }
+        while !cursor.goto_next_sibling() {
+            if !cursor.goto_parent() {
+                return out;
+            }
+        }
+    }
 }
 
 /// Looks up a symbol by name. `.` and `::` are interchangeable so that a

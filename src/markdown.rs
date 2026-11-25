@@ -202,7 +202,7 @@ pub fn parse(path: &str, source: String) -> Doc {
 
     let mut refs = Vec::new();
     for range in &text_ranges {
-        scan_at_refs(&source, range.clone(), &lines, &mut refs);
+        scan_at_refs(&source, range.clone(), &lines, false, &mut refs);
     }
     for (form, dest, span) in links {
         if let Some(target) = link_target(path, &dest) {
@@ -240,6 +240,7 @@ pub fn parse(path: &str, source: String) -> Doc {
     }
 }
 
+/// Spec: @docs/syntax#sections
 fn compute_section_ends(headings: &mut [Heading], source: &str, lines: &LineIndex) {
     let last = lines.line_count();
     for i in 0..headings.len() {
@@ -264,8 +265,18 @@ fn is_fragment_byte(b: u8) -> bool {
     b.is_ascii_alphanumeric() || matches!(b, b'_' | b'-' | b':' | b'.')
 }
 
-/// Finds `@path#fragment` references inside a run of prose text.
-fn scan_at_refs(source: &str, range: Range<usize>, lines: &LineIndex, out: &mut Vec<Ref>) {
+/// Finds `@path#fragment` references inside a run of prose text, or inside
+/// a code comment. With `qualified_only`, a reference must contain `/` or `#`,
+/// which keeps tags like `@param` or `@property` in code comments out.
+///
+/// Spec: @docs/syntax#at-references
+pub fn scan_at_refs(
+    source: &str,
+    range: Range<usize>,
+    lines: &LineIndex,
+    qualified_only: bool,
+    out: &mut Vec<Ref>,
+) {
     let bytes = source.as_bytes();
     let mut i = range.start;
     while i < range.end {
@@ -300,6 +311,10 @@ fn scan_at_refs(source: &str, range: Range<usize>, lines: &LineIndex, out: &mut 
         // Sentence punctuation directly after a reference is not part of it.
         let body = source[i + 1..j].trim_end_matches(['.', ':', '#']);
         let end = i + 1 + body.len();
+        if qualified_only && !body.contains(['/', '#']) {
+            i = end.max(i + 1);
+            continue;
+        }
         let (path, fragment) = match body.split_once('#') {
             Some((p, f)) => (p, Some(f.to_string())),
             None => (body, None),

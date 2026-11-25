@@ -111,7 +111,10 @@ fn run(cli: Cli) -> Result<ExitCode> {
                     )?;
                 }
                 let n = report.problems.len();
-                let summary = format!("{} refs across {} docs", report.refs, report.docs);
+                let mut summary = format!("{} refs across {} docs", report.refs, report.docs);
+                if report.sources > 0 {
+                    summary.push_str(&format!(" and {} source files", report.sources));
+                }
                 if n == 0 {
                     writeln!(out, "ok: {summary}")?;
                 } else {
@@ -163,7 +166,7 @@ fn run(cli: Cli) -> Result<ExitCode> {
             } else {
                 for h in &hits {
                     let section = h
-                        .section
+                        .within
                         .as_ref()
                         .map(|s| format!(" (#{s})"))
                         .unwrap_or_default();

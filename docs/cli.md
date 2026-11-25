@@ -11,7 +11,7 @@ graphdown check          # exit 1 if any reference is broken
 graphdown check --json
 ```
 
-Resolves every reference in every doc. A broken one is reported as `file:line:col: reference: reason`, with a "did you mean" when a heading or symbol is close. Put it in CI and in a pre-commit hook; it is the type checker that keeps the rest of the commands honest. Implemented by @src/ops.rs#check.
+Resolves every reference in every doc and in every code comment (@docs/syntax#references-from-code). A broken one is reported as `file:line:col: reference: reason`, with a "did you mean" when a heading or symbol is close. Put it in CI and in a pre-commit hook; it is the type checker that keeps the rest of the commands honest. Implemented by @src/ops.rs#check.
 
 ## outline
 
@@ -41,7 +41,7 @@ graphdown refs src/project.rs         # every doc that mentions the file
 graphdown refs src/project.rs#Project::resolve
 ```
 
-Lists every reference that lands on the target, as `file:line (#section)  reference`. A whole doc or file matches references to any part of it, and a section matches references to its subsections. Run it before changing code or a section, to find the docs that describe it. Implemented by @src/ops.rs#incoming.
+Lists every reference that lands on the target, as `file:line (#within)  reference`, where `within` is the section slug for a doc or the enclosing definition for code. References from code comments are included, so `graphdown refs docs/auth#token-refresh` lists the functions that claim to implement it. A whole doc or file matches references to any part of it, and a section matches references to its subsections. Run it before changing code or a section, to find the docs that describe it. Implemented by @src/ops.rs#incoming.
 
 ## slice
 
@@ -51,7 +51,7 @@ graphdown slice docs/cli#check docs/design --depth 1 --format xml
 graphdown slice docs/architecture --no-code
 ```
 
-Prints the given targets, then everything they reference, then everything those reference, breadth first. Each section or definition appears once; one already contained in an earlier piece is skipped. The result is the smallest self-contained context for a task, collected in one command instead of a chain of file reads.
+Prints the given targets, then everything they reference, then everything those reference, breadth first. A code target's comments count as references too, so `graphdown slice src/auth.rs#Session::refresh` brings in the spec its doc comment names. Each section or definition appears once; one already contained in an earlier piece is skipped. The result is the smallest self-contained context for a task, collected in one command instead of a chain of file reads.
 
 - `--depth N` stops after N hops.
 - `--no-code` follows doc references only.

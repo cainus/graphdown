@@ -21,7 +21,9 @@ Graphdown loads every markdown file in the project into memory, parses each one 
 
 ### code
 
-@src/code.rs parses source files with tree-sitter and lists their named definitions as @src/code.rs#Symbol values with qualified names and line ranges. Each language has its own walk over the syntax tree in @src/code.rs#Walker. Files are parsed only when a reference points into them, then cached for the run by @src/project.rs#Project::code_file.
+@src/code.rs parses source files with tree-sitter and lists their named definitions as @src/code.rs#Symbol values with qualified names and line ranges. Each language has its own walk over the syntax tree in @src/code.rs#Walker, and @src/code.rs#comment_ranges collects the comments in the same parse.
+
+At load time, @src/project.rs#Project::load parses only the source files that contain an `@` at all, and runs @src/markdown.rs#scan_at_refs over their comments to build `code_refs`. Any other source file is parsed only when a reference points into it. Either way the result is cached for the run by @src/project.rs#Project::code_file. @src/ops.rs#all_refs is the single place that merges doc and code references, so every command treats them alike.
 
 ### project
 

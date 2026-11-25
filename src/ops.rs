@@ -21,30 +21,47 @@ pub struct Problem {
 pub struct CheckReport {
     pub problems: Vec<Problem>,
     pub docs: usize,
+    /// Source files containing at least one comment reference.
+    pub sources: usize,
     pub refs: usize,
 }
 
-/// Resolves every reference in every doc and reports the broken ones.
+/// Every reference in the project: from docs, then from code comments.
+pub fn all_refs(project: &Project) -> impl Iterator<Item = (&str, &Ref)> {
+    let from_docs = project
+        .docs
+        .values()
+        .flat_map(|d| d.refs.iter().map(move |r| (d.path.as_str(), r)));
+    let from_code = project
+        .code_refs
+        .iter()
+        .flat_map(|(path, refs)| refs.iter().map(move |r| (path.as_str(), r)));
+    from_docs.chain(from_code)
+}
+
+/// Resolves every reference in every doc and code comment, and reports the
+/// broken ones.
+///
+/// Spec: @docs/cli#check
 pub fn check(project: &Project) -> CheckReport {
     let mut problems = Vec::new();
     let mut refs = 0;
-    for doc in project.docs.values() {
-        for r in &doc.refs {
-            refs += 1;
-            if let Err(message) = resolve_ref(project, r) {
-                problems.push(Problem {
-                    file: doc.path.clone(),
-                    line: r.line,
-                    col: r.col,
-                    reference: r.raw.clone(),
-                    message,
-                });
-            }
+    for (file, r) in all_refs(project) {
+        refs += 1;
+        if let Err(message) = resolve_ref(project, r) {
+            problems.push(Problem {
+                file: file.to_string(),
+                line: r.line,
+                col: r.col,
+                reference: r.raw.clone(),
+                message,
+            });
         }
     }
     CheckReport {
         problems,
         docs: project.docs.len(),
+        sources: project.code_refs.len(),
         refs,
     }
 }
@@ -60,30 +77,31 @@ pub fn resolve_ref(project: &Project, r: &Ref) -> Result<Resolved, String> {
 pub struct Incoming {
     pub file: String,
     pub line: usize,
-    /// Slug of the section the reference sits in, if any.
-    pub section: Option<String>,
+    /// The section slug (in a doc) or symbol name (in code) that the
+    /// reference sits in, if any.
+    pub within: Option<String>,
     pub reference: String,
     pub target: String,
 }
 
 /// Every reference that lands on `target`. A whole doc or file matches
 /// references to any part of it; a section matches its subsections too.
+///
+/// Spec: @docs/cli#refs
 pub fn incoming(project: &Project, target: &Resolved) -> Vec<Incoming> {
     let mut out = Vec::new();
-    for doc in project.docs.values() {
-        for r in &doc.refs {
-            let Ok(res) = resolve_ref(project, r) else {
-                continue;
-            };
-            if lands_on(project, &res, target) {
-                out.push(Incoming {
-                    file: doc.path.clone(),
-                    line: r.line,
-                    section: doc.section_at(r.line).map(|h| h.slug.clone()),
-                    reference: r.raw.clone(),
-                    target: res.to_string(),
-                });
-            }
+    for (file, r) in all_refs(project) {
+        let Ok(res) = resolve_ref(project, r) else {
+            continue;
+        };
+        if lands_on(project, &res, target) {
+            out.push(Incoming {
+                file: file.to_string(),
+                line: r.line,
+                within: project.within(file, r.line),
+                reference: r.raw.clone(),
+                target: res.to_string(),
+            });
         }
     }
     out
@@ -127,6 +145,8 @@ pub struct Piece {
 
 /// The entry targets plus everything they reference, transitively, each
 /// piece included once. Pieces contained in an earlier piece are skipped.
+///
+/// Spec: @docs/cli#slice
 pub fn slice(
     project: &Project,
     entries: &[Resolved],
@@ -156,12 +176,16 @@ pub fn slice(
             !(p.file == content.path && content.start <= p.start && p.end <= content.end)
         });
 
-        if target.is_doc() && max_depth.is_none_or(|m| depth < m) {
-            if let Some(doc) = project.doc(target.path()) {
-                for r in refs_in(doc, content.start, content.end) {
-                    if let Ok(next) = resolve_ref(project, r) {
-                        queue.push_back((next, depth + 1));
-                    }
+        // Follow references made inside this piece: prose in a doc, or
+        // comments in code.
+        if max_depth.is_none_or(|m| depth < m) {
+            let inside = project
+                .refs_from(target.path())
+                .iter()
+                .filter(|r| r.line >= content.start && r.line <= content.end);
+            for r in inside {
+                if let Ok(next) = resolve_ref(project, r) {
+                    queue.push_back((next, depth + 1));
                 }
             }
         }
@@ -176,12 +200,6 @@ pub fn slice(
         });
     }
     Ok(pieces)
-}
-
-fn refs_in(doc: &Doc, start: usize, end: usize) -> impl Iterator<Item = &Ref> {
-    doc.refs
-        .iter()
-        .filter(move |r| r.line >= start && r.line <= end)
 }
 
 pub fn render_slice_markdown(pieces: &[Piece]) -> String {
@@ -245,6 +263,7 @@ pub struct Outline {
     pub entries: Vec<OutlineEntry>,
 }
 
+/// Spec: @docs/cli#outline
 pub fn outline(
     project: &Project,
     target: &Resolved,
@@ -344,6 +363,8 @@ pub enum Style {
 ///
 /// `CLAUDE.md` files are left alone: Claude Code reads `@path` there as an
 /// import, which must stay in `@` form.
+///
+/// Spec: @docs/cli#fmt
 pub fn format_doc(project: &Project, doc: &Doc, style: Style) -> Option<String> {
     let name = doc.path.rsplit('/').next().unwrap_or(&doc.path);
     if name == "CLAUDE.md" || name == "CLAUDE.local.md" {

@@ -4,6 +4,8 @@ use std::collections::{HashMap, HashSet};
 
 /// Slug for a single heading, matching GitHub's anchor algorithm:
 /// lowercase, keep letters/digits/`_`/`-`, spaces become `-`, drop the rest.
+///
+/// Spec: @docs/syntax#symbols-are-headings
 pub fn slugify(text: &str) -> String {
     let mut out = String::with_capacity(text.len());
     for c in text.trim().chars() {

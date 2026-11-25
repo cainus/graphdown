@@ -11,7 +11,7 @@ use anyhow::{Context, Result};
 
 use crate::code::{self, Lang, Symbol};
 use crate::lines::LineIndex;
-use crate::markdown::{self, Doc, TargetSpec};
+use crate::markdown::{self, Doc, Ref, TargetSpec};
 
 /// What a reference points at, once checked.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
@@ -77,11 +77,15 @@ pub struct CodeFile {
     pub source: String,
     pub lines: LineIndex,
     pub symbols: Vec<Symbol>,
+    pub comments: Vec<std::ops::Range<usize>>,
 }
 
 pub struct Project {
     pub root: PathBuf,
     pub docs: BTreeMap<String, Doc>,
+    /// References written in code comments, by source file. Files without
+    /// any are absent.
+    pub code_refs: BTreeMap<String, Vec<Ref>>,
     code: RefCell<HashMap<String, Result<Rc<CodeFile>, String>>>,
 }
 
@@ -96,13 +100,15 @@ pub fn find_root(start: &Path) -> PathBuf {
 }
 
 impl Project {
-    /// Loads every `.md` file under `root`, honouring `.gitignore` and
+    /// Loads every `.md` file under `root`, and the comment references of
+    /// every source file in a supported language, honouring `.gitignore` and
     /// `.graphdownignore`.
     pub fn load(root: &Path) -> Result<Project> {
         let root = root
             .canonicalize()
             .with_context(|| format!("no such directory {}", root.display()))?;
         let mut docs = BTreeMap::new();
+        let mut sources: Vec<(String, String)> = Vec::new();
         let walker = ignore::WalkBuilder::new(&root)
             .add_custom_ignore_filename(".graphdownignore")
             .parents(false)
@@ -111,20 +117,81 @@ impl Project {
         for entry in walker {
             let entry = entry?;
             let path = entry.path();
-            if !entry.file_type().is_some_and(|t| t.is_file())
-                || path.extension().is_none_or(|e| e != "md")
-            {
+            if !entry.file_type().is_some_and(|t| t.is_file()) {
                 continue;
             }
             let rel = rel_path(&root, path);
-            let source = std::fs::read_to_string(path).with_context(|| format!("reading {rel}"))?;
-            docs.insert(rel.clone(), markdown::parse(&rel, source));
+            if path.extension().is_some_and(|e| e == "md") {
+                let source =
+                    std::fs::read_to_string(path).with_context(|| format!("reading {rel}"))?;
+                docs.insert(rel.clone(), markdown::parse(&rel, source));
+            } else if Lang::for_path(&rel).is_some() {
+                // Unreadable or non-UTF-8 source is skipped, not fatal.
+                if let Ok(source) = std::fs::read_to_string(path) {
+                    if source.contains('@') {
+                        sources.push((rel, source));
+                    }
+                }
+            }
         }
-        Ok(Project {
+        let mut project = Project {
             root,
             docs,
+            code_refs: BTreeMap::new(),
             code: RefCell::new(HashMap::new()),
-        })
+        };
+        for (rel, source) in sources {
+            let Ok(file) = project.parse_code(&rel, source) else {
+                continue;
+            };
+            let mut refs = Vec::new();
+            for range in &file.comments {
+                markdown::scan_at_refs(&file.source, range.clone(), &file.lines, true, &mut refs);
+            }
+            project.code.borrow_mut().insert(rel.clone(), Ok(file));
+            if !refs.is_empty() {
+                project.code_refs.insert(rel, refs);
+            }
+        }
+        Ok(project)
+    }
+
+    /// References made from inside `path`, whether it is a doc or source.
+    pub fn refs_from(&self, path: &str) -> &[Ref] {
+        match self.doc(path) {
+            Some(doc) => &doc.refs,
+            None => self.code_refs.get(path).map(Vec::as_slice).unwrap_or(&[]),
+        }
+    }
+
+    /// The innermost section slug (doc) or symbol name (code) containing
+    /// `line` of `path`.
+    pub fn within(&self, path: &str, line: usize) -> Option<String> {
+        if let Some(doc) = self.doc(path) {
+            return doc.section_at(line).map(|h| h.slug.clone());
+        }
+        let file = self.code_file(path).ok()?;
+        file.symbols
+            .iter()
+            .filter(|s| s.start_line <= line && line <= s.end_line)
+            .max_by_key(|s| s.start_line)
+            .map(|s| s.name.clone())
+    }
+
+    fn parse_code(&self, path: &str, source: String) -> Result<Rc<CodeFile>, String> {
+        let lang = Lang::for_path(path).ok_or_else(|| {
+            format!(
+                "can't look up symbols in `{path}` (supported: {})",
+                code::SUPPORTED
+            )
+        })?;
+        let parsed = code::parse(lang, &source)?;
+        Ok(Rc::new(CodeFile {
+            lines: LineIndex::new(&source),
+            source,
+            symbols: parsed.symbols,
+            comments: parsed.comments,
+        }))
     }
 
     /// Finds the doc for a path written with or without `.md`.
@@ -138,22 +205,9 @@ impl Project {
         if let Some(cached) = self.code.borrow().get(path) {
             return cached.clone();
         }
-        let result = (|| {
-            let lang = Lang::for_path(path).ok_or_else(|| {
-                format!(
-                    "can't look up symbols in `{path}` (supported: {})",
-                    code::SUPPORTED
-                )
-            })?;
-            let source = std::fs::read_to_string(self.root.join(path))
-                .map_err(|e| format!("reading {path}: {e}"))?;
-            let symbols = code::symbols(lang, &source)?;
-            Ok(Rc::new(CodeFile {
-                lines: LineIndex::new(&source),
-                source,
-                symbols,
-            }))
-        })();
+        let result = std::fs::read_to_string(self.root.join(path))
+            .map_err(|e| format!("reading {path}: {e}"))
+            .and_then(|source| self.parse_code(path, source));
         self.code
             .borrow_mut()
             .insert(path.to_string(), result.clone());

@@ -61,7 +61,22 @@ Names are qualified by their container: `Type::method` for Rust, `Class.method` 
 | JavaScript                | `.js` `.jsx` `.mjs` `.cjs`     | function, class and its methods and fields, const                     |
 | Python                    | `.py` `.pyi`                   | def, class and its methods, module-level assignments                  |
 
-Symbol extraction is @src/code.rs#symbols; adding a language means one more walker there.
+Symbol extraction is @src/code.rs#parse; adding a language means one more walker there.
+
+## References from code
+
+Code can point back at docs. Any `@` reference inside a comment in a supported source file is checked like one in a doc, shows up in @docs/cli#refs, and is followed by @docs/cli#slice:
+
+```rust
+/// Swaps the refresh token for a new pair.
+///
+/// Spec: @docs/auth#token-refresh
+pub fn refresh(&mut self) { /* ... */ }
+```
+
+The prose rules apply, with one more: in code, a reference must contain `/` or `#`. That keeps comment tags such as JSDoc's `@param` and `@returns` or Python's `@property` from being read as references. Backticked references and string literals are ignored, and Python docstrings count as strings, not comments.
+
+There is no required marker. `Spec:` is just a readable convention, used throughout this repo's own source. Back-links are optional and checked one way: a doc pointing at a function does not oblige the function to point back (see @docs/design#back-links-from-code).
 
 ## Frontmatter
 

@@ -38,8 +38,14 @@ The sketch compiled `docs/src` into `docs/dist`. Two copies of every doc means a
 
 Similarity search is useful for finding where to start, but it cannot follow a dependency whose wording differs from the question, and it adds a model and an index to keep fresh. For doc sets that fit in a few thousand tokens of outline, an agent reading `graphdown outline` routes better than a small embedding model. Revisit if a project's outline outgrows a prompt.
 
+## Back-links from code
+
+A comment like `// Spec: @docs/auth#token-refresh` records an edge that `graphdown refs` could already find from the doc side, so it bends the no-duplication rule above. It is allowed anyway because it puts the pointer where a reader already is: an agent editing a function sees the spec without running anything. Borrowed from lat.md's `@lat:` comments.
+
+Three choices keep the cost down. No marker is required, so there is nothing new to learn. A reference in code must contain `/` or `#`, so documentation tags like `@param` are never misread. And nothing forces the two directions to pair up: each reference is checked on its own, so a missing back-link is never an error. See @docs/syntax#references-from-code.
+
 ## Open questions
 
 - **`context:` frontmatter.** The one dependency that cannot be derived: a doc that should always come along in a slice even though the prose never mentions it. Add only when a real doc needs it.
-- **Code back-references.** A `// spec: @docs/auth#token-refresh` comment in source would let `refs` and `slice` start from code. Cheap to add to @src/code.rs once wanted.
+- **Coverage.** An opt-in rule that every section under some folder (say `docs/requirements/`) is mentioned by at least one code comment or test. Useful for specs, but it is policy rather than navigation.
 - **More languages.** Go, Java and C# are each one tree-sitter grammar and one walker.
