@@ -32,6 +32,7 @@ graphdown show docs/auth#token-refresh          # print one section
 graphdown refs src/auth.rs#Session::refresh     # who points at this?
 graphdown slice docs/auth#token-refresh         # the section plus everything it depends on
 graphdown fmt --to links                        # @refs -> clickable links (and --to at, back)
+graphdown skill --install                       # teach your coding agent to use all of the above
 ```
 
 ## Documentation
@@ -42,7 +43,8 @@ These docs are written in graphdown and checked in CI.
 - @docs/cli: every command and flag
 - @docs/architecture: how the code is organised
 - @docs/design: what was deliberately left out, and why
-- @AGENTS: how coding agents should work in a graphdown repo
+- @AGENTS: how coding agents should work in this repo
+- @skill/SKILL.md: the agent skill that `graphdown skill` prints, for any graphdown repo
 
 ## License
 

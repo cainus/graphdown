@@ -71,6 +71,15 @@ Rewrites references in place. Only references that resolve are touched. A link's
 
 `CLAUDE.md` and `CLAUDE.local.md` are never rewritten, because Claude Code reads `@path` in them as a file import. Implemented by @src/ops.rs#format_doc.
 
+## skill
+
+```sh
+graphdown skill             # print the agent skill
+graphdown skill --install   # write .claude/skills/graphdown/SKILL.md under the project root
+```
+
+Prints a short agent skill: when to reach for graphdown, how to read docs with it, how to write references, and how to keep them valid. Its source is @skill/SKILL.md, compiled into the binary, so the instructions always match the installed version. Works outside a project too. For agents that read `AGENTS.md` rather than skills, paste the output there.
+
 ## Exit codes
 
 | Code | Meaning                                         |

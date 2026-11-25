@@ -356,3 +356,18 @@ fn slice_from_code_follows_its_comments() {
         "{out}"
     );
 }
+
+#[test]
+fn skill_prints_and_installs() {
+    let p = Project::new(&[("README.md", "# Hi\n")]);
+    let (code, out) = p.run(&["skill"]);
+    assert_eq!(code, 0, "{out}");
+    assert!(out.starts_with("---\nname: graphdown\n"), "{out}");
+    let (code, out) = p.run(&["skill", "--install"]);
+    assert_eq!(code, 0, "{out}");
+    assert!(p
+        .read(".claude/skills/graphdown/SKILL.md")
+        .contains("graphdown outline"));
+    // The installed copy is hidden, so it is not checked as a project doc.
+    assert!(p.run(&["check"]).1.contains("across 1 docs"));
+}

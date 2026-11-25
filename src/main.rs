@@ -57,6 +57,12 @@ enum Command {
         #[arg(long, value_enum, default_value_t = Format::Markdown)]
         format: Format,
     },
+    /// Print the agent skill for this version of graphdown, or install it.
+    Skill {
+        /// Write it to .claude/skills/graphdown/SKILL.md under the project root.
+        #[arg(long)]
+        install: bool,
+    },
     /// Rewrite references between `@ref` form and clickable markdown links.
     Fmt {
         #[arg(long, value_enum)]
@@ -92,6 +98,10 @@ fn run(cli: Cli) -> Result<ExitCode> {
         Some(r) => r,
         None => find_root(&std::env::current_dir()?),
     };
+    // The skill needs no docs loaded, and must work outside any project.
+    if let Command::Skill { install } = cli.command {
+        return skill(&root, install);
+    }
     let project = Project::load(&root)?;
     let target =
         |s: &str| -> Result<Resolved> { project.parse_target(s).map_err(anyhow::Error::msg) };
@@ -195,6 +205,7 @@ fn run(cli: Cli) -> Result<ExitCode> {
                 Format::Json => writeln!(out, "{}", serde_json::to_string_pretty(&pieces)?)?,
             }
         }
+        Command::Skill { .. } => unreachable!("handled before loading"),
         Command::Fmt { to, check, files } => {
             let docs: Vec<&graphdown::markdown::Doc> = if files.is_empty() {
                 project.docs.values().collect()
@@ -226,5 +237,23 @@ fn run(cli: Cli) -> Result<ExitCode> {
             }
         }
     }
+    Ok(ExitCode::SUCCESS)
+}
+
+/// The agent skill, built into the binary so it always matches this version.
+///
+/// Spec: @docs/cli#skill
+const SKILL: &str = include_str!("../skill/SKILL.md");
+
+fn skill(root: &std::path::Path, install: bool) -> Result<ExitCode> {
+    if !install {
+        print!("{SKILL}");
+        return Ok(ExitCode::SUCCESS);
+    }
+    let dir = root.join(".claude/skills/graphdown");
+    std::fs::create_dir_all(&dir)?;
+    let path = dir.join("SKILL.md");
+    std::fs::write(&path, SKILL)?;
+    println!("wrote {}", path.display());
     Ok(ExitCode::SUCCESS)
 }
