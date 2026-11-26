@@ -6,9 +6,9 @@ The rule behind almost every cut: **information that can be derived from the doc
 
 ## No import or export lists
 
-The sketch had frontmatter like `exports: [token-refresh]` and `imports: [sync-engine#backoff-policy]`. Both repeat what the document already says. Every heading is a symbol, so the exports are the headings. Every reference in the prose is a dependency, so the imports are the references. @docs/cli#outline and @docs/cli#refs compute both on demand.
+The sketch had frontmatter like `exports: [token-refresh]` and `imports: [sync-engine#backoff-policy]`. Both repeat what the document already says. Every heading is a symbol, so the exports are the headings. Every reference in the prose is a dependency, so the imports are the references. The headings and @docs/cli#refs give both on demand.
 
-An exports list does have one real benefit: an agent opening a file sees its table of contents first. If agents turn out to read files directly rather than running `outline`, the fix is a generated list that `fmt` writes and `check` verifies, not a hand-kept one.
+An exports list does have one real benefit: a reader opening a file sees its table of contents first. If that turns out to matter, the fix is a generated list that `fmt` writes and `check` verifies, not a hand-kept one.
 
 ## Paths, not ids
 
@@ -28,15 +28,11 @@ The `@path` form has precedent beyond chat mentions: Claude Code's `CLAUDE.md` f
 
 ## No committed index
 
-The sketch generated a `SYMBOLS.json` with line numbers at commit time. Line numbers change on nearly every edit, so the file would be stale between commits and a constant source of merge conflicts. A native binary can parse the whole doc set faster than an agent can read that file, so @docs/cli#outline answers the same questions live.
+The sketch generated a `SYMBOLS.json` with line numbers at commit time. Line numbers change on nearly every edit, so the file would be stale between commits and a constant source of merge conflicts. A native binary can parse the whole doc set faster than an agent can read that file, so it answers the same questions live.
 
 ## No compiled copy
 
 The sketch compiled `docs/src` into `docs/dist`. Two copies of every doc means agents read, or worse edit, the wrong one. Graphdown checks docs where they are, and `fmt` rewrites them in place.
-
-## No embeddings
-
-Similarity search is useful for finding where to start, but it cannot follow a dependency whose wording differs from the question, and it adds a model and an index to keep fresh. For doc sets that fit in a few thousand tokens of outline, an agent reading `graphdown outline` routes better than a small embedding model. Revisit if a project's outline outgrows a prompt.
 
 ## Back-links from code
 
@@ -56,14 +52,19 @@ Graphdown is one static binary, and every channel delivers that same binary rath
 
 ## Mentions are leads, not edges
 
-The pilots kept finding the same failure: prose that names a function or restates a rule without linking it, which no reference check can see (@docs/benchmark-pilot-3#results). `refs` now lists those lines too, but separately and labelled as mentions, and `check` never fails on them. Text matching can't know that `refresh` in a sentence means `Session::refresh`, so treating a mention as an edge would make `check` noisy and `slice` pull in unrelated prose. Short names are skipped for the same reason.
+The pilots kept finding the same failure: prose that names a function or restates a rule without linking it, which no reference check can see (@docs/benchmark-pilot-3#results). `refs` now lists those lines too, but separately and labelled as mentions, and `check` never fails on them. Text matching can't know that `refresh` in a sentence means `Session::refresh`, so treating a mention as an edge would make `check` noisy. Short names are skipped for the same reason.
 
 ## `check` reads git, but only for notes
 
 Agents in @docs/benchmark-pilot-4 had `refs` mentions available and didn't call them once grep had found something, but they all ran `check` before finishing. So `check` lists lines that name changed code (@docs/cli#changed-code). Knowing what changed means asking git; graphdown otherwise reads only the files in front of it (@docs/design#no-committed-index). The git call is allowed because its output is advisory: outside a repository, or with git missing, the list is just empty, and it never fails the check. Errors stay purely a function of the files.
 
+## A linter, not a navigator
+
+Graphdown started as a way for agents to navigate docs like code, with `outline`, `show` and `slice` alongside `check`. The benchmarks didn't support that half. On 12 tasks written so that docs go plainly stale, agents with graphdown scored 0.97 against 0.92 without it, mostly from one judgement call, and used about a third more tokens. Agents already find what they need by searching (@docs/benchmark-study-1#conclusions). The parts that did earn their place were the checks: broken references fail, and `check` lists docs that name code you changed (@docs/benchmark-pilot-5#results).
+
+So graphdown is now just the linter: `check`, plus `refs` to see what points at a target before renaming it, and `fmt` to keep one reference style. `outline`, `show` and `slice` were removed. They are in git history if a future study shows navigation helping, for example on question tasks or much larger doc sets. A missing-link suggester was considered and left out for the same reason: deciding which links are worth adding, and where to surface them, is a product of its own.
+
 ## Open questions
 
-- **`context:` frontmatter.** The one dependency that cannot be derived: a doc that should always come along in a slice even though the prose never mentions it. Add only when a real doc needs it.
 - **Coverage.** An opt-in rule that every section under some folder (say `docs/requirements/`) is mentioned by at least one code comment or test. Useful for specs, but it is policy rather than navigation.
 - **More languages.** Go, Java and C# are each one tree-sitter grammar and one walker.

@@ -10,9 +10,9 @@ An explicit `{#id}` after a heading overrides the slug when a stable name matter
 
 ### Sections
 
-A heading owns the lines from itself down to the next heading of the same or a higher level, minus trailing blank lines. So a `##` section includes its `###` subsections. This is the unit that @docs/cli#show prints and @docs/cli#slice collects.
+A heading owns the lines from itself down to the next heading of the same or a higher level, minus trailing blank lines. So a `##` section includes its `###` subsections. A reference to a section covers its subsections, so @docs/cli#refs on a section also lists references to anything inside it.
 
-The whole document is addressed by its path with no fragment. Its title is the first `#` heading and its summary is the first paragraph, which is what @docs/cli#outline shows. There are no other declarations to keep in sync; see @docs/design#no-import-or-export-lists.
+The whole document is addressed by its path with no fragment. Its title is the first `#` heading, which @docs/cli#fmt uses as link text. There are no other declarations to keep in sync; see @docs/design#no-import-or-export-lists.
 
 ## References
 
@@ -74,7 +74,7 @@ Symbol extraction is @src/code.rs#parse; adding a language means one more walker
 
 ## References from code
 
-Code can point back at docs. Any `@` reference inside a comment in a supported source file is checked like one in a doc, shows up in @docs/cli#refs, and is followed by @docs/cli#slice:
+Code can point back at docs. Any `@` reference inside a comment in a supported source file is checked like one in a doc, and shows up in @docs/cli#refs:
 
 ```rust
 /// Swaps the refresh token for a new pair.

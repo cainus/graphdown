@@ -1,14 +1,13 @@
 # graphdown
 
-Navigate markdown docs the way agents navigate code.
+A linter for markdown docs that keeps them pointing at real things.
 
-Code has imports and function names, so an agent can jump straight to the definition it needs and find everything that uses it. Docs usually have neither: an agent reads whole files and follows links blind. Graphdown gives prose the same structure without inventing a new format:
+- **Every link is checked.** Ordinary markdown links, docs-site style links, and `@path#fragment` references must land on a real file and heading.
+- **Docs can point into code.** `@src/auth.rs#Session::refresh` must name a real definition. Rust, Python, TypeScript and JavaScript are parsed with tree-sitter, so references survive edits that move lines.
+- **Code can point back.** A comment like `/// Spec: @docs/auth#token-refresh` is checked too.
+- **Stale docs get flagged.** In a git repo, `check` lists doc lines that link to or name code you just changed but that your change didn't touch: the ones most likely to now be wrong.
 
-- **Headings are symbols.** `## Token TTL` in `docs/auth.md` is addressable as `@docs/auth#token-ttl`.
-- **References are edges.** Write `@docs/auth#token-ttl` in prose, or an ordinary markdown link. Point into code too: `@src/auth.rs#Session::refresh`.
-- **The CLI is the compiler.** `graphdown check` fails on any reference that doesn't land, and the other commands let you and your agents move around the graph.
-
-Any existing markdown repo is already valid graphdown; `graphdown check` will find its broken links on the first run.
+Any existing markdown repo works as it is; `graphdown check` will find its broken links on the first run.
 
 ```markdown
 ## Token refresh
@@ -37,18 +36,16 @@ Until the first release is tagged, install from source: `cargo install --git htt
 - uses: cainus/graphdown@v0.1.0
 ```
 
-Broken references fail the job and show up as annotations on the lines that contain them.
+Broken references fail the job and show up as annotations on the lines that contain them. Pass `args: --since origin/${{ github.base_ref }}` (with `fetch-depth: 0` on checkout) to also get notices on docs that name changed code.
 
 ## Commands
 
 ```sh
-graphdown check                                 # every reference resolves, or exit 1
-graphdown outline                               # every doc, one line each; add a doc for its headings
-graphdown show docs/auth#token-refresh          # print one section
-graphdown refs src/auth.rs#Session::refresh     # who points at this?
-graphdown slice docs/auth#token-refresh         # the section plus everything it depends on
+graphdown check                                 # every reference resolves, or exit 1; notes docs that name changed code
+graphdown check --since origin/main             # in CI: compare against the base branch
+graphdown refs src/auth.rs#Session::refresh     # who points at this, and which lines name it without a link?
 graphdown fmt --to links                        # @refs -> clickable links (and --to at, back)
-graphdown skill --install                       # teach your coding agent to use all of the above
+graphdown skill --install                       # tell your coding agent to run check before finishing
 ```
 
 ## Documentation
@@ -59,7 +56,7 @@ These docs are written in graphdown and checked in CI.
 - @docs/cli: every command and flag
 - @docs/architecture: how the code is organised
 - @docs/design: what was deliberately left out, and why
-- @docs/benchmark: how we'll test whether agents actually do better with graphdown
+- @docs/benchmark: whether agents do better with graphdown (mostly not; see @docs/design#a-linter-not-a-navigator)
 - @docs/releasing: how a tag becomes binaries, npm, PyPI and crates.io packages
 - @AGENTS: how coding agents should work in this repo
 - @skill/SKILL.md: the agent skill that `graphdown skill` prints, for any graphdown repo

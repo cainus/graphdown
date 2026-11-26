@@ -1,6 +1,6 @@
 # Benchmark pilot 3: hard tasks, 2026-11-25
 
-The third pilot, after @docs/benchmark-pilot-2 found the tasks too easy and `outline` too big. This one uses the bounded `outline` (@docs/cli#outline) and tasks chosen because agents without graphdown get them wrong. Raw data is in `bench/pilot-2026-11-25c/`.
+The third pilot, after @docs/benchmark-pilot-2 found the tasks too easy and `outline` too big. This one uses the bounded `outline` (since removed, see @docs/design#a-linter-not-a-navigator) and tasks chosen because agents without graphdown get them wrong. Raw data is in `bench/pilot-2026-11-25c/`.
 
 ## Setup
 

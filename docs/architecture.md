@@ -1,6 +1,6 @@
 # Architecture
 
-Graphdown loads every markdown file in the project into memory, parses each one into headings and references, and answers every command from that in-memory graph. There is no cache and no generated index; parsing a few hundred docs takes milliseconds, so the answer is always current. See @docs/design#no-committed-index.
+Graphdown loads every markdown file in the project into memory, parses each one into headings and references, and answers every command from that in-memory graph of references. There is no cache and no generated index; parsing a few hundred docs takes milliseconds, so the answer is always current. See @docs/design#no-committed-index.
 
 ## Data flow
 
@@ -8,7 +8,7 @@ Graphdown loads every markdown file in the project into memory, parses each one 
 2. @src/project.rs#Project::load walks it (respecting ignore files) and hands each `.md` file to the parser.
 3. @src/markdown.rs#parse turns a file into a @src/markdown.rs#Doc: its headings with section line ranges, and its references with their positions.
 4. @src/project.rs#Project::resolve checks a reference's target against the loaded docs, or against a source file's definitions, giving a @src/project.rs#Resolved.
-5. The commands in @src/ops.rs combine those: check every reference, find incoming ones, walk outgoing ones for a slice, rewrite them for fmt.
+5. The commands in @src/ops.rs combine those: check every reference, find incoming ones and mentions, list docs that name changed code, and rewrite references for fmt.
 6. @src/main.rs only parses arguments and prints.
 
 ## Modules
@@ -31,7 +31,7 @@ At load time, @src/project.rs#Project::load parses only the source files that co
 
 ### project
 
-@src/project.rs holds the loaded docs and resolves targets. @src/project.rs#Project::content turns any resolved target into the exact lines it covers; `show`, `slice` and the containment rules in `refs` all go through it. @src/project.rs#Project::parse_target reads a target typed on the command line.
+@src/project.rs holds the loaded docs and resolves targets. @src/project.rs#Project::content turns any resolved target into the exact lines it covers; the containment rules in `refs` go through it. @src/project.rs#Project::parse_target reads a target typed on the command line.
 
 ### ops
 

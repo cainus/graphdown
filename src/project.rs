@@ -185,14 +185,6 @@ impl Project {
         }
     }
 
-    /// References made from inside `path`, whether it is a doc or source.
-    pub fn refs_from(&self, path: &str) -> &[Ref] {
-        match self.doc(path) {
-            Some(doc) => &doc.refs,
-            None => self.code_refs.get(path).map(Vec::as_slice).unwrap_or(&[]),
-        }
-    }
-
     /// The innermost section slug (doc) or symbol name (code) containing
     /// `line` of `path`.
     pub fn within(&self, path: &str, line: usize) -> Option<String> {

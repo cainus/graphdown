@@ -128,26 +128,6 @@ fn check_reports_broken_refs_with_suggestions() {
 }
 
 #[test]
-fn show_prints_one_section_with_subsections() {
-    let (code, out) = sample().run(&["show", "docs/auth#token-refresh"]);
-    assert_eq!(code, 0, "{out}");
-    assert!(
-        out.starts_with("<!-- @docs/auth#token-refresh  docs/auth.md L5-12 -->\n## Token refresh"),
-        "{out}"
-    );
-    assert!(out.contains("Tokens live 15 minutes."), "{out}");
-    assert!(!out.contains("Session expiry"), "{out}");
-}
-
-#[test]
-fn show_prints_a_code_symbol_with_its_doc_comment() {
-    let (code, out) = sample().run(&["show", "@src/session.rs#Session.refresh"]);
-    assert_eq!(code, 0, "{out}");
-    assert!(out.contains("L4-5"), "{out}");
-    assert!(out.contains("/// Swaps the refresh token"), "{out}");
-}
-
-#[test]
 fn refs_finds_incoming_including_subsections() {
     let (_, out) = sample().run(&["refs", "docs/auth#token-refresh"]);
     assert!(
@@ -162,51 +142,6 @@ fn refs_finds_incoming_including_subsections() {
 
     let (_, out) = sample().run(&["refs", "src/session.rs"]);
     assert!(out.contains("docs/auth.md:7"), "{out}");
-}
-
-#[test]
-fn slice_follows_references_once_each() {
-    let (code, out) = sample().run(&["slice", "docs/auth#token-refresh", "--format", "xml"]);
-    assert_eq!(code, 0, "{out}");
-    let headers: Vec<&str> = out
-        .lines()
-        .filter(|l| l.starts_with("<doc") || l.starts_with("<code"))
-        .collect();
-    assert_eq!(
-        headers,
-        vec![
-            r#"<doc ref="@docs/auth#token-refresh" file="docs/auth.md" lines="5-12">"#,
-            r#"<code ref="@src/session.rs#Session::refresh" file="src/session.rs" lines="4-5">"#,
-            r#"<doc ref="@docs/sync#backoff-policy" file="docs/sync.md" lines="3-5">"#,
-        ],
-        "{out}"
-    );
-}
-
-#[test]
-fn slice_respects_depth_and_no_code() {
-    let (_, out) = sample().run(&["slice", "docs/auth#token-refresh", "--depth", "0"]);
-    assert_eq!(out.matches("<!-- ").count(), 1, "{out}");
-    let (_, out) = sample().run(&["slice", "docs/auth#token-refresh", "--no-code"]);
-    assert!(!out.contains("<!-- @src/session.rs"), "{out}");
-    assert!(
-        out.contains("@docs/sync#backoff-policy  docs/sync.md"),
-        "{out}"
-    );
-}
-
-#[test]
-fn outline_lists_headings_and_symbols() {
-    let (_, out) = sample().run(&["outline", "docs/auth"]);
-    assert!(
-        out.starts_with(
-            "@docs/auth  (16 lines, 2 incoming)\n  Short-lived tokens with silent renewal.\n"
-        ),
-        "{out}"
-    );
-    assert!(out.contains("#token-ttl"), "{out}");
-    let (_, out) = sample().run(&["outline", "src/session.rs"]);
-    assert!(out.contains("fn Session::refresh"), "{out}");
 }
 
 #[test]
@@ -348,16 +283,6 @@ fn refs_lists_code_that_points_at_a_section() {
 }
 
 #[test]
-fn slice_from_code_follows_its_comments() {
-    let (code, out) = backlinked().run(&["slice", "src/session.rs#Session::refresh"]);
-    assert_eq!(code, 0, "{out}");
-    assert!(
-        out.contains("<!-- @docs/auth#token-refresh  docs/auth.md L3-5 -->"),
-        "{out}"
-    );
-}
-
-#[test]
 fn skill_prints_and_installs() {
     let p = Project::new(&[("README.md", "# Hi\n")]);
     let (code, out) = p.run(&["skill"]);
@@ -367,7 +292,7 @@ fn skill_prints_and_installs() {
     assert_eq!(code, 0, "{out}");
     assert!(p
         .read(".claude/skills/graphdown/SKILL.md")
-        .contains("graphdown outline"));
+        .contains("graphdown check"));
     // The installed copy is hidden, so it is not checked as a project doc.
     assert!(p.run(&["check"]).1.contains("across 1 docs"));
 }
@@ -409,40 +334,6 @@ fn comment_tags_that_look_like_paths_are_ignored() {
     assert_eq!(code, 1, "{out}");
     assert!(!out.contains("typescript-eslint"), "{out}");
     assert!(out.contains("src/x.ts:2"), "{out}");
-}
-
-#[test]
-fn outline_lists_one_line_per_doc_by_default() {
-    let p = sample();
-    let (code, out) = p.run(&["outline"]);
-    assert_eq!(code, 0, "{out}");
-    assert!(
-        out.starts_with(
-            "@docs/auth  Auth session: Short-lived tokens with silent renewal.  (16 lines, 2 in)\n"
-        ),
-        "{out}"
-    );
-    assert!(!out.contains("#token-ttl"), "{out}");
-    assert!(out.contains("2 docs."), "{out}");
-    let (_, full) = p.run(&["outline", "--full"]);
-    assert!(full.contains("#token-ttl"), "{full}");
-}
-
-#[test]
-fn outline_narrows_to_a_folder_and_a_depth() {
-    let p = Project::new(&[
-        ("docs/guide/a.md", "# A\n\n## Deep\n\n### Deeper\n"),
-        ("docs/ref/b.md", "# B\n"),
-    ]);
-    let (_, out) = p.run(&["outline", "docs/guide"]);
-    assert!(
-        out.contains("@docs/guide/a") && !out.contains("@docs/ref/b"),
-        "{out}"
-    );
-    let (_, out) = p.run(&["outline", "docs/guide/a", "--depth", "2"]);
-    assert!(out.contains("#deep") && !out.contains("#deeper"), "{out}");
-    let (code, out) = p.run(&["outline", "nowhere/"]);
-    assert_ne!(code, 0, "{out}");
 }
 
 #[test]

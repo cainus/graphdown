@@ -7,7 +7,7 @@ build-backend = "maturin"
 
 [project]
 name = "graphdown"
-description = "Navigate markdown docs like code: checked @references, outlines, find-references and context slices"
+description = "A linter for markdown docs: checks links and @references to docs and code, and flags docs that name code you changed"
 readme = "README.md"
 license = "MIT"
 requires-python = ">=3.8"

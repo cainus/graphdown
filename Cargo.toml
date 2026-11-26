@@ -2,7 +2,7 @@
 name = "graphdown"
 version = "0.1.0"
 edition = "2021"
-description = "Navigate markdown docs like code: checked @references, outlines, find-references and context slices"
+description = "A linter for markdown docs: checks links and @references to docs and code, and flags docs that name code you changed"
 license = "MIT"
 repository = "https://github.com/cainus/graphdown"
 readme = "README.md"

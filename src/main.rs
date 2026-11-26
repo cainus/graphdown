@@ -39,23 +39,6 @@ enum Command {
         #[arg(long)]
         no_changes: bool,
     },
-    /// List the headings of docs (or the symbols of code files) with line ranges.
-    #[command(alias = "ls")]
-    Outline {
-        /// Docs, code files or folders. Defaults to every doc. A doc or code
-        /// file lists its headings or definitions; a folder lists its docs.
-        targets: Vec<String>,
-        /// Only list headings (or nested definitions) down to this level.
-        #[arg(long)]
-        depth: Option<u8>,
-        /// List headings for every doc, not just one line per doc.
-        #[arg(long)]
-        full: bool,
-        #[arg(long)]
-        json: bool,
-    },
-    /// Print one section or symbol, e.g. `graphdown show docs/syntax#references`.
-    Show { target: String },
     /// List every reference that points at a doc, section, file or symbol.
     Refs {
         target: String,
@@ -68,19 +51,6 @@ enum Command {
         no_mentions: bool,
         #[arg(long)]
         json: bool,
-    },
-    /// Print the given sections plus everything they reference, transitively.
-    Slice {
-        #[arg(required = true)]
-        targets: Vec<String>,
-        /// How many reference hops to follow (default: no limit).
-        #[arg(long)]
-        depth: Option<usize>,
-        /// Leave out referenced code.
-        #[arg(long)]
-        no_code: bool,
-        #[arg(long, value_enum, default_value_t = Format::Markdown)]
-        format: Format,
     },
     /// Print the agent skill for this version of graphdown, or install it.
     Skill {
@@ -105,13 +75,6 @@ enum CheckFormat {
     Text,
     Json,
     Github,
-}
-
-#[derive(Clone, Copy, ValueEnum)]
-enum Format {
-    Markdown,
-    Xml,
-    Json,
 }
 
 fn main() -> ExitCode {
@@ -213,87 +176,6 @@ fn run(cli: Cli) -> Result<ExitCode> {
                 ExitCode::FAILURE
             });
         }
-        Command::Outline {
-            targets,
-            depth,
-            full,
-            json,
-        } => {
-            // A folder (or nothing) means "the docs in it", one line each,
-            // unless --full; a doc or code file means its headings.
-            let mut items: Vec<(Resolved, bool)> = Vec::new();
-            let mut folder_list: Vec<String> = if targets.is_empty() {
-                vec![String::new()]
-            } else {
-                Vec::new()
-            };
-            for t in &targets {
-                let clean = t.trim_start_matches("./").trim_end_matches('/');
-                if clean.is_empty() || clean == "." || project.root.join(clean).is_dir() {
-                    folder_list.push(if clean == "." {
-                        String::new()
-                    } else {
-                        clean.to_string()
-                    });
-                } else {
-                    items.push((target(t)?, true));
-                }
-            }
-            for folder in &folder_list {
-                let prefix = if folder.is_empty() {
-                    String::new()
-                } else {
-                    format!("{folder}/")
-                };
-                let docs: Vec<&String> = project
-                    .docs
-                    .keys()
-                    .filter(|p| p.starts_with(&prefix))
-                    .collect();
-                if docs.is_empty() {
-                    bail!("no docs under `{folder}`");
-                }
-                items.extend(
-                    docs.into_iter()
-                        .map(|p| (Resolved::Doc { path: p.clone() }, full)),
-                );
-            }
-            let mut outlines = Vec::new();
-            for (t, with_entries) in &items {
-                let mut o = ops::outline(&project, t, true).map_err(anyhow::Error::msg)?;
-                if !with_entries {
-                    o.entries.clear();
-                } else if let Some(d) = depth {
-                    o.entries.retain(|e| e.level <= d);
-                }
-                outlines.push((o, *with_entries));
-            }
-            if json {
-                let plain: Vec<&ops::Outline> = outlines.iter().map(|(o, _)| o).collect();
-                writeln!(out, "{}", serde_json::to_string_pretty(&plain)?)?;
-            } else {
-                let compact = outlines.iter().filter(|(_, e)| !e).count();
-                for (i, (o, with_entries)) in outlines.iter().enumerate() {
-                    if *with_entries {
-                        if i > 0 {
-                            writeln!(out)?;
-                        }
-                        write!(out, "{}", ops::render_outline(o))?;
-                    } else {
-                        writeln!(out, "{}", ops::render_outline_line(o))?;
-                    }
-                }
-                if compact > 0 {
-                    writeln!(out, "\n{compact} docs. `graphdown outline <doc>` lists a doc's headings; `graphdown outline <folder>` narrows this list.")?;
-                }
-            }
-        }
-        Command::Show { target: t } => {
-            let t = target(&t)?;
-            let c = project.content(&t).map_err(anyhow::Error::msg)?;
-            writeln!(out, "<!-- {t}  {} L{}-{} -->", c.path, c.start, c.end)?;
-            writeln!(out, "{}", c.text)?;
-        }
         Command::Refs {
             target: t,
             mention,
@@ -334,24 +216,6 @@ fn run(cli: Cli) -> Result<ExitCode> {
                         writeln!(out, "{}", line(h))?;
                     }
                 }
-            }
-        }
-        Command::Slice {
-            targets,
-            depth,
-            no_code,
-            format,
-        } => {
-            let entries = targets
-                .iter()
-                .map(|t| target(t))
-                .collect::<Result<Vec<_>>>()?;
-            let pieces =
-                ops::slice(&project, &entries, depth, !no_code).map_err(anyhow::Error::msg)?;
-            match format {
-                Format::Markdown => write!(out, "{}", ops::render_slice_markdown(&pieces))?,
-                Format::Xml => write!(out, "{}", ops::render_slice_xml(&pieces))?,
-                Format::Json => writeln!(out, "{}", serde_json::to_string_pretty(&pieces)?)?,
             }
         }
         Command::Skill { .. } => unreachable!("handled before loading"),
